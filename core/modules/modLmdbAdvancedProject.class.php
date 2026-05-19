@@ -228,23 +228,23 @@ class modLmdbAdvancedProject extends DolibarrModules
 			),
 			'propaldet' => array(
 				'pos' => 100,
-				'enabled' => '$conf->lmdbadvancedproject->enabled && empty($object->fk_product)',
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
 			),
 			'commandedet' => array(
 				'pos' => 100,
-				'enabled' => '$conf->lmdbadvancedproject->enabled && empty($object->fk_product)',
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
 			),
 			'facturedet' => array(
 				'pos' => 100,
-				'enabled' => '$conf->lmdbadvancedproject->enabled && empty($object->fk_product)',
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
 			),
 			'commande_fournisseurdet' => array(
 				'pos' => 100,
-				'enabled' => '$conf->lmdbadvancedproject->enabled && empty($object->fk_product)',
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
 			),
 			'facture_fourn_det' => array(
 				'pos' => 100,
-				'enabled' => '$conf->lmdbadvancedproject->enabled && empty($object->fk_product)',
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
 			),
 		);
 
