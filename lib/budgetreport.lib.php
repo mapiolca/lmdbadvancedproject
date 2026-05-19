@@ -1,6 +1,8 @@
 <?php
 
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+require_once DOL_DOCUMENT_ROOT.'/projet/class/task.class.php';
+require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
 
 if (!function_exists('lmdbadvancedproject_round_amount')) {
 	/**
@@ -81,6 +83,66 @@ if (!function_exists('lmdbadvancedproject_chart_label')) {
 	function lmdbadvancedproject_chart_label($value)
 	{
 		return html_entity_decode((string) $value, ENT_QUOTES, 'UTF-8');
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_format_date')) {
+	/**
+	 * Format a SQL date using Dolibarr user preferences.
+	 *
+	 * @param  string|int $date Date value
+	 * @return string
+	 */
+	function lmdbadvancedproject_format_date($date)
+	{
+		global $db;
+
+		if (empty($date)) {
+			return '';
+		}
+
+		if (is_numeric($date)) {
+			$timestamp = (int) $date;
+		} elseif (method_exists($db, 'jdate')) {
+			$timestamp = $db->jdate($date);
+		} else {
+			$timestamp = strtotime($date);
+		}
+
+		if (empty($timestamp)) {
+			return lmdbadvancedproject_escape_html((string) $date);
+		}
+
+		if (function_exists('dol_print_date')) {
+			return dol_print_date($timestamp, 'day');
+		}
+
+		return date('d/m/Y', $timestamp);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_format_multiline_text')) {
+	/**
+	 * Normalize line breaks and escape a free text value for table output.
+	 *
+	 * @param  string $value Text value
+	 * @return string
+	 */
+	function lmdbadvancedproject_format_multiline_text($value)
+	{
+		$text = (string) $value;
+		$text = str_replace(array('\\r\\n', '\\n', '\\r'), "\n", $text);
+		$text = str_replace(array("\r\n", "\r"), "\n", $text);
+
+		$lines = array();
+		foreach (explode("\n", $text) as $line) {
+			$line = trim(preg_replace('/[ \t]+/', ' ', $line));
+			if ($line !== '') {
+				$lines[] = $line;
+			}
+		}
+
+		return nl2br(lmdbadvancedproject_escape_html(implode("\n", $lines)), false);
 	}
 }
 
@@ -317,6 +379,7 @@ if (!function_exists('lmdbadvancedproject_init_forecast')) {
 			'time' => array(
 				'hours' => 0,
 				'cost' => 0,
+				'lines' => array(),
 			),
 			'expenses' => array(
 				'total' => 0,
@@ -482,7 +545,9 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			$db->free($resql);
 		}
 
-		$sql = "SELECT SUM(ptt.element_duration) / 3600.0 AS total_hours, SUM((ptt.element_duration / 3600.0) * CASE
+		$sql = "SELECT pt.rowid AS task_id, pt.ref AS task_ref, pt.label AS task_label,
+				SUM(ptt.element_duration) / 3600.0 AS total_hours,
+				SUM((ptt.element_duration / 3600.0) * CASE
 				WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
 				WHEN u.thm IS NOT NULL AND u.thm > 0 THEN u.thm
 				ELSE 0
@@ -490,18 +555,28 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			FROM ".MAIN_DB_PREFIX."element_time ptt
 			INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 			LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.fk_projet = ".$projectId." AND pt.entity IN (".$projectEntities.")";
+			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.fk_projet = ".$projectId." AND pt.entity IN (".$projectEntities.")
+			GROUP BY pt.rowid, pt.ref, pt.label
+			ORDER BY pt.ref ASC, pt.label ASC";
 		$resql = $db->query($sql);
 		if ($resql) {
-			$obj = $db->fetch_object($resql);
-			if ($obj) {
-				$forecast['time']['hours'] = empty($obj->total_hours) ? 0 : (float) $obj->total_hours;
-				$forecast['time']['cost'] = empty($obj->total_cost) ? 0 : (float) $obj->total_cost;
+			while ($obj = $db->fetch_object($resql)) {
+				$hours = empty($obj->total_hours) ? 0 : (float) $obj->total_hours;
+				$cost = empty($obj->total_cost) ? 0 : (float) $obj->total_cost;
+				$forecast['time']['hours'] += $hours;
+				$forecast['time']['cost'] += $cost;
+				$forecast['time']['lines'][] = array(
+					'task_id' => empty($obj->task_id) ? 0 : (int) $obj->task_id,
+					'task_ref' => empty($obj->task_ref) ? '' : (string) $obj->task_ref,
+					'task_label' => empty($obj->task_label) ? '' : (string) $obj->task_label,
+					'hours' => $hours,
+					'cost' => $cost,
+				);
 			}
 			$db->free($resql);
 		}
 
-		$sql = "SELECT ex.ref, ed.date, ed.comments, ed.total_ht
+		$sql = "SELECT ex.rowid AS expense_id, ex.ref, ed.date, ed.comments, ed.total_ht
 			FROM ".MAIN_DB_PREFIX."expensereport_det ed
 			LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
 			WHERE ed.fk_projet = ".$projectId." AND ex.fk_user_approve > 0 AND ex.entity IN (".$expenseReportEntities.")
@@ -512,6 +587,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 				$amount = empty($obj->total_ht) ? 0 : (float) $obj->total_ht;
 				$forecast['expenses']['total'] += $amount;
 				$forecast['expenses']['lines'][] = array(
+					'id' => empty($obj->expense_id) ? 0 : (int) $obj->expense_id,
 					'ref' => empty($obj->ref) ? '' : (string) $obj->ref,
 					'date' => empty($obj->date) ? '' : (string) $obj->date,
 					'comment' => empty($obj->comments) ? '' : (string) $obj->comments,
@@ -639,6 +715,55 @@ if (!function_exists('lmdbadvancedproject_print_budgetreport_modal_script')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_get_task_nom_url')) {
+	/**
+	 * Return a Dolibarr task link for a time detail line.
+	 *
+	 * @param  array<string,mixed> $line Time detail line
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_task_nom_url($line)
+	{
+		global $db;
+
+		$taskId = empty($line['task_id']) ? 0 : (int) $line['task_id'];
+		if ($taskId <= 0 || !class_exists('Task')) {
+			return lmdbadvancedproject_escape_html(empty($line['task_ref']) ? '' : $line['task_ref']);
+		}
+
+		$taskstatic = new Task($db);
+		$taskstatic->id = $taskId;
+		$taskstatic->ref = empty($line['task_ref']) ? (string) $taskId : (string) $line['task_ref'];
+		$taskstatic->label = empty($line['task_label']) ? '' : (string) $line['task_label'];
+
+		return $taskstatic->getNomUrl(1);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_expense_report_nom_url')) {
+	/**
+	 * Return a Dolibarr expense report link for an expense detail line.
+	 *
+	 * @param  array<string,mixed> $line Expense detail line
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_expense_report_nom_url($line)
+	{
+		global $db;
+
+		$expenseId = empty($line['id']) ? 0 : (int) $line['id'];
+		if ($expenseId <= 0 || !class_exists('ExpenseReport')) {
+			return lmdbadvancedproject_escape_html(empty($line['ref']) ? '' : $line['ref']);
+		}
+
+		$expensestatic = new ExpenseReport($db);
+		$expensestatic->id = $expenseId;
+		$expensestatic->ref = empty($line['ref']) ? (string) $expenseId : (string) $line['ref'];
+
+		return $expensestatic->getNomUrl(1);
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 	/**
 	 * Print project forecast table.
@@ -690,8 +815,16 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 		print '<div class="budgetreport-forecast-extra">';
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
 		print '<table class="budgettbl">';
-		print '<tr><th>'.$langs->trans('BudgetReportTimeSpentHours').'</th><th>'.$langs->trans('BudgetReportSpent').'</th></tr>';
-		print '<tr><td align="right">'.price(lmdbadvancedproject_round_amount($forecast['time']['hours'])).'</td><td align="right">'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</td></tr>';
+		print '<tr><th>'.$langs->trans('Task').'</th><th>'.$langs->trans('Label').'</th><th>'.$langs->trans('BudgetReportTimeSpentHours').'</th><th>'.$langs->trans('BudgetReportSpent').'</th></tr>';
+		foreach ($forecast['time']['lines'] as $line) {
+			print '<tr>';
+			print '<td>'.lmdbadvancedproject_get_task_nom_url($line).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html(empty($line['task_label']) ? '' : $line['task_label']).'</td>';
+			print '<td align="right">'.price(lmdbadvancedproject_round_amount($line['hours'])).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($line['cost']).'</td>';
+			print '</tr>';
+		}
+		print '<tr><td colspan="2"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td align="right"><b>'.price(lmdbadvancedproject_round_amount($forecast['time']['hours'])).'</b></td><td align="right"><b>'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</b></td></tr>';
 		print '</table>';
 
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportExpenseReportDetails').'</div>';
@@ -699,9 +832,9 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 		print '<tr><th>'.$langs->trans('Date').'</th><th>'.$langs->trans('Ref').'</th><th>'.$langs->trans('BudgetReportExpenseComment').'</th><th>'.$langs->trans('AmountHTShort').'</th></tr>';
 		foreach ($forecast['expenses']['lines'] as $line) {
 			print '<tr>';
-			print '<td>'.lmdbadvancedproject_escape_html($line['date']).'</td>';
-			print '<td>'.lmdbadvancedproject_escape_html($line['ref']).'</td>';
-			print '<td>'.lmdbadvancedproject_escape_html($line['comment']).'</td>';
+			print '<td>'.lmdbadvancedproject_format_date($line['date']).'</td>';
+			print '<td>'.lmdbadvancedproject_get_expense_report_nom_url($line).'</td>';
+			print '<td class="budgetreport-expense-comment">'.lmdbadvancedproject_format_multiline_text($line['comment']).'</td>';
 			print '<td align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
 			print '</tr>';
 		}

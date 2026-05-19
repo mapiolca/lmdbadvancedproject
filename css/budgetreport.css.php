@@ -214,6 +214,11 @@ div.mainmenu.budgetreport {
 	vertical-align: top;
 }
 
+.budgetreport-expense-comment {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 .budgetreport-modal-open {
 	margin: 0 8px 8px 0;
 }
