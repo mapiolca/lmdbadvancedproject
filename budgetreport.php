@@ -22,6 +22,25 @@ if (!function_exists('lmdbadvancedproject_format_price')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_trans_chart')) {
+	/**
+	 * Return a translated string suitable for JavaScript chart labels.
+	 *
+	 * @param  string $key Translation key
+	 * @return string
+	 */
+	function lmdbadvancedproject_trans_chart($key)
+	{
+		global $langs;
+
+		if (method_exists($langs, 'transnoentitiesnoconv')) {
+			return $langs->transnoentitiesnoconv($key);
+		}
+
+		return html_entity_decode($langs->trans($key), ENT_QUOTES, 'UTF-8');
+	}
+}
+
 $datenow = date('Y-m-d');
 $projects = array();
 $mobudget = array();
@@ -198,14 +217,14 @@ foreach ($projects as $data) {
 }
 
 $spentLabels = array(
-	$langs->trans("BudgetReportTimeSpentOnTasks"),
-	$langs->trans("BudgetReportVendorInvoices"),
-	$langs->trans("BudgetReportStaffExpenses"),
+	lmdbadvancedproject_trans_chart("BudgetReportTimeSpentOnTasks"),
+	lmdbadvancedproject_trans_chart("BudgetReportVendorInvoices"),
+	lmdbadvancedproject_trans_chart("BudgetReportStaffExpenses"),
 );
 $spentValues = array($totaltime, $totalvendinv, $totalexpenses);
 
 if ($balance > 0) {
-	$spentLabels[] = $langs->trans("BudgetReportBalance");
+	$spentLabels[] = lmdbadvancedproject_trans_chart("BudgetReportBalance");
 	$spentValues[] = $balance;
 }
 
@@ -389,7 +408,7 @@ foreach ($spentValues as $spentValue) {
 			type: 'pie',
 			data: {
 				datasets: [{
-					label: <?php echo json_encode($langs->trans("BudgetReportBudgetVsSpent")); ?>,
+					label: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpent")); ?>,
 					data: <?php echo json_encode(array_values($spentValues)); ?>,
 					backgroundColor: [window.chartColors.cyan,
 										window.chartColors.pink,
@@ -406,7 +425,7 @@ foreach ($spentValues as $spentValue) {
 				},
 				title: {
 					display: false,
-					text: <?php echo json_encode($langs->trans("BudgetReportBudgetVsSpent")); ?>
+					text: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpent")); ?>
 				},
 				animation: {
 					animateScale: true,
