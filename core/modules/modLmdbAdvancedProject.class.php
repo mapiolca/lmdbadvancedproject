@@ -56,7 +56,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://diamubi.com';
 		$this->editor_email = 'doli@diamubi.com';
 
-		$this->version = '1.1';
+		$this->version = '1.0.1';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'generic';
 
