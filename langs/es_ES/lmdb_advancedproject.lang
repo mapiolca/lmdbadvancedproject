@@ -1,0 +1,32 @@
+# Copyright (C) 2022 SuperAdmin
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+ModuleLmdbAdvancedProjectName = Advanced Project
+ModuleLmdbAdvancedProjectDesc = Advanced Project amplía el análisis presupuestario de proyectos en Dolibarr.
+
+AdvancedProjectSetup = Configuración de Advanced Project
+AdvancedProjectSetupPage = Página de configuración de Advanced Project
+AdvancedProjectAbout = Acerca de Advanced Project
+AdvancedProjectAboutPage = Página acerca de Advanced Project
+ReadBudgetReport = Leer informe de presupuesto
+
+BudgetReportArea = Informe de presupuesto de proyectos
+BudgetReportBudget = Presupuesto
+BudgetReportSpent = Gastado
+BudgetReportLeftToSpend = Restante por gastar
+BudgetReportBudgetByProjects = Presupuesto por proyecto
+BudgetReportBudgetVsSpentByProject = Presupuesto vs gastado por proyecto
+BudgetReportProject = Proyecto
+BudgetReportBalance = Saldo
+BudgetReportTotal = Total
+BudgetReportBudgetVsSpent = Presupuesto vs gastado
+BudgetReportTimeSpentOnTasks = Tiempo dedicado a tareas
+BudgetReportVendorInvoices = Facturas de proveedores
+BudgetReportStaffExpenses = Gastos de personal
+BudgetReportBudgetVsSpentByMonth = Presupuesto vs gastado por mes
+BudgetReportOpenProjectsNote = Solo son visibles los proyectos abiertos con un presupuesto superior a 0; los proyectos en borrador o cerrados no son visibles.
+BudgetReportMonthlySplitNote = El presupuesto de cada proyecto se reparte equitativamente por mes según el calendario del proyecto.

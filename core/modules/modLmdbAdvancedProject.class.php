@@ -1,0 +1,159 @@
+<?php
+/* Copyright (C) 2004-2018 Laurent Destailleur     <eldy@users.sourceforge.net>
+ * Copyright (C) 2018-2019 Nicolas ZABOURI         <info@inovea-conseil.com>
+ * Copyright (C) 2019-2020 Frederic France         <frederic.france@netlogic.fr>
+ * Copyright (C) 2022      SuperAdmin
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \defgroup   lmdb_advancedproject     Module Advanced Project
+ * \brief      Advanced Project module descriptor.
+ *
+ * \file       htdocs/lmdb_advancedproject/core/modules/modLmdbAdvancedProject.class.php
+ * \ingroup    lmdb_advancedproject
+ * \brief      Description and activation file for module Advanced Project
+ */
+include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
+
+/**
+ * Description and activation class for module Advanced Project.
+ */
+class modLmdbAdvancedProject extends DolibarrModules
+{
+	/**
+	 * Constructor. Define names, constants, directories, boxes, permissions.
+	 *
+	 * @param DoliDB $db Database handler
+	 */
+	public function __construct($db)
+	{
+		global $conf;
+
+		$this->db = $db;
+
+		$this->numero = 302502;
+		$this->rights_class = 'lmdb_advancedproject';
+		$this->family = 'projects';
+		$this->module_position = '90';
+		$this->name = preg_replace('/^mod/i', '', get_class($this));
+		$this->description = 'ModuleLmdbAdvancedProjectDesc';
+		$this->descriptionlong = 'ModuleLmdbAdvancedProjectDesc';
+
+		$this->editor_name = 'Maii S.';
+		$this->editor_url = 'https://diamubi.com';
+		$this->editor_email = 'doli@diamubi.com';
+
+		$this->version = '1.1';
+		$this->const_name = 'MAIN_MODULE_LMDB_ADVANCEDPROJECT';
+		$this->picto = 'generic';
+
+		$this->module_parts = array(
+			'triggers' => 0,
+			'login' => 0,
+			'substitutions' => 0,
+			'menus' => 0,
+			'tpl' => 0,
+			'barcode' => 0,
+			'models' => 0,
+			'printing' => 0,
+			'theme' => 0,
+			'css' => array(
+				'/lmdb_advancedproject/css/budgetreport.css.php',
+			),
+			'js' => array(),
+			'hooks' => array(),
+			'moduleforexternal' => 0,
+		);
+
+		$this->dirs = array('/lmdb_advancedproject/temp');
+		$this->config_page_url = array('setup.php@lmdb_advancedproject');
+
+		$this->hidden = false;
+		$this->depends = array();
+		$this->requiredby = array();
+		$this->conflictwith = array();
+		$this->langfiles = array('lmdb_advancedproject@lmdb_advancedproject');
+		$this->phpmin = array(5, 6);
+		$this->need_dolibarr_version = array(11, -3);
+		$this->warnings_activation = array();
+		$this->warnings_activation_ext = array();
+		$this->const = array();
+
+		if (!isset($conf->lmdb_advancedproject) || !isset($conf->lmdb_advancedproject->enabled)) {
+			$conf->lmdb_advancedproject = new stdClass();
+			$conf->lmdb_advancedproject->enabled = 0;
+		}
+
+		$this->tabs = array();
+		$this->dictionaries = array();
+		$this->boxes = array();
+		$this->cronjobs = array();
+
+		$this->rights = array();
+		$r = 0;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'ReadBudgetReport';
+		$this->rights[$r][4] = 'myobject';
+		$this->rights[$r][5] = 'read';
+
+		$this->menu = array();
+		$r = 0;
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=project,fk_leftmenu=projects',
+			'mainmenu' => 'project',
+			'leftmenu' => 'budgetreport',
+			'type' => 'left',
+			'titre' => 'BudgetReportArea',
+			'prefix' => img_picto('', '', 'class="fas fa-chart-pie paddingright pictofixedwidth valignmiddle"'),
+			'url' => '/lmdb_advancedproject/budgetreportindex.php',
+			'langs' => 'lmdb_advancedproject@lmdb_advancedproject',
+			'position' => '9',
+			'enabled' => '$conf->lmdb_advancedproject->enabled',
+			'perms' => '$user->rights->lmdb_advancedproject->myobject->read',
+			'target' => '',
+			'user' => 0,
+		);
+	}
+
+	/**
+	 * Function called when module is enabled.
+	 *
+	 * @param  string $options Options when enabling module
+	 * @return int             1 if OK, 0 if KO
+	 */
+	public function init($options = '')
+	{
+		$result = $this->_load_tables('/lmdb_advancedproject/sql/');
+		if ($result < 0) {
+			return -1;
+		}
+
+		$this->remove($options);
+
+		return $this->_init(array(), $options);
+	}
+
+	/**
+	 * Function called when module is disabled.
+	 *
+	 * @param  string $options Options when disabling module
+	 * @return int             1 if OK, 0 if KO
+	 */
+	public function remove($options = '')
+	{
+		return $this->_remove(array(), $options);
+	}
+}
