@@ -118,14 +118,18 @@ div.mainmenu.budgetreport {
 }
 
 .dashboard_budget {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	display: grid !important;
+	grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 	gap: 0;
 	width: 100%;
 }
 
 .dashboard_budget figure {
 	margin:0;
+	float: none !important;
+	display: block !important;
+	width: auto !important;
+	box-sizing: border-box;
 	min-width: 0;
 	border-right: solid 2px rgba(0,0,0,0.2);
 	border-bottom: solid 2px rgba(0,0,0,0.2); 
@@ -280,7 +284,7 @@ div.mainmenu.budgetreport {
 @media only screen and (max-width: 980px) {
 	.dashboard_budget,
 	.budgetreport-charts-row {
-		grid-template-columns: 1fr;
+		grid-template-columns: 1fr !important;
 	}
 
 	.dashboard_budget figure {

@@ -49,6 +49,7 @@ LMDB_ENtityTooltipHelp = Identificador de entidad
 LMDB_LabelTooltipHelp = Etiqueta de la entrada del diccionario
 LMDB_ActiveTooltipHelp = Estado activo de la entrada del diccionario
 BudgetReportForecastBudget = Presupuesto previsto
+BudgetReportCategorySummary = Síntesis por categoría
 BudgetReportOrderAmount = Importe pedido sin impuestos
 BudgetReportOrderBudget = Presupuesto pedido sin impuestos
 BudgetReportSupplierExpenses = Gastos proveedor sin impuestos

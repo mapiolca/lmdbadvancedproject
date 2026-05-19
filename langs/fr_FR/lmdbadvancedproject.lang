@@ -49,6 +49,7 @@ LMDB_ENtityTooltipHelp = Identifiant de l'entité
 LMDB_LabelTooltipHelp = Libellé de l'entrée du dictionnaire
 LMDB_ActiveTooltipHelp = Statut actif de l'entrée du dictionnaire
 BudgetReportForecastBudget = Budget prévisionnel
+BudgetReportCategorySummary = Synthèse par catégorie
 BudgetReportOrderAmount = Montant commande HT
 BudgetReportOrderBudget = Budget commande HT
 BudgetReportSupplierExpenses = Dépenses fournisseurs HT

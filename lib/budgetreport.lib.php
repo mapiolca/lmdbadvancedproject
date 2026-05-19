@@ -71,6 +71,19 @@ if (!function_exists('lmdbadvancedproject_trans_chart')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_chart_label')) {
+	/**
+	 * Return a string suitable for JavaScript chart labels.
+	 *
+	 * @param  string $value Label value
+	 * @return string
+	 */
+	function lmdbadvancedproject_chart_label($value)
+	{
+		return html_entity_decode((string) $value, ENT_QUOTES, 'UTF-8');
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_is_multicompany_enabled')) {
 	/**
 	 * Check if Dolibarr Multicompany module is enabled.
@@ -422,7 +435,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			FROM ".MAIN_DB_PREFIX."commande c
 			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
 			".$categorySql['join']."
-			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")";
+			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.") AND cd.product_type IN (0,1)";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -436,7 +449,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
 			".$categorySql['join']."
-			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")";
+			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -459,6 +472,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			AND cf.fk_statut IN (3,4,5)
 			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")
+			AND cfd.product_type IN (0,1)
 			HAVING amount_ht > 0";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -987,7 +1001,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$spentFormattedValues = array();
 
 		foreach ($projects as $data) {
-			$labels[] = $data["title"];
+			$labels[] = lmdbadvancedproject_chart_label($data["title"]);
 			$budgets[] = lmdbadvancedproject_round_amount($data["budget"]);
 			$spents[] = lmdbadvancedproject_round_amount($data["spent"]);
 			$budgetFormattedValues[] = lmdbadvancedproject_format_price($data["budget"]);
@@ -1031,7 +1045,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			if (!empty($budgetReportForecast['categories'])) {
 				foreach ($budgetReportForecast['categories'] as $category) {
 					$categoryBudget = empty($category['order_budget']) ? 0 : (float) $category['order_budget'];
-					$labels[] = $category['label'];
+					$labels[] = lmdbadvancedproject_chart_label($category['label']);
 					$budgets[] = lmdbadvancedproject_round_amount($categoryBudget);
 					$budgetFormattedValues[] = lmdbadvancedproject_format_price($categoryBudget);
 				}
@@ -1190,7 +1204,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			type: 'pie',
 			data: {
 				datasets: [{
-					label: <?php echo json_encode($langs->trans($budgetChartTitleKey)); ?>,
+					label: <?php echo json_encode(lmdbadvancedproject_trans_chart($budgetChartTitleKey)); ?>,
 					data: <?php echo json_encode(array_values($budgets)); ?>,
 					backgroundColor: [window.chartColors.green,
 										window.chartColors.red,
@@ -1212,7 +1226,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				},
 				title: {
 					display: false,
-					text: <?php echo json_encode($langs->trans($budgetChartTitleKey)); ?>
+					text: <?php echo json_encode(lmdbadvancedproject_trans_chart($budgetChartTitleKey)); ?>
 				},
 				animation: {
 					animateScale: true,
@@ -1398,7 +1412,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 <div class="budgetreport-table-section">
 <?php if ($budgetReportProjectId > 0) { ?>
-	<div class="budgettitle"><?php echo $langs->trans("BudgetReportForecastBudget"); ?></div>
+	<div class="budgettitle"><?php echo $langs->trans("BudgetReportCategorySummary"); ?></div>
 	<?php lmdbadvancedproject_print_project_forecast($budgetReportForecast); ?>
 <?php } else { ?>
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>

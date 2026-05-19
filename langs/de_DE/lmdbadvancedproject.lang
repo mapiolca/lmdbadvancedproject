@@ -49,6 +49,7 @@ LMDB_ENtityTooltipHelp = Entitätskennung
 LMDB_LabelTooltipHelp = Bezeichnung des Wörterbucheintrags
 LMDB_ActiveTooltipHelp = Aktiver Status des Wörterbucheintrags
 BudgetReportForecastBudget = Planbudget
+BudgetReportCategorySummary = Zusammenfassung nach Kategorie
 BudgetReportOrderAmount = Bestellbetrag ohne Steuer
 BudgetReportOrderBudget = Bestellbudget ohne Steuer
 BudgetReportSupplierExpenses = Lieferantenausgaben ohne Steuer

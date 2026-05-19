@@ -49,6 +49,7 @@ LMDB_ENtityTooltipHelp = Identificativo entità
 LMDB_LabelTooltipHelp = Etichetta della voce del dizionario
 LMDB_ActiveTooltipHelp = Stato attivo della voce del dizionario
 BudgetReportForecastBudget = Budget previsionale
+BudgetReportCategorySummary = Sintesi per categoria
 BudgetReportOrderAmount = Importo ordine IVA esclusa
 BudgetReportOrderBudget = Budget ordine IVA esclusa
 BudgetReportSupplierExpenses = Spese fornitori IVA esclusa

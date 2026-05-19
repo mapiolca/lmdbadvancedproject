@@ -49,6 +49,7 @@ LMDB_ENtityTooltipHelp = Entity identifier
 LMDB_LabelTooltipHelp = Dictionary entry label
 LMDB_ActiveTooltipHelp = Active status of the dictionary entry
 BudgetReportForecastBudget = Forecast budget
+BudgetReportCategorySummary = Category summary
 BudgetReportOrderAmount = Order amount excl. tax
 BudgetReportOrderBudget = Order budget excl. tax
 BudgetReportSupplierExpenses = Supplier expenses excl. tax
