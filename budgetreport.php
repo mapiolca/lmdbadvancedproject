@@ -24,18 +24,18 @@ if (!function_exists('lmdbadvancedproject_format_price')) {
 
 if (!function_exists('lmdbadvancedproject_format_margin')) {
 	/**
-	 * Format gross margin with its percentage of market amount.
+	 * Format gross margin with its percentage of orders amount.
 	 *
 	 * @param  float|int $amount Gross margin amount
-	 * @param  float|int $market Market amount
+	 * @param  float|int $orders Orders amount
 	 * @return string
 	 */
-	function lmdbadvancedproject_format_margin($amount, $market)
+	function lmdbadvancedproject_format_margin($amount, $orders)
 	{
 		$formattedAmount = lmdbadvancedproject_format_price($amount);
 
-		if ($market > 0) {
-			return $formattedAmount.' ('.round(($amount / $market) * 100).'%)';
+		if ($orders > 0) {
+			return $formattedAmount.' ('.round(($amount / $orders) * 100).'%)';
 		}
 
 		return $formattedAmount.' (-)';
@@ -70,12 +70,18 @@ $cleanmos = array();
 $totaltime = 0;
 $totalvendinv = 0;
 $totalexpenses = 0;
-$totalmarket = 0;
+$totalorders = 0;
 $budget = 0;
 
-$sql = "SELECT p.* FROM ".MAIN_DB_PREFIX."projet p 
-		WHERE p.fk_statut=1 AND p.budget_amount>0 	
-		ORDER BY p.budget_amount DESC";
+$sql = "SELECT p.*, cmd.total_orders FROM ".MAIN_DB_PREFIX."projet p
+		INNER JOIN (
+			SELECT fk_projet, SUM(total_ht) as total_orders
+			FROM ".MAIN_DB_PREFIX."commande
+			WHERE fk_projet > 0 AND fk_statut > 0
+			GROUP BY fk_projet
+		) cmd ON cmd.fk_projet = p.rowid
+		WHERE p.fk_statut=1
+		ORDER BY cmd.total_orders DESC";
 
 
 $result = $db->query($sql);
@@ -83,24 +89,26 @@ $nbtotalofrecords = $db->num_rows($result);
 
 $i=0;
 while ($i<$nbtotalofrecords) {
-	$obj = $db->fetch_object($result);	
+	$obj = $db->fetch_object($result);
+	$projectBudget = (float)$obj->total_orders;
 
 	$projects[$obj->rowid] = array ("ref"=>$obj->rowid,
 									"title"=>$obj->title,
-									"budget"=>(int)$obj->budget_amount,
-									"market"=>0,
+									"budget"=>$projectBudget,
+									"orders"=>$projectBudget,
 									"spent"=>0);
 	//total up all budget
-	$budget += (int)$obj->budget_amount;
+	$budget += $projectBudget;
+	$totalorders += $projectBudget;
 
 	//separate budget by months
 	if (empty($obj->datee) || $obj->datee<$obj->dateo) {
 		$yrmo = date('Y-m',strtotime($obj->dateo));
 		$cleanmos[$yrmo] = $yrmo;
-		
-		$mobudget[$yrmo] += (int)$obj->budget_amount;
-		
-	} else if (!empty($obj->dateo) && $obj->budget_amount>0) {
+
+		$mobudget[$yrmo] += $projectBudget;
+
+	} else if (!empty($obj->dateo) && $projectBudget>0) {
 		$j = 0; $molist = array();
 		$yrmo = date('Y-m',strtotime($obj->dateo));
 		$yrme = date('Y-m',strtotime($obj->datee));
@@ -113,8 +121,8 @@ while ($i<$nbtotalofrecords) {
 			$yrmo = date("Y-m",strtotime($obj->dateo." +$j months") );
 		}
 		//echo $j; var_dump ($molist); exit;
-		
-		$permonth = (int)($obj->budget_amount/$j);
+
+		$permonth = $projectBudget/$j;
 		foreach ($molist as $mos) {
 			$mobudget[$mos] += $permonth;
 		}
@@ -126,29 +134,6 @@ while ($i<$nbtotalofrecords) {
 $db->free($result);
 
 //var_dump ($mobudget); exit;
-
-//----start: adding customer orders to market amount
-$markets = array();
-$sql_market = "SELECT fk_projet, SUM(total_ht) as total_market FROM ".MAIN_DB_PREFIX."commande
-			WHERE fk_projet > 0 AND fk_statut > 0 GROUP BY fk_projet";
-$result_market = $db->query($sql_market);
-$nbtotalmarket = $db->num_rows($result_market);
-$i=0;
-while ($i<$nbtotalmarket) {
-	$obj = $db->fetch_object($result_market);
-	$markets[$obj->fk_projet] = (float)$obj->total_market;
-	$i++;
-}
-
-$db->free($result_market);
-
-foreach ($projects as $pid=>$data) {
-	if (isset($markets[$pid])) {
-		$projects[$pid]["market"] = $markets[$pid];
-		$totalmarket += (float)$markets[$pid];
-	}
-}
-//----end: adding customer orders to market amount
 
 //----start: adding timespent to spent item
 $timespent = array();
@@ -434,7 +419,7 @@ foreach ($spentValues as $spentValue) {
 		$fbal = $data['budget']-$data['spent'];
 		$fcolor = "green";
 		if ($fbal<0) $fcolor="red";
-		$fgrossmargin = $data['market']-$data['spent'];
+		$fgrossmargin = $data['orders']-$data['spent'];
 		$fgrosscolor = "green";
 		if ($fgrossmargin<0) $fgrosscolor="red";
 		$url = DOL_URL_ROOT.'/projet/element.php?id='.$pid;
@@ -442,26 +427,26 @@ foreach ($spentValues as $spentValue) {
 
 		<tr>
 			<td><a href='<?php echo $url; ?>'><?php echo $data['title']; ?></a></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['market']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
-			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['market']); ?></td>
+			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td>
 			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
 		</tr>
 
 		<?php } ?>
 
 		<?php
-		$totalgrossmargin = $totalmarket-$totalspent;
+		$totalgrossmargin = $totalorders-$totalspent;
 		$totalgrosscolor = "green";
 		if ($totalgrossmargin<0) $totalgrosscolor="red";
 		?>
 		<tr>
 			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
-			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalmarket); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalorders); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
-			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalmarket); ?></b></td>
+			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>
 			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
 		</tr>
 		
