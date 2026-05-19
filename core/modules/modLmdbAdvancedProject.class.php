@@ -44,21 +44,21 @@ class modLmdbAdvancedProject extends DolibarrModules
 
 		$this->db = $db;
 
-		$this->numero = 302502;
+		$this->numero = 450021;
 		$this->rights_class = 'lmdbadvancedproject';
-		$this->family = 'projects';
+		$this->family = 'Les Métiers du Bâtiment';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = 'ModuleLmdbAdvancedProjectDesc';
 		$this->descriptionlong = 'ModuleLmdbAdvancedProjectDesc';
 
-		$this->editor_name = 'Maii S.';
-		$this->editor_url = 'https://diamubi.com';
-		$this->editor_email = 'doli@diamubi.com';
+		$this->editor_name = 'Les Métiers du Bâtiment';
+		$this->editor_url = 'https://lesmetiersdubatiment.fr';
+		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
 		$this->version = '1.0.1';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
-		$this->picto = 'generic';
+		$this->picto = 'project';
 
 		$this->module_parts = array(
 			'triggers' => 0,
