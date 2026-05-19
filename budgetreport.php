@@ -368,8 +368,8 @@ foreach ($spentValues as $spentValue) {
 <div class="warning"><?php echo $langs->trans("BudgetReportProjectNoData"); ?></div>
 <?php return; } ?>
 
-<div style='clear:both; overflow:auto; margin-bottom: 30px;'>
-<div class='dashboard_budget'>
+<div class="budgetreport-summary-fullwidth">
+<div class="dashboard_budget">
 	<figure>		
 		<div class='figurein'>
 			<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
@@ -399,9 +399,10 @@ foreach ($spentValues as $spentValue) {
 </div>
 </div>
 
-<div class="fichecenter">
+<div class="budgetreport-report">
 
-<div class="fichehalfleft">
+<div class="budgetreport-charts-row">
+<div class="budgetreport-chart-panel">
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetByProjects"); ?></div>
 	<div class="budgetchart">
 	<canvas id="canvas_idgraphstatus"></canvas>
@@ -495,64 +496,9 @@ foreach ($spentValues as $spentValue) {
 	var ctx = document.getElementById("canvas_idgraphstatus").getContext("2d");
 	var chart = new Chart(ctx, budget_config);
 	</script>
-	
-
-
-	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>
-	<table class='budgettbl'>
-		<tr>
-			<th><?php echo $langs->trans("BudgetReportProject"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportMarket"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportBudget"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportSpent"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportBalance"); ?></th>
-		</tr>
-
-		<?php
-		foreach ($projects as $pid=>$data) {
-		$fbal = $data['budget']-$data['spent'];
-		$fcolor = "green";
-		if ($fbal<0) $fcolor="red";
-		$fgrossmargin = $data['orders']-$data['spent'];
-		$fgrosscolor = "green";
-		if ($fgrossmargin<0) $fgrosscolor="red";
-		$projectstatic = new Project($db);
-		$projectstatic->id = $pid;
-		$projectstatic->ref = $data['project_ref'];
-		$projectstatic->title = $data['title'];
-		$projectstatic->public = $data['public'];
-		?>
-
-		<tr>
-			<td><?php echo $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php', 1); ?></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
-			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td>
-			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
-		</tr>
-
-		<?php } ?>
-
-		<?php
-		$totalgrossmargin = $totalorders-$totalspent;
-		$totalgrosscolor = "green";
-		if ($totalgrossmargin<0) $totalgrosscolor="red";
-		?>
-		<tr>
-			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
-			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalorders); ?></b></td>
-			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
-			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
-			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>
-			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
-		</tr>
-		
-	</table>	
 </div>
 
-<div class="fichehalfright">
+<div class="budgetreport-chart-panel">
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpent"); ?></div>
 	<div class="budgetchart">
 	<canvas id="canvas_idgraphspent"></canvas>
@@ -603,6 +549,8 @@ foreach ($spentValues as $spentValue) {
 	var ctx = document.getElementById("canvas_idgraphspent").getContext("2d");
 	var chart = new Chart(ctx, spent_config);
 	</script>
+</div>
+</div>
 
 
 
@@ -626,6 +574,7 @@ foreach ($spentValues as $spentValue) {
 	}	
 	?>
 
+<div class="budgetreport-month-section">
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByMonth"); ?></div>
 	<div class="budgetbarchart">
 	<canvas id="canvas_idgraphmonth"></canvas>
@@ -706,5 +655,58 @@ foreach ($spentValues as $spentValue) {
 	</script>
 </div>
 
+<div class="budgetreport-table-section">
+	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>
+	<table class="budgettbl">
+		<tr>
+			<th><?php echo $langs->trans("BudgetReportProject"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportMarket"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportBudget"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportSpent"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportBalance"); ?></th>
+		</tr>
+
+		<?php
+		foreach ($projects as $pid=>$data) {
+		$fbal = $data['budget']-$data['spent'];
+		$fcolor = "green";
+		if ($fbal<0) $fcolor="red";
+		$fgrossmargin = $data['orders']-$data['spent'];
+		$fgrosscolor = "green";
+		if ($fgrossmargin<0) $fgrosscolor="red";
+		$projectstatic = new Project($db);
+		$projectstatic->id = $pid;
+		$projectstatic->ref = $data['project_ref'];
+		$projectstatic->title = $data['title'];
+		$projectstatic->public = $data['public'];
+		?>
+
+		<tr>
+			<td><?php echo $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php', 1); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
+			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td>
+			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
+		</tr>
+
+		<?php } ?>
+
+		<?php
+		$totalgrossmargin = $totalorders-$totalspent;
+		$totalgrosscolor = "green";
+		if ($totalgrossmargin<0) $totalgrosscolor="red";
+		?>
+		<tr>
+			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalorders); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
+			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>
+			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
+		</tr>
+	</table>
+</div>
 
 </div>

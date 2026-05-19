@@ -105,21 +105,47 @@ div.mainmenu.budgetreport {
 	background-image: none;
 }
 
+.budgetreport-summary-fullwidth,
+.budgetreport-report,
+.budgetreport-month-section,
+.budgetreport-table-section {
+	clear: both;
+	width: 100%;
+}
+
+.budgetreport-summary-fullwidth {
+	margin-bottom: 30px;
+}
+
 .dashboard_budget {
-	column-width: 350px; 
-	column-gap: 0px; 
-	column-span: none; 
-	column-fill: balance;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0;
+	width: 100%;
 }
 
 .dashboard_budget figure {
 	margin:0;
-	flex-flow: column wrap; 
-	page-break-inside: avoid; 
-	break-inside: avoid;
+	min-width: 0;
 	border-right: solid 2px rgba(0,0,0,0.2);
 	border-bottom: solid 2px rgba(0,0,0,0.2); 
 	text-align:center;
+}
+
+.dashboard_budget figure:last-child {
+	border-right: 0;
+}
+
+.budgetreport-charts-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 32px;
+	width: 100%;
+	align-items: start;
+}
+
+.budgetreport-chart-panel {
+	min-width: 0;
 }
 
 .figurein {
@@ -144,13 +170,18 @@ div.mainmenu.budgetreport {
 .budgetchart, 
 .budgetbarchart {
 	margin-top:20px; 
-	width:90%;
+	width:100%;
 	margin-bottom: 30px;
 }
 
-.budgetchart {
-	max-width: 460px;
-}	
+.budgetchart canvas,
+.budgetbarchart canvas {
+	max-width: 100%;
+}
+
+.budgetreport-table-section .budgettbl {
+	width: 100%;
+}
 
 .budgettbl th{
 	background: rgba(0,0,0,0.1);
@@ -165,25 +196,13 @@ div.mainmenu.budgetreport {
 	border-bottom: 1px solid rgba(0,0,0,0.2);
 }
 
-@media only screen and (max-width: 1400px) {
-	.dashboard_budget {
-		column-width: 300px; 
-	}	
-}
-
-@media only screen and (max-width: 1200px) {
-	.dashboard_budget {
-		column-width: 250px; 
-	}	
-}
-
 @media only screen and (max-width: 980px) {
+	.dashboard_budget,
+	.budgetreport-charts-row {
+		grid-template-columns: 1fr;
+	}
+
 	.dashboard_budget figure {
 		border-right: 0;
-	}
-	.budgettbl, 
-	.budgetchart,
-	.budgetbarchart	{
-		width:100%;
 	}
 }
