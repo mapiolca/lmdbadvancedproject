@@ -123,8 +123,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'url' => '/lmdbadvancedproject/budgetreportindex.php',
 			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
 			'position' => '9',
-			'enabled' => 'isset($conf->lmdbadvancedproject->enabled) && !empty($conf->lmdbadvancedproject->enabled)',
-			'perms' => 'isset($user->rights->lmdbadvancedproject->budgetreport->read) && !empty($user->rights->lmdbadvancedproject->budgetreport->read)',
+			'enabled' => '$conf->lmdbadvancedproject->enabled',
+			'perms' => '$user->rights->lmdbadvancedproject->budgetreport->read',
 			'target' => '',
 			'user' => 0,
 		);
