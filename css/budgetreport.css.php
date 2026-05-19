@@ -16,8 +16,8 @@
  */
 
 /**
- * \file    lmdb_advancedproject/css/budgetreport.css.php
- * \ingroup lmdb_advancedproject
+ * \file    lmdbadvancedproject/css/budgetreport.css.php
+ * \ingroup lmdbadvancedproject
  * \brief   CSS file for the Budget Report feature.
  */
 

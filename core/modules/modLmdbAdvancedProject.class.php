@@ -19,11 +19,11 @@
  */
 
 /**
- * \defgroup   lmdb_advancedproject     Module Advanced Project
+ * \defgroup   lmdbadvancedproject     Module Advanced Project
  * \brief      Advanced Project module descriptor.
  *
- * \file       htdocs/lmdb_advancedproject/core/modules/modLmdbAdvancedProject.class.php
- * \ingroup    lmdb_advancedproject
+ * \file       htdocs/lmdbadvancedproject/core/modules/modLmdbAdvancedProject.class.php
+ * \ingroup    lmdbadvancedproject
  * \brief      Description and activation file for module Advanced Project
  */
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
@@ -45,7 +45,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->db = $db;
 
 		$this->numero = 302502;
-		$this->rights_class = 'lmdb_advancedproject';
+		$this->rights_class = 'lmdbadvancedproject';
 		$this->family = 'projects';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
@@ -57,7 +57,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_email = 'doli@diamubi.com';
 
 		$this->version = '1.1';
-		$this->const_name = 'MAIN_MODULE_LMDB_ADVANCEDPROJECT';
+		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'generic';
 
 		$this->module_parts = array(
@@ -71,32 +71,32 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'printing' => 0,
 			'theme' => 0,
 			'css' => array(
-				'/lmdb_advancedproject/css/budgetreport.css.php',
+				'/lmdbadvancedproject/css/budgetreport.css.php',
 			),
 			'js' => array(),
 			'hooks' => array(),
 			'moduleforexternal' => 0,
 		);
 
-		$this->dirs = array('/lmdb_advancedproject/temp');
-		$this->config_page_url = array('setup.php@lmdb_advancedproject');
+		$this->dirs = array('/lmdbadvancedproject/temp');
+		$this->config_page_url = array('setup.php@lmdbadvancedproject');
 
 		$this->hidden = false;
 		$this->depends = array();
 		$this->requiredby = array();
 		$this->conflictwith = array();
-		$this->langfiles = array('lmdb_advancedproject@lmdb_advancedproject');
+		$this->langfiles = array('lmdbadvancedproject@lmdbadvancedproject');
 		$this->phpmin = array(5, 6);
 		$this->need_dolibarr_version = array(11, -3);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array();
 
-		if (empty($conf->lmdb_advancedproject) || !is_object($conf->lmdb_advancedproject)) {
-			$conf->lmdb_advancedproject = new stdClass();
+		if (empty($conf->lmdbadvancedproject) || !is_object($conf->lmdbadvancedproject)) {
+			$conf->lmdbadvancedproject = new stdClass();
 		}
-		if (!isset($conf->lmdb_advancedproject->enabled)) {
-			$conf->lmdb_advancedproject->enabled = 0;
+		if (!isset($conf->lmdbadvancedproject->enabled)) {
+			$conf->lmdbadvancedproject->enabled = 0;
 		}
 
 		$this->tabs = array();
@@ -120,11 +120,11 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'type' => 'left',
 			'titre' => 'BudgetReportArea',
 			'prefix' => img_picto('', '', 'class="fas fa-chart-pie paddingright pictofixedwidth valignmiddle"'),
-			'url' => '/lmdb_advancedproject/budgetreportindex.php',
-			'langs' => 'lmdb_advancedproject@lmdb_advancedproject',
+			'url' => '/lmdbadvancedproject/budgetreportindex.php',
+			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
 			'position' => '9',
-			'enabled' => 'isset($conf->lmdb_advancedproject->enabled) && !empty($conf->lmdb_advancedproject->enabled)',
-			'perms' => 'isset($user->rights->lmdb_advancedproject->budgetreport->read) && !empty($user->rights->lmdb_advancedproject->budgetreport->read)',
+			'enabled' => 'isset($conf->lmdbadvancedproject->enabled) && !empty($conf->lmdbadvancedproject->enabled)',
+			'perms' => 'isset($user->rights->lmdbadvancedproject->budgetreport->read) && !empty($user->rights->lmdbadvancedproject->budgetreport->read)',
 			'target' => '',
 			'user' => 0,
 		);
@@ -138,7 +138,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
-		$result = $this->_load_tables('/lmdb_advancedproject/sql/');
+		$result = $this->_load_tables('/lmdbadvancedproject/sql/');
 		if ($result < 0) {
 			return -1;
 		}

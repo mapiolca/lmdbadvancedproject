@@ -17,8 +17,8 @@
  */
 
 /**
- * \file    lmdb_advancedproject/admin/about.php
- * \ingroup lmdb_advancedproject
+ * \file    lmdbadvancedproject/admin/about.php
+ * \ingroup lmdbadvancedproject
  * \brief   About page of module Advanced Project.
  */
 
@@ -53,9 +53,9 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
-require_once '../lib/lmdb_advancedproject.lib.php';
+require_once '../lib/lmdbadvancedproject.lib.php';
 
-$langs->loadLangs(array('errors', 'admin', 'lmdb_advancedproject@lmdb_advancedproject'));
+$langs->loadLangs(array('errors', 'admin', 'lmdbadvancedproject@lmdbadvancedproject'));
 
 if (!$user->admin) {
 	accessforbidden();
@@ -71,10 +71,10 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 
-$head = lmdb_advancedprojectAdminPrepareHead();
-print dol_get_fiche_head($head, 'about', $langs->trans($page_name), 0, 'lmdb_advancedproject@lmdb_advancedproject');
+$head = lmdbadvancedprojectAdminPrepareHead();
+print dol_get_fiche_head($head, 'about', $langs->trans($page_name), 0, 'lmdbadvancedproject@lmdbadvancedproject');
 
-dol_include_once('/lmdb_advancedproject/core/modules/modLmdbAdvancedProject.class.php');
+dol_include_once('/lmdbadvancedproject/core/modules/modLmdbAdvancedProject.class.php');
 $tmpmodule = new modLmdbAdvancedProject($db);
 print $tmpmodule->getDescLong();
 

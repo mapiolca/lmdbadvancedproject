@@ -17,8 +17,8 @@
  */
 
 /**
- * \file    lmdb_advancedproject/admin/setup.php
- * \ingroup lmdb_advancedproject
+ * \file    lmdbadvancedproject/admin/setup.php
+ * \ingroup lmdbadvancedproject
  * \brief   Advanced Project setup page.
  */
 
@@ -52,9 +52,9 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once '../lib/lmdb_advancedproject.lib.php';
+require_once '../lib/lmdbadvancedproject.lib.php';
 
-$langs->loadLangs(array('admin', 'lmdb_advancedproject@lmdb_advancedproject'));
+$langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
 
 if (!$user->admin) {
 	accessforbidden();
@@ -70,8 +70,8 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 
-$head = lmdb_advancedprojectAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'lmdb_advancedproject@lmdb_advancedproject');
+$head = lmdbadvancedprojectAdminPrepareHead();
+print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'lmdbadvancedproject@lmdbadvancedproject');
 
 print '<span class="opacitymedium">'.$langs->trans('AdvancedProjectSetupPage').'</span><br><br>';
 print '<br>'.$langs->trans('NothingToSetup');

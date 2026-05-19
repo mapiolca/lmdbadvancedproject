@@ -5,14 +5,14 @@ if (!$user->rights->projet->lire) {
 	echo "access forbidden";
 } 
 
-if (!function_exists('lmdb_advancedproject_format_price')) {
+if (!function_exists('lmdbadvancedproject_format_price')) {
 	/**
 	 * Format amounts with Dolibarr's configured currency.
 	 *
 	 * @param  float|int $amount Amount to format
 	 * @return string
 	 */
-	function lmdb_advancedproject_format_price($amount)
+	function lmdbadvancedproject_format_price($amount)
 	{
 		global $conf, $langs;
 
@@ -193,8 +193,8 @@ foreach ($projects as $data) {
 	$labels[] = $data["title"];
 	$budgets[] = $data["budget"];
 	$spents[] = $data["spent"];
-	$budgetFormattedValues[] = lmdb_advancedproject_format_price($data["budget"]);
-	$spentFormattedValues[] = lmdb_advancedproject_format_price($data["spent"]);
+	$budgetFormattedValues[] = lmdbadvancedproject_format_price($data["budget"]);
+	$spentFormattedValues[] = lmdbadvancedproject_format_price($data["spent"]);
 }
 
 $spentLabels = array(
@@ -211,7 +211,7 @@ if ($balance > 0) {
 
 $spentPieFormattedValues = array();
 foreach ($spentValues as $spentValue) {
-	$spentPieFormattedValues[] = lmdb_advancedproject_format_price($spentValue);
+	$spentPieFormattedValues[] = lmdbadvancedproject_format_price($spentValue);
 }
 
 ?>
@@ -222,7 +222,7 @@ foreach ($spentValues as $spentValue) {
 		<div class='figurein'>
 			<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
 			<div class="famount">
-				<?php echo lmdb_advancedproject_format_price($budget); ?>
+				<?php echo lmdbadvancedproject_format_price($budget); ?>
 			</div>
 		</div>				
 	</figure>
@@ -231,7 +231,7 @@ foreach ($spentValues as $spentValue) {
 		<div class='figurein'>
 			<div class="budgettitle"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
 			<div class="famount">
-				<?php echo lmdb_advancedproject_format_price($totalspent); ?>
+				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 			</div>
 		</div>		
 	</figure>
@@ -240,7 +240,7 @@ foreach ($spentValues as $spentValue) {
 		<div class='figurein'>
 			<div class="budgettitle"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
 			<div class="famount" style='color:<?php echo $blncolor; ?>'>
-				<?php echo lmdb_advancedproject_format_price($balance); ?>
+				<?php echo lmdbadvancedproject_format_price($balance); ?>
 			</div>
 		</div>		
 	</figure>
@@ -360,18 +360,18 @@ foreach ($spentValues as $spentValue) {
 		
 		<tr>
 			<td><a href='<?php echo $url; ?>'><?php echo $data['title']; ?></a></td>
-			<td align="right"><?php echo lmdb_advancedproject_format_price($data['budget']); ?></td>
-			<td align="right"><?php echo lmdb_advancedproject_format_price($data['spent']); ?></td>
-			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdb_advancedproject_format_price($fbal); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
+			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
 		</tr>
 		
 		<?php } ?>
 
 		<tr>
 			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
-			<td align="right"><b><?php echo lmdb_advancedproject_format_price($budget); ?></b></td>
-			<td align="right"><b><?php echo lmdb_advancedproject_format_price($totalspent); ?></b></td>
-			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdb_advancedproject_format_price($balance); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
+			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
 		</tr>
 		
 	</table>	
@@ -446,8 +446,8 @@ foreach ($spentValues as $spentValue) {
 		$molabels[] = date("M'y",strtotime($data."-01"));
 		$mobudgets[] = $monthBudget;
 		$mospents[] = $monthSpent;
-		$mobudgetFormattedValues[] = lmdb_advancedproject_format_price($monthBudget);
-		$mospentFormattedValues[] = lmdb_advancedproject_format_price($monthSpent);
+		$mobudgetFormattedValues[] = lmdbadvancedproject_format_price($monthBudget);
+		$mospentFormattedValues[] = lmdbadvancedproject_format_price($monthSpent);
 	}	
 	?>
 

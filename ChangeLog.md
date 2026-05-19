@@ -2,7 +2,7 @@
 
 ## 1.1
 
-- Rename the Dolibarr module envelope to `lmdb_advancedproject`.
+- Rename the Dolibarr module envelope to `lmdbadvancedproject`.
 - Keep Budget Report as the existing project budget reporting feature.
 - Use Dolibarr's configured currency for displayed amounts and chart tooltips.
 - Add English, French, Italian, Spanish, and German translations.

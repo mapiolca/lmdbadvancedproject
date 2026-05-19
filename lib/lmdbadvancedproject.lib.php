@@ -16,8 +16,8 @@
  */
 
 /**
- * \file    lmdb_advancedproject/lib/lmdb_advancedproject.lib.php
- * \ingroup lmdb_advancedproject
+ * \file    lmdbadvancedproject/lib/lmdbadvancedproject.lib.php
+ * \ingroup lmdbadvancedproject
  * \brief   Library file with common functions for Advanced Project.
  */
 
@@ -26,27 +26,27 @@
  *
  * @return array
  */
-function lmdb_advancedprojectAdminPrepareHead()
+function lmdbadvancedprojectAdminPrepareHead()
 {
 	global $langs, $conf;
 
-	$langs->load('lmdb_advancedproject@lmdb_advancedproject');
+	$langs->load('lmdbadvancedproject@lmdbadvancedproject');
 
 	$h = 0;
 	$head = array();
 
-	$head[$h][0] = dol_buildpath('/lmdb_advancedproject/admin/setup.php', 1);
+	$head[$h][0] = dol_buildpath('/lmdbadvancedproject/admin/setup.php', 1);
 	$head[$h][1] = $langs->trans('Settings');
 	$head[$h][2] = 'settings';
 	$h++;
 
-	$head[$h][0] = dol_buildpath('/lmdb_advancedproject/admin/about.php', 1);
+	$head[$h][0] = dol_buildpath('/lmdbadvancedproject/admin/about.php', 1);
 	$head[$h][1] = $langs->trans('About');
 	$head[$h][2] = 'about';
 	$h++;
 
-	complete_head_from_modules($conf, $langs, null, $head, $h, 'lmdb_advancedproject@lmdb_advancedproject');
-	complete_head_from_modules($conf, $langs, null, $head, $h, 'lmdb_advancedproject@lmdb_advancedproject', 'remove');
+	complete_head_from_modules($conf, $langs, null, $head, $h, 'lmdbadvancedproject@lmdbadvancedproject');
+	complete_head_from_modules($conf, $langs, null, $head, $h, 'lmdbadvancedproject@lmdbadvancedproject', 'remove');
 
 	return $head;
 }

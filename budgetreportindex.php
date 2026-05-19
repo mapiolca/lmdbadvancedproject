@@ -19,8 +19,8 @@
  */
 
 /**
- *	\file       lmdb_advancedproject/budgetreportindex.php
- *	\ingroup    lmdb_advancedproject
+ *	\file       lmdbadvancedproject/budgetreportindex.php
+ *	\ingroup    lmdbadvancedproject
  *	\brief      Budget Report page of Advanced Project
  */
 
@@ -58,13 +58,13 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 
 // Load translation files required by the page
-$langs->loadLangs(array("lmdb_advancedproject@lmdb_advancedproject"));
+$langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject"));
 
 $action = GETPOST('action', 'aZ09');
 
 
 // Security check
-// if (! $user->rights->lmdb_advancedproject->budgetreport->read) {
+// if (! $user->rights->lmdbadvancedproject->budgetreport->read) {
 // 	accessforbidden();
 // }
 $socid = GETPOST('socid', 'int');
