@@ -1111,43 +1111,34 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 <?php return; } ?>
 
 <div class="budgetreport-summary-fullwidth">
-<div class="dashboard_budget">
-	<figure>
-		<div class='figurein'>
-			<div class="budgettitle"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
-			<div class="famount">
+<table class="noborder centpercent dashboard_budget" role="presentation">
+	<tr>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
+			<div class="nowraponall budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
 			</div>
-		</div>
-	</figure>
-
-	<figure>
-		<div class='figurein'>
-			<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
-			<div class="famount">
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
+			<div class="nowraponall budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($budget); ?>
 			</div>
-		</div>
-	</figure>
-
-	<figure>
-		<div class='figurein'>
-			<div class="budgettitle"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
-			<div class="famount">
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
+			<div class="nowraponall budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 			</div>
-		</div>
-	</figure>
-
-	<figure style="border-right: 0;">
-		<div class='figurein'>
-			<div class="budgettitle"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
-			<div class="famount" style='color:<?php echo $blncolor; ?>'>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
+			<div class="nowraponall budgetreport-summary-amount" style='color:<?php echo $blncolor; ?>'>
 				<?php echo lmdbadvancedproject_format_price($balance); ?>
 			</div>
-		</div>
-	</figure>
-</div>
+		</td>
+	</tr>
+</table>
 </div>
 
 <div class="budgetreport-report">

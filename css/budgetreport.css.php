@@ -118,26 +118,32 @@ div.mainmenu.budgetreport {
 }
 
 .dashboard_budget {
-	display: grid !important;
-	grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-	gap: 0;
+	table-layout: fixed;
 	width: 100%;
+	margin: 0;
 }
 
-.dashboard_budget figure {
-	margin:0;
-	float: none !important;
-	display: block !important;
-	width: auto !important;
+.dashboard_budget .budgetreport-summary-cell {
 	box-sizing: border-box;
-	min-width: 0;
+	padding: 10px 8px 12px;
 	border-right: solid 2px rgba(0,0,0,0.2);
-	border-bottom: solid 2px rgba(0,0,0,0.2); 
-	text-align:center;
+	border-bottom: solid 2px rgba(0,0,0,0.2);
 }
 
-.dashboard_budget figure:last-child {
+.dashboard_budget .budgetreport-summary-cell:last-child {
 	border-right: 0;
+}
+
+.budgetreport-summary-label {
+	font-size: 110%;
+	line-height: 1.2;
+}
+
+.budgetreport-summary-amount {
+	display: block;
+	font-size: 2.1em;
+	line-height: 1.1;
+	color: #333;
 }
 
 .budgetreport-charts-row {
@@ -152,22 +158,10 @@ div.mainmenu.budgetreport {
 	min-width: 0;
 }
 
-.figurein {
-	display:inline-block; 
-	text-align:left; 
-	margin:auto;
-}
-
 .budgettitle {
 	color:#888; 
 	font-size: 120%;
 	padding-top: 10px;
-}
-
-.figurein .famount {
-	font-size: 300%; 
-	margin-top:-10px;
-	color: #333;
 }
 
 .budgettbl, 
@@ -282,12 +276,19 @@ div.mainmenu.budgetreport {
 }
 
 @media only screen and (max-width: 980px) {
-	.dashboard_budget,
 	.budgetreport-charts-row {
 		grid-template-columns: 1fr !important;
 	}
 
-	.dashboard_budget figure {
+	.dashboard_budget,
+	.dashboard_budget tbody,
+	.dashboard_budget tr,
+	.dashboard_budget .budgetreport-summary-cell {
+		display: block;
+		width: 100%;
+	}
+
+	.dashboard_budget .budgetreport-summary-cell {
 		border-right: 0;
 	}
 }
