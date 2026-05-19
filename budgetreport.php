@@ -485,14 +485,14 @@ foreach ($spentValues as $spentValue) {
 			type: 'bar',
 			data: {
 				datasets: [{
-					label: <?php echo json_encode($langs->trans("BudgetReportBudget")); ?>,
+					label: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudget")); ?>,
 					data: <?php echo json_encode(array_values($mobudgets)); ?>,
 					backgroundColor: color(window.chartColors.blue).alpha(0.4).rgbString(),
 					borderColor: window.chartColors.blue,
 					borderWidth: 1,				
 					},
 					{
-					label: <?php echo json_encode($langs->trans("BudgetReportSpent")); ?>,
+					label: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportSpent")); ?>,
 					type: 'line',
 					data: <?php echo json_encode(array_values($mospents)); ?>,
 					backgroundColor: color(window.chartColors.red).alpha(0).rgbString(),
@@ -510,7 +510,7 @@ foreach ($spentValues as $spentValue) {
 				},
 				title: {
 					display: false,
-					text: <?php echo json_encode($langs->trans("BudgetReportBudgetVsSpentByMonth")); ?>
+					text: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpentByMonth")); ?>
 				},
 				animation: {
 					animateScale: true,

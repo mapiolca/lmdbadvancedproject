@@ -117,12 +117,8 @@ llxHeader("", $langs->trans("BudgetReportArea"));
 <?php include('budgetreport.php');?>
 
 <div class="tabBar" style='clear:both;'>
-<div class="opacitymedium">
-<ul>
-<li><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></li>
-<li><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></li>
-</ul>
-</div>
+<div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>
+<div class="warning"><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></div>
 </div>
 
 <?php
