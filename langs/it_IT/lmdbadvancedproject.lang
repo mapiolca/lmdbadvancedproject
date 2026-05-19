@@ -28,6 +28,7 @@ BudgetReportBudget = Budget
 BudgetReportSpent = Speso
 BudgetReportLeftToSpend = Rimanente da spendere
 BudgetReportBudgetByProjects = Budget per progetto
+BudgetReportBudgetByCategory = Budget per categoria
 BudgetReportBudgetVsSpentByProject = Budget vs speso per progetto
 BudgetReportProject = Progetto
 BudgetReportMarket = Ordini
