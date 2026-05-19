@@ -22,6 +22,26 @@ if (!function_exists('lmdbadvancedproject_format_price')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_format_margin')) {
+	/**
+	 * Format gross margin with its percentage of market amount.
+	 *
+	 * @param  float|int $amount Gross margin amount
+	 * @param  float|int $market Market amount
+	 * @return string
+	 */
+	function lmdbadvancedproject_format_margin($amount, $market)
+	{
+		$formattedAmount = lmdbadvancedproject_format_price($amount);
+
+		if ($market > 0) {
+			return $formattedAmount.' ('.round(($amount / $market) * 100).'%)';
+		}
+
+		return $formattedAmount.' (-)';
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_trans_chart')) {
 	/**
 	 * Return a translated string suitable for JavaScript chart labels.
@@ -50,6 +70,7 @@ $cleanmos = array();
 $totaltime = 0;
 $totalvendinv = 0;
 $totalexpenses = 0;
+$totalmarket = 0;
 $budget = 0;
 
 $sql = "SELECT p.* FROM ".MAIN_DB_PREFIX."projet p 
@@ -67,6 +88,7 @@ while ($i<$nbtotalofrecords) {
 	$projects[$obj->rowid] = array ("ref"=>$obj->rowid,
 									"title"=>$obj->title,
 									"budget"=>(int)$obj->budget_amount,
+									"market"=>0,
 									"spent"=>0);
 	//total up all budget
 	$budget += (int)$obj->budget_amount;
@@ -104,6 +126,29 @@ while ($i<$nbtotalofrecords) {
 $db->free($result);
 
 //var_dump ($mobudget); exit;
+
+//----start: adding customer orders to market amount
+$markets = array();
+$sql_market = "SELECT fk_projet, SUM(total_ht) as total_market FROM ".MAIN_DB_PREFIX."commande
+			WHERE fk_projet > 0 AND fk_statut > 0 GROUP BY fk_projet";
+$result_market = $db->query($sql_market);
+$nbtotalmarket = $db->num_rows($result_market);
+$i=0;
+while ($i<$nbtotalmarket) {
+	$obj = $db->fetch_object($result_market);
+	$markets[$obj->fk_projet] = (float)$obj->total_market;
+	$i++;
+}
+
+$db->free($result_market);
+
+foreach ($projects as $pid=>$data) {
+	if (isset($markets[$pid])) {
+		$projects[$pid]["market"] = $markets[$pid];
+		$totalmarket += (float)$markets[$pid];
+	}
+}
+//----end: adding customer orders to market amount
 
 //----start: adding timespent to spent item
 $timespent = array();
@@ -377,32 +422,46 @@ foreach ($spentValues as $spentValue) {
 	<table class='budgettbl'>
 		<tr>
 			<th><?php echo $langs->trans("BudgetReportProject"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportMarket"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportBudget"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportSpent"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportBalance"); ?></th>
 		</tr>
-		
-		<?php 
-		foreach ($projects as $pid=>$data) { 
+
+		<?php
+		foreach ($projects as $pid=>$data) {
 		$fbal = $data['budget']-$data['spent'];
 		$fcolor = "green";
 		if ($fbal<0) $fcolor="red";
+		$fgrossmargin = $data['market']-$data['spent'];
+		$fgrosscolor = "green";
+		if ($fgrossmargin<0) $fgrosscolor="red";
 		$url = DOL_URL_ROOT.'/projet/element.php?id='.$pid;
 		?>
-		
-		<tr>
-			<td><a href='<?php echo $url; ?>'><?php echo $data['title']; ?></a></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
-			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
-		</tr>
-		
-		<?php } ?>
 
 		<tr>
+			<td><a href='<?php echo $url; ?>'><?php echo $data['title']; ?></a></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['market']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
+			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['market']); ?></td>
+			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
+		</tr>
+
+		<?php } ?>
+
+		<?php
+		$totalgrossmargin = $totalmarket-$totalspent;
+		$totalgrosscolor = "green";
+		if ($totalgrossmargin<0) $totalgrosscolor="red";
+		?>
+		<tr>
 			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalmarket); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
+			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalmarket); ?></b></td>
 			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
 		</tr>
 		
