@@ -107,16 +107,16 @@ $db->free($result);
 
 //----start: adding timespent to spent item
 $timespent = array();
-$sql0 = "SELECT pt.fk_projet, ptt.task_date, SUM((ptt.task_duration / 3600.0) * CASE
+$sql0 = "SELECT pt.fk_projet, ptt.element_date AS task_date, SUM((ptt.element_duration / 3600.0) * CASE
 				WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
 				WHEN u.thm IS NOT NULL AND u.thm > 0 THEN u.thm
 				ELSE 0
 			END) AS totalspent
-		FROM ".MAIN_DB_PREFIX."projet_task_time ptt
-		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_task = pt.rowid
+		FROM ".MAIN_DB_PREFIX."element_time ptt
+		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 		LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-		WHERE ptt.task_duration > 0
-		GROUP BY pt.fk_projet, ptt.task_date";
+		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0
+		GROUP BY pt.fk_projet, ptt.element_date";
 $result0 = $db->query($sql0);
 $nbtotal0 = $db->num_rows($result0);
 $i=0;
