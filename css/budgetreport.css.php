@@ -174,9 +174,16 @@ div.mainmenu.budgetreport {
 	margin-bottom: 30px;
 }
 
+.budgetchart,
+.budgetbarchart {
+	height: 350px;
+	max-height: 350px;
+}
+
 .budgetchart canvas,
 .budgetbarchart canvas {
 	max-width: 100%;
+	max-height: 350px;
 }
 
 .budgetreport-table-section .budgettbl {
@@ -194,6 +201,39 @@ div.mainmenu.budgetreport {
 .budgettbl td{
 	padding: 5px 8px;
 	border-bottom: 1px solid rgba(0,0,0,0.2);
+}
+
+.budgetreport-forecast-table td {
+	vertical-align: top;
+}
+
+.budgetreport-forecast-details {
+	margin-bottom: 8px;
+}
+
+.budgetreport-forecast-details summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.budgetreport-forecast-subtable {
+	width: 100%;
+	margin-top: 8px;
+	border-collapse: collapse;
+}
+
+.budgetreport-forecast-subtable th,
+.budgetreport-forecast-subtable td {
+	padding: 4px 6px;
+	border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.budgetreport-forecast-extra {
+	margin-top: 20px;
+}
+
+.budgetreport-forecast-subtitle {
+	margin-top: 16px;
 }
 
 @media only screen and (max-width: 980px) {

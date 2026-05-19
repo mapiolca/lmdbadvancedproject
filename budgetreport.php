@@ -114,6 +114,493 @@ if (!function_exists('lmdbadvancedproject_get_entity_filter')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_table_exists')) {
+	/**
+	 * Check if a database table exists.
+	 *
+	 * @param  string $tableName Full table name
+	 * @return bool
+	 */
+	function lmdbadvancedproject_table_exists($tableName)
+	{
+		global $db;
+
+		$sql = "SHOW TABLES LIKE '".$db->escape($tableName)."'";
+		$resql = $db->query($sql);
+
+		return ($resql && $db->num_rows($resql) > 0);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_column_exists')) {
+	/**
+	 * Check if a database column exists.
+	 *
+	 * @param  string $tableName  Full table name
+	 * @param  string $columnName Column name
+	 * @return bool
+	 */
+	function lmdbadvancedproject_column_exists($tableName, $columnName)
+	{
+		global $db;
+
+		$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$db->escape($columnName)."'";
+		$resql = $db->query($sql);
+
+		return ($resql && $db->num_rows($resql) > 0);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_escape_html')) {
+	/**
+	 * Escape a string for HTML output.
+	 *
+	 * @param  string $value Value to escape
+	 * @return string
+	 */
+	function lmdbadvancedproject_escape_html($value)
+	{
+		if (function_exists('dol_escape_htmltag')) {
+			return dol_escape_htmltag($value);
+		}
+
+		return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_short_line_label')) {
+	/**
+	 * Return a compact label for a document line.
+	 *
+	 * @param  string $label       Line label
+	 * @param  string $description Line description
+	 * @return string
+	 */
+	function lmdbadvancedproject_short_line_label($label, $description)
+	{
+		$text = trim((string) $label);
+		if ($text === '') {
+			$text = trim(strip_tags((string) $description));
+		}
+		if ($text === '') {
+			return '-';
+		}
+		if (function_exists('dol_trunc')) {
+			return dol_trunc($text, 90);
+		}
+		if (strlen($text) > 90) {
+			return substr($text, 0, 87).'...';
+		}
+
+		return $text;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_build_category_sql_parts')) {
+	/**
+	 * Build SQL fragments used to resolve commercial categories from product or line extrafields.
+	 *
+	 * @param  string $lineExtraTable Line extrafields table without prefix
+	 * @param  string $lineAlias      SQL alias of the line table
+	 * @return array<string,string>
+	 */
+	function lmdbadvancedproject_build_category_sql_parts($lineExtraTable, $lineAlias)
+	{
+		$parts = array(
+			'select' => 'NULL AS product_category_key, NULL AS product_category_label, NULL AS line_category_key, NULL AS line_category_label',
+			'join' => '',
+		);
+
+		if (!lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'c_commercial_category')) {
+			return $parts;
+		}
+
+		$select = array(
+			'NULL AS product_category_key',
+			'NULL AS product_category_label',
+			'NULL AS line_category_key',
+			'NULL AS line_category_label',
+		);
+		$join = '';
+
+		if (lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'product_extrafields') && lmdbadvancedproject_column_exists(MAIN_DB_PREFIX.'product_extrafields', 'lmdb_commercial_category')) {
+			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'product_extrafields pex ON pex.fk_object = '.$lineAlias.'.fk_product';
+			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category pc ON (pc.rowid = pex.lmdb_commercial_category OR BINARY pc.code = BINARY pex.lmdb_commercial_category)';
+			$select[0] = 'pc.rowid AS product_category_key';
+			$select[1] = 'pc.label AS product_category_label';
+		}
+
+		if (lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.$lineExtraTable) && lmdbadvancedproject_column_exists(MAIN_DB_PREFIX.$lineExtraTable, 'lmdb_commercial_category')) {
+			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.$lineExtraTable.' lex ON lex.fk_object = '.$lineAlias.'.rowid';
+			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category lc ON (lc.rowid = lex.lmdb_commercial_category OR BINARY lc.code = BINARY lex.lmdb_commercial_category)';
+			$select[2] = 'lc.rowid AS line_category_key';
+			$select[3] = 'lc.label AS line_category_label';
+		}
+
+		$parts['select'] = implode(', ', $select);
+		$parts['join'] = $join;
+
+		return $parts;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_init_forecast')) {
+	/**
+	 * Initialize forecast structure.
+	 *
+	 * @return array<string,mixed>
+	 */
+	function lmdbadvancedproject_init_forecast()
+	{
+		return array(
+			'categories' => array(),
+			'totals' => array(
+				'order_amount' => 0,
+				'order_budget' => 0,
+				'supplier_expenses' => 0,
+				'forecast_gap' => 0,
+			),
+			'time' => array(
+				'hours' => 0,
+				'cost' => 0,
+			),
+			'expenses' => array(
+				'total' => 0,
+				'lines' => array(),
+			),
+		);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_forecast_category')) {
+	/**
+	 * Resolve category key and label from a SQL row.
+	 *
+	 * @param  stdClass $obj SQL row
+	 * @return array<string,string>
+	 */
+	function lmdbadvancedproject_get_forecast_category($obj)
+	{
+		global $langs;
+
+		$productKey = empty($obj->product_category_key) ? '' : (string) $obj->product_category_key;
+		$productLabel = empty($obj->product_category_label) ? '' : (string) $obj->product_category_label;
+		$lineKey = empty($obj->line_category_key) ? '' : (string) $obj->line_category_key;
+		$lineLabel = empty($obj->line_category_label) ? '' : (string) $obj->line_category_label;
+		$fkProduct = empty($obj->fk_product) ? 0 : (int) $obj->fk_product;
+
+		if ($fkProduct > 0 && $productKey !== '') {
+			return array('key' => 'cat_'.$productKey, 'label' => $productLabel);
+		}
+		if ($fkProduct <= 0 && $lineKey !== '') {
+			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel);
+		}
+		if ($productKey !== '') {
+			return array('key' => 'cat_'.$productKey, 'label' => $productLabel);
+		}
+		if ($lineKey !== '') {
+			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel);
+		}
+
+		return array('key' => 'uncategorized', 'label' => $langs->trans('BudgetReportUncategorized'));
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_add_forecast_line')) {
+	/**
+	 * Add a line amount to a forecast category.
+	 *
+	 * @param array<string,mixed> $forecast Forecast data
+	 * @param stdClass           $obj      SQL row
+	 * @param string             $type     customer_order|supplier_invoice|supplier_order
+	 * @return void
+	 */
+	function lmdbadvancedproject_add_forecast_line(&$forecast, $obj, $type)
+	{
+		$category = lmdbadvancedproject_get_forecast_category($obj);
+		$key = $category['key'];
+
+		if (!isset($forecast['categories'][$key])) {
+			$forecast['categories'][$key] = array(
+				'label' => $category['label'],
+				'order_amount' => 0,
+				'order_budget' => 0,
+				'supplier_expenses' => 0,
+				'order_lines' => array(),
+				'supplier_lines' => array(),
+			);
+		}
+
+		$amount = empty($obj->amount_ht) ? 0 : (float) $obj->amount_ht;
+		$budget = empty($obj->budget_ht) ? 0 : (float) $obj->budget_ht;
+		$line = array(
+			'type' => $type,
+			'ref' => empty($obj->document_ref) ? '' : (string) $obj->document_ref,
+			'date' => empty($obj->document_date) ? '' : (string) $obj->document_date,
+			'label' => lmdbadvancedproject_short_line_label(empty($obj->line_label) ? '' : $obj->line_label, empty($obj->line_description) ? '' : $obj->line_description),
+			'qty' => empty($obj->qty) ? 0 : (float) $obj->qty,
+			'amount' => $amount,
+			'budget' => $budget,
+		);
+
+		if ($type === 'customer_order') {
+			$forecast['categories'][$key]['order_amount'] += $amount;
+			$forecast['categories'][$key]['order_budget'] += $budget;
+			$forecast['categories'][$key]['order_lines'][] = $line;
+			$forecast['totals']['order_amount'] += $amount;
+			$forecast['totals']['order_budget'] += $budget;
+		} else {
+			$forecast['categories'][$key]['supplier_expenses'] += $amount;
+			$forecast['categories'][$key]['supplier_lines'][] = $line;
+			$forecast['totals']['supplier_expenses'] += $amount;
+		}
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
+	/**
+	 * Load forecast data for a single project.
+	 *
+	 * @param  int    $projectId               Project id
+	 * @param  string $projectEntities         Project entity filter
+	 * @param  string $orderEntities           Customer order entity filter
+	 * @param  string $supplierInvoiceEntities Supplier invoice entity filter
+	 * @param  string $supplierOrderEntities   Supplier order entity filter
+	 * @param  string $expenseReportEntities   Expense report entity filter
+	 * @return array<string,mixed>
+	 */
+	function lmdbadvancedproject_load_project_forecast($projectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities)
+	{
+		global $db;
+
+		$forecast = lmdbadvancedproject_init_forecast();
+		$projectId = (int) $projectId;
+
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'cd');
+		$sql = "SELECT 'customer_order' AS source_type, c.ref AS document_ref, c.date_commande AS document_date, cd.fk_product, cd.label AS line_label, cd.description AS line_description, cd.qty, cd.total_ht AS amount_ht, (cd.buy_price_ht * cd.qty) AS budget_ht, ".$categorySql['select']."
+			FROM ".MAIN_DB_PREFIX."commande c
+			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
+			".$categorySql['join']."
+			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				lmdbadvancedproject_add_forecast_line($forecast, $obj, 'customer_order');
+			}
+			$db->free($resql);
+		}
+
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd');
+		$sql = "SELECT 'supplier_invoice' AS source_type, ff.ref AS document_ref, ff.datef AS document_date, ffd.fk_product, ffd.label AS line_label, ffd.description AS line_description, ffd.qty, ffd.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
+			FROM ".MAIN_DB_PREFIX."facture_fourn ff
+			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
+			".$categorySql['join']."
+			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				lmdbadvancedproject_add_forecast_line($forecast, $obj, 'supplier_invoice');
+			}
+			$db->free($resql);
+		}
+
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'cfd');
+		$sql = "SELECT 'supplier_order' AS source_type, cf.ref AS document_ref, cf.date_commande AS document_date, cfd.fk_product, cfd.label AS line_label, cfd.description AS line_description, cfd.qty, cfd.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
+			FROM ".MAIN_DB_PREFIX."commande_fournisseur cf
+			INNER JOIN ".MAIN_DB_PREFIX."commande_fournisseurdet cfd ON cfd.fk_commande = cf.rowid
+			".$categorySql['join']."
+			WHERE cf.fk_projet = ".$projectId."
+			AND cf.fk_statut > 0 AND cf.fk_statut NOT IN (6,7,9)
+			AND cf.entity IN (".$supplierOrderEntities.")
+			AND NOT EXISTS (
+				SELECT ee.rowid
+				FROM ".MAIN_DB_PREFIX."element_element ee
+				WHERE (
+					ee.fk_source = cf.rowid
+					AND ee.sourcetype IN ('order_supplier', 'supplier_order')
+					AND ee.targettype IN ('invoice_supplier', 'supplier_invoice')
+				) OR (
+					ee.fk_target = cf.rowid
+					AND ee.targettype IN ('order_supplier', 'supplier_order')
+					AND ee.sourcetype IN ('invoice_supplier', 'supplier_invoice')
+				)
+			)";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				lmdbadvancedproject_add_forecast_line($forecast, $obj, 'supplier_order');
+			}
+			$db->free($resql);
+		}
+
+		$sql = "SELECT SUM(ptt.element_duration) / 3600.0 AS total_hours, SUM((ptt.element_duration / 3600.0) * CASE
+				WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
+				WHEN u.thm IS NOT NULL AND u.thm > 0 THEN u.thm
+				ELSE 0
+			END) AS total_cost
+			FROM ".MAIN_DB_PREFIX."element_time ptt
+			INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
+			LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
+			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.fk_projet = ".$projectId." AND pt.entity IN (".$projectEntities.")";
+		$resql = $db->query($sql);
+		if ($resql) {
+			$obj = $db->fetch_object($resql);
+			if ($obj) {
+				$forecast['time']['hours'] = empty($obj->total_hours) ? 0 : (float) $obj->total_hours;
+				$forecast['time']['cost'] = empty($obj->total_cost) ? 0 : (float) $obj->total_cost;
+			}
+			$db->free($resql);
+		}
+
+		$sql = "SELECT ex.ref, ed.date, ed.comments, ed.total_ht
+			FROM ".MAIN_DB_PREFIX."expensereport_det ed
+			LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
+			WHERE ed.fk_projet = ".$projectId." AND ex.fk_user_approve > 0 AND ex.entity IN (".$expenseReportEntities.")
+			ORDER BY ed.date ASC, ex.ref ASC";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$amount = empty($obj->total_ht) ? 0 : (float) $obj->total_ht;
+				$forecast['expenses']['total'] += $amount;
+				$forecast['expenses']['lines'][] = array(
+					'ref' => empty($obj->ref) ? '' : (string) $obj->ref,
+					'date' => empty($obj->date) ? '' : (string) $obj->date,
+					'comment' => empty($obj->comments) ? '' : (string) $obj->comments,
+					'amount' => $amount,
+				);
+			}
+			$db->free($resql);
+		}
+
+		foreach ($forecast['categories'] as $key => $category) {
+			$forecast['categories'][$key]['forecast_gap'] = $category['order_budget'] - $category['supplier_expenses'];
+		}
+		$forecast['totals']['forecast_gap'] = $forecast['totals']['order_budget'] - $forecast['totals']['supplier_expenses'];
+
+		return $forecast;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_print_forecast_lines')) {
+	/**
+	 * Print forecast detail lines.
+	 *
+	 * @param array<int,array<string,mixed>> $lines      Lines to print
+	 * @param bool                          $showBudget Show budget column
+	 * @param string                        $titleKey   Translation key for details title
+	 * @return void
+	 */
+	function lmdbadvancedproject_print_forecast_lines($lines, $showBudget, $titleKey)
+	{
+		global $langs;
+
+		if (empty($lines)) {
+			print '<span class="opacitymedium">-</span>';
+			return;
+		}
+
+		print '<details class="budgetreport-forecast-details">';
+		print '<summary>'.$langs->trans($titleKey).' ('.count($lines).')</summary>';
+		print '<table class="budgetreport-forecast-subtable">';
+		print '<tr><th>'.$langs->trans('Ref').'</th><th>'.$langs->trans('Date').'</th><th>'.$langs->trans('Label').'</th><th>'.$langs->trans('Qty').'</th><th>'.$langs->trans('AmountHTShort').'</th>';
+		if ($showBudget) {
+			print '<th>'.$langs->trans('BudgetReportOrderBudget').'</th>';
+		}
+		print '</tr>';
+		foreach ($lines as $line) {
+			$typeLabel = '';
+			if ($line['type'] === 'supplier_order') {
+				$typeLabel = $langs->trans('BudgetReportSupplierOrderNotInvoiced').' - ';
+			} elseif ($line['type'] === 'supplier_invoice') {
+				$typeLabel = $langs->trans('BudgetReportSupplierInvoice').' - ';
+			}
+			print '<tr>';
+			print '<td>'.$typeLabel.lmdbadvancedproject_escape_html($line['ref']).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html($line['date']).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html($line['label']).'</td>';
+			print '<td align="right">'.price($line['qty']).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
+			if ($showBudget) {
+				print '<td align="right">'.lmdbadvancedproject_format_price($line['budget']).'</td>';
+			}
+			print '</tr>';
+		}
+		print '</table>';
+		print '</details>';
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
+	/**
+	 * Print project forecast table.
+	 *
+	 * @param array<string,mixed> $forecast Forecast data
+	 * @return void
+	 */
+	function lmdbadvancedproject_print_project_forecast($forecast)
+	{
+		global $langs;
+
+		print '<table class="budgettbl budgetreport-forecast-table">';
+		print '<tr>';
+		print '<th>'.$langs->trans('LMDB_CommercialCategoryExtrafield').'</th>';
+		print '<th>'.$langs->trans('BudgetReportOrderAmount').'</th>';
+		print '<th>'.$langs->trans('BudgetReportOrderBudget').'</th>';
+		print '<th>'.$langs->trans('BudgetReportSupplierExpenses').'</th>';
+		print '<th>'.$langs->trans('BudgetReportForecastGap').'</th>';
+		print '<th>'.$langs->trans('BudgetReportDetails').'</th>';
+		print '</tr>';
+
+		foreach ($forecast['categories'] as $category) {
+			$gapColor = $category['forecast_gap'] >= 0 ? 'green' : 'red';
+			print '<tr>';
+			print '<td>'.lmdbadvancedproject_escape_html($category['label']).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($category['order_amount']).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($category['order_budget']).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($category['supplier_expenses']).'</td>';
+			print '<td align="right" style="color:'.$gapColor.'">'.lmdbadvancedproject_format_price($category['forecast_gap']).'</td>';
+			print '<td>';
+			lmdbadvancedproject_print_forecast_lines($category['order_lines'], true, 'BudgetReportOrderDetails');
+			lmdbadvancedproject_print_forecast_lines($category['supplier_lines'], false, 'BudgetReportSupplierDetails');
+			print '</td>';
+			print '</tr>';
+		}
+
+		$totalGapColor = $forecast['totals']['forecast_gap'] >= 0 ? 'green' : 'red';
+		print '<tr>';
+		print '<td><b>'.$langs->trans('BudgetReportTotal').'</b></td>';
+		print '<td align="right"><b>'.lmdbadvancedproject_format_price($forecast['totals']['order_amount']).'</b></td>';
+		print '<td align="right"><b>'.lmdbadvancedproject_format_price($forecast['totals']['order_budget']).'</b></td>';
+		print '<td align="right"><b>'.lmdbadvancedproject_format_price($forecast['totals']['supplier_expenses']).'</b></td>';
+		print '<td align="right" style="color:'.$totalGapColor.'"><b>'.lmdbadvancedproject_format_price($forecast['totals']['forecast_gap']).'</b></td>';
+		print '<td></td>';
+		print '</tr>';
+		print '</table>';
+
+		print '<div class="budgetreport-forecast-extra">';
+		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
+		print '<table class="budgettbl">';
+		print '<tr><th>'.$langs->trans('BudgetReportTimeSpentHours').'</th><th>'.$langs->trans('BudgetReportSpent').'</th></tr>';
+		print '<tr><td align="right">'.price(lmdbadvancedproject_round_amount($forecast['time']['hours'])).'</td><td align="right">'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</td></tr>';
+		print '</table>';
+
+		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportExpenseReportDetails').'</div>';
+		print '<table class="budgettbl">';
+		print '<tr><th>'.$langs->trans('Date').'</th><th>'.$langs->trans('Ref').'</th><th>'.$langs->trans('BudgetReportExpenseComment').'</th><th>'.$langs->trans('AmountHTShort').'</th></tr>';
+		foreach ($forecast['expenses']['lines'] as $line) {
+			print '<tr>';
+			print '<td>'.lmdbadvancedproject_escape_html($line['date']).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html($line['ref']).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html($line['comment']).'</td>';
+			print '<td align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
+			print '</tr>';
+		}
+		print '<tr><td colspan="3"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td align="right"><b>'.lmdbadvancedproject_format_price($forecast['expenses']['total']).'</b></td></tr>';
+		print '</table>';
+		print '</div>';
+	}
+}
+
 $datenow = date('Y-m-d');
 $projects = array();
 $mobudget = array();
@@ -138,11 +625,13 @@ if (function_exists('getEntity')) {
 	$projectEntities = getEntity('project', $entityShared);
 	$orderEntities = getEntity('commande', $entityShared);
 	$supplierInvoiceEntities = getEntity('supplier_invoice', $entityShared);
+	$supplierOrderEntities = getEntity('supplier_order', $entityShared);
 	$expenseReportEntities = getEntity('expensereport', $entityShared);
 } else {
 	$projectEntities = lmdbadvancedproject_get_entity_filter('project', $entityShared);
 	$orderEntities = lmdbadvancedproject_get_entity_filter('commande', $entityShared);
 	$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', $entityShared);
+	$supplierOrderEntities = lmdbadvancedproject_get_entity_filter('supplier_order', $entityShared);
 	$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', $entityShared);
 }
 
@@ -360,6 +849,11 @@ foreach ($spentValues as $spentValue) {
 	$spentPieFormattedValues[] = lmdbadvancedproject_format_price($spentValue);
 }
 
+$budgetReportForecast = array();
+if ($budgetReportProjectId > 0 && !empty($projects)) {
+	$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities);
+}
+
 ?>
 
 <div class="info"><?php echo $langs->trans($budgetReportMulticompanyInfoKey); ?></div>
@@ -469,6 +963,7 @@ foreach ($spentValues as $spentValue) {
 				
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				legend: {
 					position: 'right',
 				},
@@ -522,6 +1017,7 @@ foreach ($spentValues as $spentValue) {
 				
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				legend: {
 					position: 'right',
 				},
@@ -610,6 +1106,7 @@ foreach ($spentValues as $spentValue) {
 				
 			options: {
 				responsive: true,
+				maintainAspectRatio: false,
 				legend: {
 					position: 'top',
 				},
@@ -656,6 +1153,10 @@ foreach ($spentValues as $spentValue) {
 </div>
 
 <div class="budgetreport-table-section">
+<?php if ($budgetReportProjectId > 0) { ?>
+	<div class="budgettitle"><?php echo $langs->trans("BudgetReportForecastBudget"); ?></div>
+	<?php lmdbadvancedproject_print_project_forecast($budgetReportForecast); ?>
+<?php } else { ?>
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>
 	<table class="budgettbl">
 		<tr>
@@ -707,6 +1208,7 @@ foreach ($spentValues as $spentValue) {
 			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
 		</tr>
 	</table>
+<?php } ?>
 </div>
 
 </div>
