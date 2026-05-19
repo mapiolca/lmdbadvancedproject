@@ -372,7 +372,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 		$projectId = (int) $projectId;
 
 		$categorySql = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'cd');
-		$sql = "SELECT 'customer_order' AS source_type, c.ref AS document_ref, c.date_commande AS document_date, cd.fk_product, cd.label AS line_label, cd.description AS line_description, cd.qty, cd.total_ht AS amount_ht, (cd.buy_price_ht * cd.qty) AS budget_ht, ".$categorySql['select']."
+		$sql = "SELECT 'customer_order' AS source_type, c.ref AS document_ref, c.date_commande AS document_date, cd.fk_product, cd.label AS line_label, cd.description AS line_description, cd.qty, cd.total_ht AS amount_ht, (COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0)) AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."commande c
 			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
 			".$categorySql['join']."
@@ -400,26 +400,40 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 		}
 
 		$categorySql = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'cfd');
-		$sql = "SELECT 'supplier_order' AS source_type, cf.ref AS document_ref, cf.date_commande AS document_date, cfd.fk_product, cfd.label AS line_label, cfd.description AS line_description, cfd.qty, cfd.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
+		$linkedSupplierInvoiceSql = "SELECT linked.order_id, SUM(linked.total_ht) AS invoiced_ht
+			FROM (
+				SELECT DISTINCT ee.fk_source AS order_id, ff.rowid AS invoice_id, ff.total_ht
+				FROM ".MAIN_DB_PREFIX."element_element ee
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = ee.fk_target
+				WHERE ee.sourcetype IN ('order_supplier', 'supplier_order')
+				AND ee.targettype IN ('invoice_supplier', 'supplier_invoice')
+				AND ff.fk_statut IN (1,2)
+				AND ff.entity IN (".$supplierInvoiceEntities.")
+				UNION
+				SELECT DISTINCT ee.fk_target AS order_id, ff.rowid AS invoice_id, ff.total_ht
+				FROM ".MAIN_DB_PREFIX."element_element ee
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = ee.fk_source
+				WHERE ee.targettype IN ('order_supplier', 'supplier_order')
+				AND ee.sourcetype IN ('invoice_supplier', 'supplier_invoice')
+				AND ff.fk_statut IN (1,2)
+				AND ff.entity IN (".$supplierInvoiceEntities.")
+			) linked
+			GROUP BY linked.order_id";
+		$sql = "SELECT 'supplier_order' AS source_type, cf.ref AS document_ref, COALESCE(cf.date_commande, DATE(cf.date_creation)) AS document_date, cfd.fk_product, cfd.label AS line_label, cfd.description AS line_description, cfd.qty,
+				CASE
+					WHEN COALESCE(cf.total_ht, 0) > 0 THEN COALESCE(cfd.total_ht, 0) * GREATEST(COALESCE(cf.total_ht, 0) - COALESCE(inv.invoiced_ht, 0), 0) / COALESCE(cf.total_ht, 0)
+					ELSE 0
+				END AS amount_ht,
+				0 AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."commande_fournisseur cf
 			INNER JOIN ".MAIN_DB_PREFIX."commande_fournisseurdet cfd ON cfd.fk_commande = cf.rowid
+			LEFT JOIN (".$linkedSupplierInvoiceSql.") inv ON inv.order_id = cf.rowid
 			".$categorySql['join']."
 			WHERE cf.fk_projet = ".$projectId."
-			AND cf.fk_statut > 0 AND cf.fk_statut NOT IN (6,7,9)
+			AND cf.fk_statut IN (3,4,5)
+			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")
-			AND NOT EXISTS (
-				SELECT ee.rowid
-				FROM ".MAIN_DB_PREFIX."element_element ee
-				WHERE (
-					ee.fk_source = cf.rowid
-					AND ee.sourcetype IN ('order_supplier', 'supplier_order')
-					AND ee.targettype IN ('invoice_supplier', 'supplier_invoice')
-				) OR (
-					ee.fk_target = cf.rowid
-					AND ee.targettype IN ('order_supplier', 'supplier_order')
-					AND ee.sourcetype IN ('invoice_supplier', 'supplier_invoice')
-				)
-			)";
+			HAVING amount_ht > 0";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -683,6 +697,7 @@ $cleanmos = array();
 
 $totaltime = 0;
 $totalvendinv = 0;
+$totalsupplierordersremaining = 0;
 $totalexpenses = 0;
 $totalorders = 0;
 $budget = 0;
@@ -692,35 +707,37 @@ $projectSqlFilter = $budgetReportProjectId > 0 ? " AND p.rowid = ".$budgetReport
 $orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
 $taskProjectSqlFilter = $budgetReportProjectId > 0 ? " AND pt.fk_projet = ".$budgetReportProjectId : "";
 $vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
+$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 $expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
 
 $entityShared = (lmdbadvancedproject_is_multicompany_enabled() && !empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES)) ? 1 : 0;
-if (function_exists('getEntity')) {
-	$projectEntities = getEntity('project', $entityShared);
-	$orderEntities = getEntity('commande', $entityShared);
-	$supplierInvoiceEntities = getEntity('supplier_invoice', $entityShared);
-	$supplierOrderEntities = getEntity('supplier_order', $entityShared);
-	$expenseReportEntities = getEntity('expensereport', $entityShared);
-} else {
-	$projectEntities = lmdbadvancedproject_get_entity_filter('project', $entityShared);
-	$orderEntities = lmdbadvancedproject_get_entity_filter('commande', $entityShared);
-	$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', $entityShared);
-	$supplierOrderEntities = lmdbadvancedproject_get_entity_filter('supplier_order', $entityShared);
-	$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', $entityShared);
-}
+$projectDisplayEntityShared = $budgetReportProjectId > 0 ? 1 : $entityShared;
+$projectEntities = lmdbadvancedproject_get_entity_filter('project', $projectDisplayEntityShared);
+$projectDataEntities = lmdbadvancedproject_get_entity_filter('project', 1);
+$orderEntities = lmdbadvancedproject_get_entity_filter('commande', 1);
+$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', 1);
+$supplierOrderEntities = lmdbadvancedproject_get_entity_filter('supplier_order', 1);
+$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', 1);
 
 $budgetReportMulticompanyInfoKey = 'BudgetReportMulticompanyInactiveInfo';
 if (lmdbadvancedproject_is_multicompany_enabled()) {
 	$budgetReportMulticompanyInfoKey = $entityShared ? 'BudgetReportMulticompanyAllEntitiesInfo' : 'BudgetReportMulticompanyCurrentEntityInfo';
 }
 
-$sql = "SELECT p.*, cmd.total_orders FROM ".MAIN_DB_PREFIX."projet p
+$sql = "SELECT p.*, cmd.total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget FROM ".MAIN_DB_PREFIX."projet p
 		INNER JOIN (
-			SELECT c.fk_projet, SUM(c.total_ht) as total_orders
+			SELECT c.fk_projet, SUM(COALESCE(c.total_ht, 0)) as total_orders
 			FROM ".MAIN_DB_PREFIX."commande c
 			WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
 			GROUP BY c.fk_projet
 		) cmd ON cmd.fk_projet = p.rowid
+		LEFT JOIN (
+			SELECT c.fk_projet, SUM(COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0)) as total_budget
+			FROM ".MAIN_DB_PREFIX."commande c
+			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
+			WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
+			GROUP BY c.fk_projet
+		) cmdbudget ON cmdbudget.fk_projet = p.rowid
 		WHERE p.fk_statut=1 AND p.entity IN (".$projectEntities.")".$projectSqlFilter."
 		ORDER BY cmd.total_orders DESC";
 
@@ -731,23 +748,27 @@ $nbtotalofrecords = $db->num_rows($result);
 $i=0;
 while ($i<$nbtotalofrecords) {
 	$obj = $db->fetch_object($result);
-	$projectBudget = (float)$obj->total_orders;
+	$projectOrders = (float)$obj->total_orders;
+	$projectBudget = (float)$obj->total_budget;
 
 	$projects[$obj->rowid] = array ("ref"=>$obj->rowid,
 									"project_ref"=>$obj->ref,
 									"title"=>$obj->title,
 									"public"=>(int) $obj->public,
 									"budget"=>$projectBudget,
-									"orders"=>$projectBudget,
+									"orders"=>$projectOrders,
 									"spent"=>0);
 	//total up all budget
 	$budget += $projectBudget;
-	$totalorders += $projectBudget;
+	$totalorders += $projectOrders;
 
 	//separate budget by months
 	if (empty($obj->datee) || $obj->datee<$obj->dateo) {
 		$yrmo = date('Y-m',strtotime($obj->dateo));
 		$cleanmos[$yrmo] = $yrmo;
+		if (!isset($mobudget[$yrmo])) {
+			$mobudget[$yrmo] = 0;
+		}
 
 		$mobudget[$yrmo] += $projectBudget;
 
@@ -767,6 +788,9 @@ while ($i<$nbtotalofrecords) {
 
 		$permonth = $projectBudget/$j;
 		foreach ($molist as $mos) {
+			if (!isset($mobudget[$mos])) {
+				$mobudget[$mos] = 0;
+			}
 			$mobudget[$mos] += $permonth;
 		}
 	}
@@ -788,7 +812,7 @@ $sql0 = "SELECT pt.fk_projet, ptt.element_date AS task_date, SUM((ptt.element_du
 		FROM ".MAIN_DB_PREFIX."element_time ptt
 		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 		LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectEntities.")".$taskProjectSqlFilter."
+		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectDataEntities.")".$taskProjectSqlFilter."
 		GROUP BY pt.fk_projet, ptt.element_date";
 $result0 = $db->query($sql0);
 $nbtotal0 = $db->num_rows($result0);
@@ -824,13 +848,16 @@ foreach ($projects as $pid=>$data) {
 
 //----start: adding vendor invoices to spent item
 $vendorinvs = array();
-$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ff.total_ttc) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
-			WHERE ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter." GROUP BY ff.fk_projet, ff.datef";
+$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ff.total_ht) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
+			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter." GROUP BY ff.fk_projet, ff.datef";
 $result1 = $db->query($sql1);
 $nbtotal1 = $db->num_rows($result1);
 $i=0;
 while ($i<$nbtotal1) {
 	$obj = $db->fetch_object($result1);
+	if (!isset($vendorinvs[$obj->fk_projet][$obj->datef])) {
+		$vendorinvs[$obj->fk_projet][$obj->datef] = 0;
+	}
 	$vendorinvs[$obj->fk_projet][$obj->datef] += (float)$obj->total_inv;
 	$i++;
 }
@@ -843,6 +870,9 @@ foreach ($projects as $pid=>$data) {
 
 			$yrmo = date('Y-m',strtotime($dt));
 			$cleanmos[$yrmo] = $yrmo;
+			if (!isset($mospent[$yrmo])) {
+				$mospent[$yrmo] = 0;
+			}
 			$mospent[$yrmo] += (float)$val;
 		}
 	}
@@ -850,16 +880,81 @@ foreach ($projects as $pid=>$data) {
 //----end: adding vendor invoices to spent item
 
 
+//----start: adding supplier orders remaining to spent item
+$supplierorders = array();
+$linkedSupplierInvoiceSql = "SELECT linked.order_id, SUM(linked.total_ht) AS invoiced_ht
+			FROM (
+				SELECT DISTINCT ee.fk_source AS order_id, ff.rowid AS invoice_id, ff.total_ht
+				FROM ".MAIN_DB_PREFIX."element_element ee
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = ee.fk_target
+				WHERE ee.sourcetype IN ('order_supplier', 'supplier_order')
+				AND ee.targettype IN ('invoice_supplier', 'supplier_invoice')
+				AND ff.fk_statut IN (1,2)
+				AND ff.entity IN (".$supplierInvoiceEntities.")
+				UNION
+				SELECT DISTINCT ee.fk_target AS order_id, ff.rowid AS invoice_id, ff.total_ht
+				FROM ".MAIN_DB_PREFIX."element_element ee
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = ee.fk_source
+				WHERE ee.targettype IN ('order_supplier', 'supplier_order')
+				AND ee.sourcetype IN ('invoice_supplier', 'supplier_invoice')
+				AND ff.fk_statut IN (1,2)
+				AND ff.entity IN (".$supplierInvoiceEntities.")
+			) linked
+			GROUP BY linked.order_id";
+$sql3 = "SELECT cf.fk_projet, COALESCE(cf.date_commande, DATE(cf.date_creation)) AS order_date,
+			SUM(GREATEST(COALESCE(cf.total_ht, 0) - COALESCE(inv.invoiced_ht, 0), 0)) as total_order_remaining
+			FROM ".MAIN_DB_PREFIX."commande_fournisseur cf
+			LEFT JOIN (".$linkedSupplierInvoiceSql.") inv ON inv.order_id = cf.rowid
+			WHERE cf.fk_projet > 0
+			AND cf.fk_statut IN (3,4,5)
+			AND COALESCE(cf.billed, 0) = 0
+			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter."
+			GROUP BY cf.fk_projet, order_date";
+$result3 = $db->query($sql3);
+$nbtotal3 = $db->num_rows($result3);
+$i=0;
+while ($i<$nbtotal3) {
+	$obj = $db->fetch_object($result3);
+	if ($obj->total_order_remaining > 0) {
+		if (!isset($supplierorders[$obj->fk_projet][$obj->order_date])) {
+			$supplierorders[$obj->fk_projet][$obj->order_date] = 0;
+		}
+		$supplierorders[$obj->fk_projet][$obj->order_date] += (float)$obj->total_order_remaining;
+	}
+	$i++;
+}
+
+foreach ($projects as $pid=>$data) {
+	if (isset($supplierorders[$pid])) {
+		foreach ($supplierorders[$pid] as $dt=>$val) {
+			$projects[$pid]["spent"] += (float)$val;
+			$totalsupplierordersremaining += (float)$val;
+
+			$yrmo = date('Y-m',strtotime($dt));
+			$cleanmos[$yrmo] = $yrmo;
+			if (!isset($mospent[$yrmo])) {
+				$mospent[$yrmo] = 0;
+			}
+			$mospent[$yrmo] += (float)$val;
+		}
+	}
+}
+//----end: adding supplier orders remaining to spent item
+
+
 //----start: adding expenses to spent item
 $expenses = array();
 $sql2 = "SELECT ed.date, ed.fk_projet, SUM(ed.total_ht) as total_exp FROM ".MAIN_DB_PREFIX."expensereport_det ed
 		 LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
-			WHERE ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.")".$expenseProjectSqlFilter." GROUP BY ed.fk_projet, date ";
+			WHERE ed.fk_projet > 0 AND ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.")".$expenseProjectSqlFilter." GROUP BY ed.fk_projet, ed.date ";
 $result2 = $db->query($sql2);
 $nbtotal2 = $db->num_rows($result2);
 $i=0;
 while ($i<$nbtotal2) {
 	$obj = $db->fetch_object($result2);
+	if (!isset($expenses[$obj->fk_projet][$obj->date])) {
+		$expenses[$obj->fk_projet][$obj->date] = 0;
+	}
 	$expenses[$obj->fk_projet][$obj->date] += (float)$obj->total_exp;
 	$i++;
 }
@@ -872,6 +967,9 @@ foreach ($projects as $pid=>$data) {
 
 			$yrmo = date('Y-m',strtotime($dt));
 			$cleanmos[$yrmo] = $yrmo;
+			if (!isset($mospent[$yrmo])) {
+				$mospent[$yrmo] = 0;
+			}
 			$mospent[$yrmo] += (float)$val;
 		}
 	}
@@ -880,7 +978,7 @@ foreach ($projects as $pid=>$data) {
 
 
 //processing data for view
-$totalspent = $totaltime+$totalvendinv+$totalexpenses;
+$totalspent = $totaltime+$totalvendinv+$totalsupplierordersremaining+$totalexpenses;
 $balance = $budget-$totalspent;
 
 $blncolor = "green";
@@ -905,11 +1003,13 @@ foreach ($projects as $data) {
 $spentLabels = array(
 	lmdbadvancedproject_trans_chart("BudgetReportTimeSpentOnTasks"),
 	lmdbadvancedproject_trans_chart("BudgetReportVendorInvoices"),
+	lmdbadvancedproject_trans_chart("BudgetReportSupplierOrderNotInvoiced"),
 	lmdbadvancedproject_trans_chart("BudgetReportStaffExpenses"),
 );
 $spentValues = array(
 	lmdbadvancedproject_round_amount($totaltime),
 	lmdbadvancedproject_round_amount($totalvendinv),
+	lmdbadvancedproject_round_amount($totalsupplierordersremaining),
 	lmdbadvancedproject_round_amount($totalexpenses),
 );
 
@@ -925,7 +1025,7 @@ foreach ($spentValues as $spentValue) {
 
 $budgetReportForecast = array();
 if ($budgetReportProjectId > 0 && !empty($projects)) {
-	$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities);
+	$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectDataEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities);
 }
 
 ?>
@@ -938,6 +1038,15 @@ if ($budgetReportProjectId > 0 && !empty($projects)) {
 
 <div class="budgetreport-summary-fullwidth">
 <div class="dashboard_budget">
+	<figure>
+		<div class='figurein'>
+			<div class="budgettitle"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
+			<div class="famount">
+				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
+			</div>
+		</div>
+	</figure>
+
 	<figure>
 		<div class='figurein'>
 			<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
@@ -1083,6 +1192,7 @@ if ($budgetReportProjectId > 0 && !empty($projects)) {
 					data: <?php echo json_encode(array_values($spentValues)); ?>,
 					backgroundColor: [window.chartColors.cyan,
 										window.chartColors.pink,
+										window.chartColors.orange,
 										window.chartColors.yellow,
 										window.chartColors.white,]
 					}],
