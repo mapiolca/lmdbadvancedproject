@@ -107,16 +107,26 @@ $db->free($result);
 
 //----start: adding timespent to spent item
 $timespent = array();
-$sql0 = "SELECT pt.fk_projet, ptt.task_date, SUM(ptt.task_duration)*ptt.thm/60/60 AS totalspent FROM ".MAIN_DB_PREFIX."projet_task pt 
-			LEFT JOIN ".MAIN_DB_PREFIX."projet_task_time ptt ON ptt.fk_task = pt.rowid 
-		 GROUP BY pt.fk_projet, ptt.fk_user, ptt.task_date";
+$sql0 = "SELECT pt.fk_projet, ptt.task_date, SUM((ptt.task_duration / 3600.0) * CASE
+				WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
+				WHEN u.thm IS NOT NULL AND u.thm > 0 THEN u.thm
+				ELSE 0
+			END) AS totalspent
+		FROM ".MAIN_DB_PREFIX."projet_task_time ptt
+		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_task = pt.rowid
+		LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
+		WHERE ptt.task_duration > 0
+		GROUP BY pt.fk_projet, ptt.task_date";
 $result0 = $db->query($sql0);
 $nbtotal0 = $db->num_rows($result0);
 $i=0;
 while ($i<$nbtotal0) {
-	$obj = $db->fetch_object($result0);	
+	$obj = $db->fetch_object($result0);
 	if ($obj->totalspent>0) {
-		$timespent[$obj->fk_projet][$obj->task_date] += (int)$obj->totalspent;	
+		if (!isset($timespent[$obj->fk_projet][$obj->task_date])) {
+			$timespent[$obj->fk_projet][$obj->task_date] = 0;
+		}
+		$timespent[$obj->fk_projet][$obj->task_date] += (float)$obj->totalspent;
 	}
 	$i++;
 }
@@ -124,12 +134,15 @@ while ($i<$nbtotal0) {
 foreach ($projects as $pid=>$data) {
 	if (isset($timespent[$pid])) {
 		foreach ($timespent[$pid] as $dt=>$val) {
-			$projects[$pid]["spent"] += (int)$val;
-			$totaltime += (int)$val;	
-			
+			$projects[$pid]["spent"] += (float)$val;
+			$totaltime += (float)$val;
+
 			$yrmo = date('Y-m',strtotime($dt));
 			$cleanmos[$yrmo] = $yrmo;
-			$mospent[$yrmo] += (int)$val;	
+			if (!isset($mospent[$yrmo])) {
+				$mospent[$yrmo] = 0;
+			}
+			$mospent[$yrmo] += (float)$val;
 		}
 	}
 }
