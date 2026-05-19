@@ -92,8 +92,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->warnings_activation_ext = array();
 		$this->const = array();
 
-		if (!isset($conf->lmdb_advancedproject) || !isset($conf->lmdb_advancedproject->enabled)) {
+		if (empty($conf->lmdb_advancedproject) || !is_object($conf->lmdb_advancedproject)) {
 			$conf->lmdb_advancedproject = new stdClass();
+		}
+		if (!isset($conf->lmdb_advancedproject->enabled)) {
 			$conf->lmdb_advancedproject->enabled = 0;
 		}
 
@@ -106,7 +108,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$r = 0;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
 		$this->rights[$r][1] = 'ReadBudgetReport';
-		$this->rights[$r][4] = 'myobject';
+		$this->rights[$r][4] = 'budgetreport';
 		$this->rights[$r][5] = 'read';
 
 		$this->menu = array();
@@ -121,8 +123,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'url' => '/lmdb_advancedproject/budgetreportindex.php',
 			'langs' => 'lmdb_advancedproject@lmdb_advancedproject',
 			'position' => '9',
-			'enabled' => '$conf->lmdb_advancedproject->enabled',
-			'perms' => '$user->rights->lmdb_advancedproject->myobject->read',
+			'enabled' => '!empty($conf->global->MAIN_MODULE_LMDB_ADVANCEDPROJECT)',
+			'perms' => '!empty($user->rights->lmdb_advancedproject->budgetreport->read)',
 			'target' => '',
 			'user' => 0,
 		);

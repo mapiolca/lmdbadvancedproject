@@ -64,7 +64,7 @@ $action = GETPOST('action', 'aZ09');
 
 
 // Security check
-// if (! $user->rights->lmdb_advancedproject->myobject->read) {
+// if (! $user->rights->lmdb_advancedproject->budgetreport->read) {
 // 	accessforbidden();
 // }
 $socid = GETPOST('socid', 'int');
