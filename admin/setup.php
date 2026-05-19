@@ -56,13 +56,56 @@ require_once '../lib/lmdbadvancedproject.lib.php';
 
 $langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
 
+if (!function_exists('lmdbadvancedproject_is_multicompany_enabled')) {
+	/**
+	 * Check if Dolibarr Multicompany module is enabled.
+	 *
+	 * @return bool
+	 */
+	function lmdbadvancedproject_is_multicompany_enabled()
+	{
+		global $conf;
+
+		if (function_exists('isModEnabled')) {
+			return isModEnabled('multicompany');
+		}
+
+		return !empty($conf->multicompany->enabled);
+	}
+}
+
 if (!$user->admin) {
 	accessforbidden();
 }
 
 $backtopage = GETPOST('backtopage', 'alpha');
+$action = GETPOST('action', 'aZ09');
 $help_url = '';
 $page_name = 'AdvancedProjectSetup';
+
+if ($action === 'set_multicompany_scope') {
+	$token = GETPOST('token', 'alpha');
+	$expectedToken = '';
+	if (function_exists('currentToken')) {
+		$expectedToken = currentToken();
+	} elseif (!empty($_SESSION['newtoken'])) {
+		$expectedToken = $_SESSION['newtoken'];
+	}
+
+	if (!empty($expectedToken) && $token !== $expectedToken) {
+		accessforbidden('Bad value for token');
+	}
+
+	$value = GETPOST('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES', 'int') ? 1 : 0;
+	$result = dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES', $value, 'chaine', 0, '', $conf->entity);
+	if ($result > 0) {
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+		header('Location: '.$_SERVER['PHP_SELF']);
+		exit;
+	} else {
+		dol_print_error($db);
+	}
+}
 
 llxHeader('', $langs->trans($page_name), $help_url);
 
@@ -74,7 +117,37 @@ $head = lmdbadvancedprojectAdminPrepareHead();
 print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'lmdbadvancedproject@lmdbadvancedproject');
 
 print '<span class="opacitymedium">'.$langs->trans('AdvancedProjectSetupPage').'</span><br><br>';
-print '<br>'.$langs->trans('NothingToSetup');
+
+if (lmdbadvancedproject_is_multicompany_enabled()) {
+	$newToken = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
+	$multicompanyAllEntities = empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES) ? 0 : 1;
+
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
+	print '<input type="hidden" name="token" value="'.$newToken.'">';
+	print '<input type="hidden" name="action" value="set_multicompany_scope">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td>'.$langs->trans('Parameters').'</td>';
+	print '<td class="right">'.$langs->trans('Value').'</td>';
+	print '</tr>';
+	print '<tr class="oddeven">';
+	print '<td>';
+	print '<label for="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES">'.$langs->trans('AdvancedProjectMulticompanyScope').'</label>';
+	print '<br><span class="opacitymedium">'.$langs->trans('AdvancedProjectMulticompanyScopeHelp').'</span>';
+	print '</td>';
+	print '<td class="right">';
+	print '<input type="checkbox" class="flat" id="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES" name="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES" value="1"'.($multicompanyAllEntities ? ' checked' : '').'> ';
+	print '<label for="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES">'.$langs->trans('AdvancedProjectMulticompanyAllEntities').'</label>';
+	print '</td>';
+	print '</tr>';
+	print '</table>';
+	print '<div class="tabsAction">';
+	print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
+	print '</div>';
+	print '</form>';
+} else {
+	print '<div class="info">'.$langs->trans('AdvancedProjectMulticompanyInactive').'</div>';
+}
 
 print dol_get_fiche_end();
 

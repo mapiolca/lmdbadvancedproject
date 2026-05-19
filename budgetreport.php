@@ -61,6 +61,44 @@ if (!function_exists('lmdbadvancedproject_trans_chart')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_is_multicompany_enabled')) {
+	/**
+	 * Check if Dolibarr Multicompany module is enabled.
+	 *
+	 * @return bool
+	 */
+	function lmdbadvancedproject_is_multicompany_enabled()
+	{
+		global $conf;
+
+		if (function_exists('isModEnabled')) {
+			return isModEnabled('multicompany');
+		}
+
+		return !empty($conf->multicompany->enabled);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_entity_filter')) {
+	/**
+	 * Return entity filter values for a Dolibarr element.
+	 *
+	 * @param  string $element Dolibarr element name
+	 * @param  int    $shared  Use shared/available entities
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_entity_filter($element, $shared)
+	{
+		global $conf;
+
+		if (function_exists('getEntity')) {
+			return getEntity($element, $shared);
+		}
+
+		return (string) ((int) $conf->entity);
+	}
+}
+
 $datenow = date('Y-m-d');
 $projects = array();
 $mobudget = array();
@@ -73,14 +111,27 @@ $totalexpenses = 0;
 $totalorders = 0;
 $budget = 0;
 
+$entityShared = (lmdbadvancedproject_is_multicompany_enabled() && !empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES)) ? 1 : 0;
+if (function_exists('getEntity')) {
+	$projectEntities = getEntity('project', $entityShared);
+	$orderEntities = getEntity('commande', $entityShared);
+	$supplierInvoiceEntities = getEntity('supplier_invoice', $entityShared);
+	$expenseReportEntities = getEntity('expensereport', $entityShared);
+} else {
+	$projectEntities = lmdbadvancedproject_get_entity_filter('project', $entityShared);
+	$orderEntities = lmdbadvancedproject_get_entity_filter('commande', $entityShared);
+	$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', $entityShared);
+	$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', $entityShared);
+}
+
 $sql = "SELECT p.*, cmd.total_orders FROM ".MAIN_DB_PREFIX."projet p
 		INNER JOIN (
-			SELECT fk_projet, SUM(total_ht) as total_orders
-			FROM ".MAIN_DB_PREFIX."commande
-			WHERE fk_projet > 0 AND fk_statut > 0
-			GROUP BY fk_projet
+			SELECT c.fk_projet, SUM(c.total_ht) as total_orders
+			FROM ".MAIN_DB_PREFIX."commande c
+			WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")
+			GROUP BY c.fk_projet
 		) cmd ON cmd.fk_projet = p.rowid
-		WHERE p.fk_statut=1
+		WHERE p.fk_statut=1 AND p.entity IN (".$projectEntities.")
 		ORDER BY cmd.total_orders DESC";
 
 
@@ -145,7 +196,7 @@ $sql0 = "SELECT pt.fk_projet, ptt.element_date AS task_date, SUM((ptt.element_du
 		FROM ".MAIN_DB_PREFIX."element_time ptt
 		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 		LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0
+		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectEntities.")
 		GROUP BY pt.fk_projet, ptt.element_date";
 $result0 = $db->query($sql0);
 $nbtotal0 = $db->num_rows($result0);
@@ -181,8 +232,8 @@ foreach ($projects as $pid=>$data) {
 
 //----start: adding vendor invoices to spent item
 $vendorinvs = array();
-$sql1 = "SELECT datef, fk_projet, SUM(total_ttc) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn 
-			WHERE fk_statut IN (1,2) GROUP BY fk_projet, datef";
+$sql1 = "SELECT datef, fk_projet, SUM(total_ttc) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn
+			WHERE fk_statut IN (1,2) AND entity IN (".$supplierInvoiceEntities.") GROUP BY fk_projet, datef";
 $result1 = $db->query($sql1);
 $nbtotal1 = $db->num_rows($result1);
 $i=0;
@@ -209,9 +260,9 @@ foreach ($projects as $pid=>$data) {
 
 //----start: adding expenses to spent item
 $expenses = array();
-$sql2 = "SELECT ed.date, ed.fk_projet, SUM(ed.total_ht) as total_exp FROM ".MAIN_DB_PREFIX."expensereport_det ed 
-		 LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid 
-			WHERE ex.fk_user_approve>0 GROUP BY ed.fk_projet, date ";
+$sql2 = "SELECT ed.date, ed.fk_projet, SUM(ed.total_ht) as total_exp FROM ".MAIN_DB_PREFIX."expensereport_det ed
+		 LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
+			WHERE ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.") GROUP BY ed.fk_projet, date ";
 $result2 = $db->query($sql2);
 $nbtotal2 = $db->num_rows($result2);
 $i=0;

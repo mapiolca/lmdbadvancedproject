@@ -10,6 +10,10 @@ ModuleLmdbAdvancedProjectDesc = Advanced Project amplía el análisis presupuest
 
 AdvancedProjectSetup = Configuración de Advanced Project
 AdvancedProjectSetupPage = Página de configuración de Advanced Project
+AdvancedProjectMulticompanyScope = Ámbito multicompany del informe
+AdvancedProjectMulticompanyAllEntities = Mostrar todas las entidades disponibles por defecto
+AdvancedProjectMulticompanyScopeHelp = Cuando esta opción está desactivada, el informe se limita a la entidad actual.
+AdvancedProjectMulticompanyInactive = El módulo Multicompany no está activado; el informe permanece limitado a la entidad actual.
 AdvancedProjectAbout = Acerca de Advanced Project
 AdvancedProjectAboutPage = Página acerca de Advanced Project
 ReadBudgetReport = Leer informe de presupuesto
