@@ -58,6 +58,7 @@ BudgetReportSupplierInvoice = Factura proveedor
 BudgetReportOrderDetails = Detalle pedidos
 BudgetReportSupplierDetails = Detalle proveedores
 BudgetReportDetails = Detalles
+BudgetReportNoDetail = Sin detalle
 BudgetReportTimeSpentTotal = Tiempo total dedicado
 BudgetReportTimeSpentHours = Horas
 BudgetReportExpenseReportDetails = Detalle de gastos

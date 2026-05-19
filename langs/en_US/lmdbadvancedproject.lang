@@ -58,6 +58,7 @@ BudgetReportSupplierInvoice = Supplier invoice
 BudgetReportOrderDetails = Order details
 BudgetReportSupplierDetails = Supplier details
 BudgetReportDetails = Details
+BudgetReportNoDetail = No detail
 BudgetReportTimeSpentTotal = Total time spent
 BudgetReportTimeSpentHours = Hours
 BudgetReportExpenseReportDetails = Expense report details

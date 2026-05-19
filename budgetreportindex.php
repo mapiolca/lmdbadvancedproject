@@ -56,6 +56,7 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
+require_once __DIR__.'/lib/budgetreport.lib.php';
 
 // Load translation files required by the page
 $langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject"));
@@ -114,7 +115,7 @@ llxHeader("", $langs->trans("BudgetReportArea"));
 <div >
 
 
-<?php include('budgetreport.php');?>
+<?php lmdbadvancedproject_render_global_budget_report(); ?>
 
 <div class="tabBar" style='clear:both;'>
 <div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>

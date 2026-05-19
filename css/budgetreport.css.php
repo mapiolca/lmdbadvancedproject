@@ -207,18 +207,12 @@ div.mainmenu.budgetreport {
 	vertical-align: top;
 }
 
-.budgetreport-forecast-details {
-	margin-bottom: 8px;
-}
-
-.budgetreport-forecast-details summary {
-	cursor: pointer;
-	font-weight: 600;
+.budgetreport-modal-open {
+	margin: 0 8px 8px 0;
 }
 
 .budgetreport-forecast-subtable {
 	width: 100%;
-	margin-top: 8px;
 	border-collapse: collapse;
 }
 
@@ -234,6 +228,53 @@ div.mainmenu.budgetreport {
 
 .budgetreport-forecast-subtitle {
 	margin-top: 16px;
+}
+
+.budgetreport-modal {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+}
+
+.budgetreport-modal.budgetreport-modal-is-open {
+	display: block;
+}
+
+.budgetreport-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.budgetreport-modal-dialog {
+	position: relative;
+	max-width: min(1000px, calc(100vw - 32px));
+	max-height: calc(100vh - 32px);
+	margin: 16px auto;
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+}
+
+.budgetreport-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 16px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.budgetreport-modal-title {
+	font-weight: 600;
+}
+
+.budgetreport-modal-body {
+	max-height: calc(100vh - 120px);
+	overflow: auto;
+	padding: 16px;
 }
 
 @media only screen and (max-width: 980px) {

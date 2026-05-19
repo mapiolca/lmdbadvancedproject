@@ -16,7 +16,7 @@
  */
 
 /**
- * \file       lmdbadvancedproject/tabs/project_budgetreport.php
+ * \file       lmdbadvancedproject/tabs/project_budgetreport
  * \ingroup    lmdbadvancedproject
  * \brief      Project budget report tab.
  */
@@ -55,6 +55,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/project.lib.php';
+require_once dirname(__DIR__).'/lib/budgetreport.lib.php';
 
 $langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 
@@ -103,8 +104,7 @@ $morehtmlref .= '</div>';
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 
 print '<div class="fichecenter">';
-$budgetReportProjectId = (int) $object->id;
-include dirname(__DIR__).'/budgetreport.php';
+lmdbadvancedproject_render_project_budget_report((int) $object->id);
 print '</div>';
 
 print dol_get_fiche_end();

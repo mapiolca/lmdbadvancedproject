@@ -58,6 +58,7 @@ BudgetReportSupplierInvoice = Lieferantenrechnung
 BudgetReportOrderDetails = Bestelldetails
 BudgetReportSupplierDetails = Lieferantendetails
 BudgetReportDetails = Details
+BudgetReportNoDetail = Keine Details
 BudgetReportTimeSpentTotal = Gesamtzeit
 BudgetReportTimeSpentHours = Stunden
 BudgetReportExpenseReportDetails = Spesenberichtdetails

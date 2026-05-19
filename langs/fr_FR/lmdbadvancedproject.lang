@@ -58,6 +58,7 @@ BudgetReportSupplierInvoice = Facture fournisseur
 BudgetReportOrderDetails = Détail commandes
 BudgetReportSupplierDetails = Détail fournisseurs
 BudgetReportDetails = Détails
+BudgetReportNoDetail = Aucun détail
 BudgetReportTimeSpentTotal = Temps passé total
 BudgetReportTimeSpentHours = Heures
 BudgetReportExpenseReportDetails = Détail des notes de frais
