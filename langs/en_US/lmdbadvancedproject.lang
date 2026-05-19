@@ -19,6 +19,11 @@ AdvancedProjectAboutPage = Advanced Project about page
 ReadBudgetReport = Read Budget Report
 
 BudgetReportArea = Project Budget Report
+BudgetReportProjectTab = Budget report
+BudgetReportProjectNoData = No validated customer order is linked to this project; the budget report has no data.
+BudgetReportMulticompanyInactiveInfo = Multicompany is not enabled; the report is limited to the current entity.
+BudgetReportMulticompanyCurrentEntityInfo = The report only shows projects from the current entity.
+BudgetReportMulticompanyAllEntitiesInfo = The report shows projects from all available entities.
 BudgetReportBudget = Budget
 BudgetReportSpent = Spent
 BudgetReportLeftToSpend = Left to spend

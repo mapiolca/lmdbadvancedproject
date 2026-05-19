@@ -5,6 +5,21 @@ if (!$user->rights->projet->lire) {
 	echo "access forbidden";
 } 
 
+require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+
+if (!function_exists('lmdbadvancedproject_round_amount')) {
+	/**
+	 * Round monetary amounts for display and chart data.
+	 *
+	 * @param  float|int $amount Amount to round
+	 * @return float
+	 */
+	function lmdbadvancedproject_round_amount($amount)
+	{
+		return round((float) $amount, 2);
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_format_price')) {
 	/**
 	 * Format amounts with Dolibarr's configured currency.
@@ -18,7 +33,7 @@ if (!function_exists('lmdbadvancedproject_format_price')) {
 
 		$currencyCode = empty($conf->currency) ? '' : $conf->currency;
 
-		return price($amount, 0, $langs, 1, -1, -1, $currencyCode);
+		return price(lmdbadvancedproject_round_amount($amount), 0, $langs, 1, 2, 2, $currencyCode);
 	}
 }
 
@@ -111,6 +126,13 @@ $totalexpenses = 0;
 $totalorders = 0;
 $budget = 0;
 
+$budgetReportProjectId = empty($budgetReportProjectId) ? 0 : (int) $budgetReportProjectId;
+$projectSqlFilter = $budgetReportProjectId > 0 ? " AND p.rowid = ".$budgetReportProjectId : "";
+$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
+$taskProjectSqlFilter = $budgetReportProjectId > 0 ? " AND pt.fk_projet = ".$budgetReportProjectId : "";
+$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
+$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
+
 $entityShared = (lmdbadvancedproject_is_multicompany_enabled() && !empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES)) ? 1 : 0;
 if (function_exists('getEntity')) {
 	$projectEntities = getEntity('project', $entityShared);
@@ -124,14 +146,19 @@ if (function_exists('getEntity')) {
 	$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', $entityShared);
 }
 
+$budgetReportMulticompanyInfoKey = 'BudgetReportMulticompanyInactiveInfo';
+if (lmdbadvancedproject_is_multicompany_enabled()) {
+	$budgetReportMulticompanyInfoKey = $entityShared ? 'BudgetReportMulticompanyAllEntitiesInfo' : 'BudgetReportMulticompanyCurrentEntityInfo';
+}
+
 $sql = "SELECT p.*, cmd.total_orders FROM ".MAIN_DB_PREFIX."projet p
 		INNER JOIN (
 			SELECT c.fk_projet, SUM(c.total_ht) as total_orders
 			FROM ".MAIN_DB_PREFIX."commande c
-			WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")
+			WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
 			GROUP BY c.fk_projet
 		) cmd ON cmd.fk_projet = p.rowid
-		WHERE p.fk_statut=1 AND p.entity IN (".$projectEntities.")
+		WHERE p.fk_statut=1 AND p.entity IN (".$projectEntities.")".$projectSqlFilter."
 		ORDER BY cmd.total_orders DESC";
 
 
@@ -144,7 +171,9 @@ while ($i<$nbtotalofrecords) {
 	$projectBudget = (float)$obj->total_orders;
 
 	$projects[$obj->rowid] = array ("ref"=>$obj->rowid,
+									"project_ref"=>$obj->ref,
 									"title"=>$obj->title,
+									"public"=>(int) $obj->public,
 									"budget"=>$projectBudget,
 									"orders"=>$projectBudget,
 									"spent"=>0);
@@ -196,7 +225,7 @@ $sql0 = "SELECT pt.fk_projet, ptt.element_date AS task_date, SUM((ptt.element_du
 		FROM ".MAIN_DB_PREFIX."element_time ptt
 		INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 		LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectEntities.")
+		WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectEntities.")".$taskProjectSqlFilter."
 		GROUP BY pt.fk_projet, ptt.element_date";
 $result0 = $db->query($sql0);
 $nbtotal0 = $db->num_rows($result0);
@@ -232,26 +261,26 @@ foreach ($projects as $pid=>$data) {
 
 //----start: adding vendor invoices to spent item
 $vendorinvs = array();
-$sql1 = "SELECT datef, fk_projet, SUM(total_ttc) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn
-			WHERE fk_statut IN (1,2) AND entity IN (".$supplierInvoiceEntities.") GROUP BY fk_projet, datef";
+$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ff.total_ttc) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
+			WHERE ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter." GROUP BY ff.fk_projet, ff.datef";
 $result1 = $db->query($sql1);
 $nbtotal1 = $db->num_rows($result1);
 $i=0;
 while ($i<$nbtotal1) {
-	$obj = $db->fetch_object($result1);	
-	$vendorinvs[$obj->fk_projet][$obj->datef] += (int)$obj->total_inv;	
+	$obj = $db->fetch_object($result1);
+	$vendorinvs[$obj->fk_projet][$obj->datef] += (float)$obj->total_inv;
 	$i++;
 }
 
 foreach ($projects as $pid=>$data) {
 	if (isset($vendorinvs[$pid])) {
 		foreach ($vendorinvs[$pid] as $dt=>$val) {
-			$projects[$pid]["spent"] += (int)$val;
-			$totalvendinv += (int)$val;
-			
+			$projects[$pid]["spent"] += (float)$val;
+			$totalvendinv += (float)$val;
+
 			$yrmo = date('Y-m',strtotime($dt));
 			$cleanmos[$yrmo] = $yrmo;
-			$mospent[$yrmo] += (int)$val;	
+			$mospent[$yrmo] += (float)$val;
 		}
 	}
 }
@@ -262,25 +291,25 @@ foreach ($projects as $pid=>$data) {
 $expenses = array();
 $sql2 = "SELECT ed.date, ed.fk_projet, SUM(ed.total_ht) as total_exp FROM ".MAIN_DB_PREFIX."expensereport_det ed
 		 LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
-			WHERE ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.") GROUP BY ed.fk_projet, date ";
+			WHERE ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.")".$expenseProjectSqlFilter." GROUP BY ed.fk_projet, date ";
 $result2 = $db->query($sql2);
 $nbtotal2 = $db->num_rows($result2);
 $i=0;
 while ($i<$nbtotal2) {
-	$obj = $db->fetch_object($result2);	
-	$expenses[$obj->fk_projet][$obj->date] += (int)$obj->total_exp;	
+	$obj = $db->fetch_object($result2);
+	$expenses[$obj->fk_projet][$obj->date] += (float)$obj->total_exp;
 	$i++;
 }
 
 foreach ($projects as $pid=>$data) {
 	if (isset($expenses[$pid])) {
 		foreach ($expenses[$pid] as $dt=>$val) {
-			$projects[$pid]["spent"] += (int)$val;
-			$totalexpenses += (int)$val;
+			$projects[$pid]["spent"] += (float)$val;
+			$totalexpenses += (float)$val;
 
 			$yrmo = date('Y-m',strtotime($dt));
 			$cleanmos[$yrmo] = $yrmo;
-			$mospent[$yrmo] += (int)$val;	
+			$mospent[$yrmo] += (float)$val;
 		}
 	}
 }
@@ -304,8 +333,8 @@ $spentFormattedValues = array();
 
 foreach ($projects as $data) {
 	$labels[] = $data["title"];
-	$budgets[] = $data["budget"];
-	$spents[] = $data["spent"];
+	$budgets[] = lmdbadvancedproject_round_amount($data["budget"]);
+	$spents[] = lmdbadvancedproject_round_amount($data["spent"]);
 	$budgetFormattedValues[] = lmdbadvancedproject_format_price($data["budget"]);
 	$spentFormattedValues[] = lmdbadvancedproject_format_price($data["spent"]);
 }
@@ -315,11 +344,15 @@ $spentLabels = array(
 	lmdbadvancedproject_trans_chart("BudgetReportVendorInvoices"),
 	lmdbadvancedproject_trans_chart("BudgetReportStaffExpenses"),
 );
-$spentValues = array($totaltime, $totalvendinv, $totalexpenses);
+$spentValues = array(
+	lmdbadvancedproject_round_amount($totaltime),
+	lmdbadvancedproject_round_amount($totalvendinv),
+	lmdbadvancedproject_round_amount($totalexpenses),
+);
 
 if ($balance > 0) {
 	$spentLabels[] = lmdbadvancedproject_trans_chart("BudgetReportBalance");
-	$spentValues[] = $balance;
+	$spentValues[] = lmdbadvancedproject_round_amount($balance);
 }
 
 $spentPieFormattedValues = array();
@@ -328,6 +361,12 @@ foreach ($spentValues as $spentValue) {
 }
 
 ?>
+
+<div class="info"><?php echo $langs->trans($budgetReportMulticompanyInfoKey); ?></div>
+
+<?php if ($budgetReportProjectId > 0 && empty($projects)) { ?>
+<div class="warning"><?php echo $langs->trans("BudgetReportProjectNoData"); ?></div>
+<?php return; } ?>
 
 <div style='clear:both; overflow:auto; margin-bottom: 30px;'>
 <div class='dashboard_budget'>
@@ -393,14 +432,19 @@ foreach ($spentValues as $spentValue) {
 				return new Intl.NumberFormat(undefined, {
 					style: 'currency',
 					currency: budgetReportCurrencyCode,
-					maximumFractionDigits: 0
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2
 				}).format(value);
 			} catch (e) {}
 		}
 
-		value = value.toString();
-		value = value.split(/(?=(?:...)*$)/);
-		return value.join(',');
+		value = Number(value);
+		if (isNaN(value)) {
+			value = 0;
+		}
+		value = value.toFixed(2).split('.');
+		value[0] = value[0].split(/(?=(?:...)*$)/).join(',');
+		return value.join('.');
 	}
 
 	var budgetFormattedValues = <?php echo json_encode(array_values($budgetFormattedValues)); ?>;
@@ -473,11 +517,15 @@ foreach ($spentValues as $spentValue) {
 		$fgrossmargin = $data['orders']-$data['spent'];
 		$fgrosscolor = "green";
 		if ($fgrossmargin<0) $fgrosscolor="red";
-		$url = DOL_URL_ROOT.'/projet/element.php?id='.$pid;
+		$projectstatic = new Project($db);
+		$projectstatic->id = $pid;
+		$projectstatic->ref = $data['project_ref'];
+		$projectstatic->title = $data['title'];
+		$projectstatic->public = $data['public'];
 		?>
 
 		<tr>
-			<td><a href='<?php echo $url; ?>'><?php echo $data['title']; ?></a></td>
+			<td><?php echo $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php', 1); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
@@ -571,8 +619,8 @@ foreach ($spentValues as $spentValue) {
 		$monthBudget = empty($mobudget[$data]) ? 0 : $mobudget[$data];
 		$monthSpent = empty($mospent[$data]) ? 0 : $mospent[$data];
 		$molabels[] = date("M'y",strtotime($data."-01"));
-		$mobudgets[] = $monthBudget;
-		$mospents[] = $monthSpent;
+		$mobudgets[] = lmdbadvancedproject_round_amount($monthBudget);
+		$mospents[] = lmdbadvancedproject_round_amount($monthSpent);
 		$mobudgetFormattedValues[] = lmdbadvancedproject_format_price($monthBudget);
 		$mospentFormattedValues[] = lmdbadvancedproject_format_price($monthSpent);
 	}	

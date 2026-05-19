@@ -100,6 +100,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 		}
 
 		$this->tabs = array();
+		$this->tabs[] = array(
+			'data' => 'project:+budgetreport:BudgetReportProjectTab:lmdbadvancedproject@lmdbadvancedproject:$user->rights->lmdbadvancedproject->budgetreport->read:/lmdbadvancedproject/tabs/project_budgetreport.php?id=__ID__',
+		);
+
 		$this->dictionaries = array();
 		$this->boxes = array();
 		$this->cronjobs = array();

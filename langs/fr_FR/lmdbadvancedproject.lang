@@ -19,6 +19,11 @@ AdvancedProjectAboutPage = Page À propos d'Advanced Project
 ReadBudgetReport = Lire le rapport budgétaire
 
 BudgetReportArea = Rapport budgétaire des projets
+BudgetReportProjectTab = Rapport budgétaire
+BudgetReportProjectNoData = Aucune commande client validée n'est liée à ce projet; le rapport budgétaire ne contient pas de données.
+BudgetReportMulticompanyInactiveInfo = Multicompany n'est pas activé; le rapport est limité à l'entité courante.
+BudgetReportMulticompanyCurrentEntityInfo = Le rapport affiche uniquement les projets de l'entité courante.
+BudgetReportMulticompanyAllEntitiesInfo = Le rapport affiche les projets de toutes les entités disponibles.
 BudgetReportBudget = Budget
 BudgetReportSpent = Dépensé
 BudgetReportLeftToSpend = Reste à dépenser
