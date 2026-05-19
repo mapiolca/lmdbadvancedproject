@@ -114,18 +114,26 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-summary-fullwidth {
+	display: block;
+	max-width: none;
 	margin-bottom: 30px;
+	margin-left: 0;
+	margin-right: 0;
 }
 
 .dashboard_budget {
 	table-layout: fixed;
 	width: 100%;
+	max-width: none;
 	margin: 0;
+	border-spacing: 0;
 }
 
 .dashboard_budget .budgetreport-summary-cell {
 	box-sizing: border-box;
-	padding: 10px 8px 12px;
+	width: 25%;
+	max-width: 25%;
+	padding: 10px 6px 12px;
 	border-right: solid 2px rgba(0,0,0,0.2);
 	border-bottom: solid 2px rgba(0,0,0,0.2);
 }
@@ -137,11 +145,12 @@ div.mainmenu.budgetreport {
 .budgetreport-summary-label {
 	font-size: 110%;
 	line-height: 1.2;
+	overflow-wrap: anywhere;
 }
 
 .budgetreport-summary-amount {
 	display: block;
-	font-size: 2.1em;
+	font-size: 2em;
 	line-height: 1.1;
 	color: #333;
 }
@@ -275,6 +284,27 @@ div.mainmenu.budgetreport {
 	padding: 16px;
 }
 
+@media only screen and (max-width: 1400px) {
+	.budgetreport-summary-amount {
+		font-size: 1.8em;
+	}
+}
+
+@media only screen and (max-width: 1180px) {
+	.dashboard_budget .budgetreport-summary-cell {
+		padding-left: 4px;
+		padding-right: 4px;
+	}
+
+	.budgetreport-summary-label {
+		font-size: 100%;
+	}
+
+	.budgetreport-summary-amount {
+		font-size: 1.6em;
+	}
+}
+
 @media only screen and (max-width: 980px) {
 	.budgetreport-charts-row {
 		grid-template-columns: 1fr !important;
@@ -290,5 +320,22 @@ div.mainmenu.budgetreport {
 
 	.dashboard_budget .budgetreport-summary-cell {
 		border-right: 0;
+		max-width: none;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	.budgetreport-summary-label {
+		font-size: 110%;
+	}
+
+	.budgetreport-summary-amount {
+		font-size: 2em;
+	}
+}
+
+@media only screen and (max-width: 480px) {
+	.budgetreport-summary-amount {
+		font-size: 1.7em;
 	}
 }
