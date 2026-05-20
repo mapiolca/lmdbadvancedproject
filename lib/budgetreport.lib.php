@@ -209,6 +209,62 @@ if (!function_exists('lmdbadvancedproject_format_multiline_text')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_normalize_compact_text')) {
+	/**
+	 * Normalize free text for compact single-line table output.
+	 *
+	 * @param  string $value Text value
+	 * @return string
+	 */
+	function lmdbadvancedproject_normalize_compact_text($value)
+	{
+		$text = (string) $value;
+		$text = str_replace(array('\\r\\n', '\\n', '\\r'), "\n", $text);
+		$text = str_replace(array("\r\n", "\r"), "\n", $text);
+
+		$lines = array();
+		foreach (explode("\n", $text) as $line) {
+			$line = trim(preg_replace('/[ \t]+/', ' ', $line));
+			if ($line !== '') {
+				$lines[] = $line;
+			}
+		}
+
+		return implode(' ', $lines);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_truncated_text_parts')) {
+	/**
+	 * Return escaped full and truncated text parts for compact output.
+	 *
+	 * @param  string $value Text value
+	 * @param  int    $limit Maximum displayed length
+	 * @return array<string,string>
+	 */
+	function lmdbadvancedproject_truncated_text_parts($value, $limit)
+	{
+		$fullText = lmdbadvancedproject_normalize_compact_text($value);
+		$limit = (int) $limit;
+		if ($limit <= 0) {
+			$limit = 1;
+		}
+
+		if (function_exists('dol_trunc')) {
+			$shortText = dol_trunc($fullText, $limit);
+		} elseif (strlen($fullText) > $limit) {
+			$shortText = substr($fullText, 0, max(0, $limit - 3)).'...';
+		} else {
+			$shortText = $fullText;
+		}
+
+		return array(
+			'full' => lmdbadvancedproject_escape_html($fullText),
+			'short' => lmdbadvancedproject_escape_html($shortText),
+		);
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_is_multicompany_enabled')) {
 	/**
 	 * Check if Dolibarr Multicompany module is enabled.
@@ -1212,31 +1268,33 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 
 		print '<div class="budgetreport-forecast-extra">';
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
-		print '<table class="budgettbl">';
-		print '<tr><th>'.$langs->trans('Task').'</th><th>'.$langs->trans('Label').'</th><th>'.$langs->trans('BudgetReportTimeSpentHours').'</th><th>'.$langs->trans('BudgetReportSpent').'</th></tr>';
+		print '<table class="budgettbl budgetreport-extra-subtable">';
+		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Task').'</th><th class="budgetreport-extra-task-label-col">'.$langs->trans('Label').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportTimeSpentHours').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportSpent').'</th></tr>';
 		foreach ($forecast['time']['lines'] as $line) {
+			$taskLabelParts = lmdbadvancedproject_truncated_text_parts(empty($line['task_label']) ? '' : $line['task_label'], 50);
 			print '<tr>';
-			print '<td>'.lmdbadvancedproject_get_task_nom_url($line).'</td>';
-			print '<td>'.lmdbadvancedproject_escape_html(empty($line['task_label']) ? '' : $line['task_label']).'</td>';
-			print '<td align="right">'.price(lmdbadvancedproject_round_amount($line['hours'])).'</td>';
-			print '<td align="right">'.lmdbadvancedproject_format_price($line['cost']).'</td>';
+			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_get_task_nom_url($line).'</td>';
+			print '<td class="budgetreport-extra-task-label-col"><span class="budgetreport-extra-task-label-truncate" title="'.$taskLabelParts['full'].'">'.$taskLabelParts['short'].'</span></td>';
+			print '<td class="budgetreport-extra-compact-col" align="right">'.price(lmdbadvancedproject_round_amount($line['hours'])).'</td>';
+			print '<td class="budgetreport-extra-compact-col" align="right">'.lmdbadvancedproject_format_price($line['cost']).'</td>';
 			print '</tr>';
 		}
-		print '<tr><td colspan="2"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td align="right"><b>'.price(lmdbadvancedproject_round_amount($forecast['time']['hours'])).'</b></td><td align="right"><b>'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</b></td></tr>';
+		print '<tr><td colspan="2"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.price(lmdbadvancedproject_round_amount($forecast['time']['hours'])).'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</b></td></tr>';
 		print '</table>';
 
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportExpenseReportDetails').'</div>';
-		print '<table class="budgettbl">';
-		print '<tr><th>'.$langs->trans('Date').'</th><th>'.$langs->trans('Ref').'</th><th>'.$langs->trans('BudgetReportExpenseComment').'</th><th>'.$langs->trans('AmountHTShort').'</th></tr>';
+		print '<table class="budgettbl budgetreport-extra-subtable">';
+		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Date').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('Ref').'</th><th class="budgetreport-extra-expense-comment-col">'.$langs->trans('BudgetReportExpenseComment').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('AmountHTShort').'</th></tr>';
 		foreach ($forecast['expenses']['lines'] as $line) {
+			$expenseCommentParts = lmdbadvancedproject_truncated_text_parts(empty($line['comment']) ? '' : $line['comment'], 75);
 			print '<tr>';
-			print '<td>'.lmdbadvancedproject_format_date($line['date']).'</td>';
-			print '<td>'.lmdbadvancedproject_get_expense_report_nom_url($line).'</td>';
-			print '<td class="budgetreport-expense-comment">'.lmdbadvancedproject_format_multiline_text($line['comment']).'</td>';
-			print '<td align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
+			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_format_date($line['date']).'</td>';
+			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_get_expense_report_nom_url($line).'</td>';
+			print '<td class="budgetreport-extra-expense-comment-col"><span class="budgetreport-extra-expense-comment-truncate" title="'.$expenseCommentParts['full'].'">'.$expenseCommentParts['short'].'</span></td>';
+			print '<td class="budgetreport-extra-compact-col" align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
 			print '</tr>';
 		}
-		print '<tr><td colspan="3"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td align="right"><b>'.lmdbadvancedproject_format_price($forecast['expenses']['total']).'</b></td></tr>';
+		print '<tr><td colspan="3"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['expenses']['total']).'</b></td></tr>';
 		print '</table>';
 		print '</div>';
 		lmdbadvancedproject_print_budgetreport_modal_script();
@@ -1719,9 +1777,11 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 			</div>
 			<div class="budgetreport-summary-breakdown">
+				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportStaffExpenses"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')'; ?></strong></div>
 			</div>
 		</td>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">

@@ -287,11 +287,6 @@ div.mainmenu.budgetreport {
 	vertical-align: top;
 }
 
-.budgetreport-expense-comment {
-	white-space: normal;
-	overflow-wrap: anywhere;
-}
-
 .budgetreport-modal-open {
 	margin: 0 8px 8px 0;
 }
@@ -336,6 +331,45 @@ div.mainmenu.budgetreport {
 .budgetreport-forecast-total-row td {
 	font-weight: 600;
 	background: rgba(0,0,0,0.05);
+}
+
+.budgetreport-extra-subtable {
+	table-layout: auto;
+}
+
+.budgetreport-extra-compact-col {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.budgetreport-extra-task-label-col {
+	width: 50ch;
+	min-width: 50ch;
+	max-width: 50ch;
+}
+
+.budgetreport-extra-task-label-truncate {
+	display: block;
+	width: 50ch;
+	max-width: 50ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.budgetreport-extra-expense-comment-col {
+	width: 75ch;
+	min-width: 75ch;
+	max-width: 75ch;
+}
+
+.budgetreport-extra-expense-comment-truncate {
+	display: block;
+	width: 75ch;
+	max-width: 75ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .budgetreport-forecast-extra {
