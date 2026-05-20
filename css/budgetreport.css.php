@@ -370,16 +370,6 @@ div.mainmenu.budgetreport {
 	font-weight: 600;
 }
 
-.budgetreport-modal-close {
-	width: 34px;
-	min-width: 34px;
-	height: 34px;
-	padding: 0;
-	text-align: center;
-	font-weight: 700;
-	line-height: 32px;
-}
-
 .budgetreport-modal-body {
 	max-height: calc(100vh - 120px);
 	overflow: auto;
