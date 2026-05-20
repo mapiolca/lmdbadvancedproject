@@ -76,6 +76,11 @@ if (isset($user->socid) && $user->socid > 0) {
 
 $max = 5;
 $now = dol_now();
+$budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
+	'date_start' => GETPOST('date_start', 'alpha'),
+	'date_end' => GETPOST('date_end', 'alpha'),
+	'project_status' => GETPOST('project_status', 'alpha'),
+));
 
 
 /*
@@ -115,7 +120,10 @@ llxHeader("", $langs->trans("BudgetReportArea"));
 <div >
 
 
-<?php lmdbadvancedproject_render_global_budget_report(); ?>
+<?php
+lmdbadvancedproject_print_budget_report_filters($budgetReportFilters);
+lmdbadvancedproject_render_global_budget_report($budgetReportFilters);
+?>
 
 <div class="tabBar" style='clear:both;'>
 <div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>
