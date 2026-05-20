@@ -177,8 +177,8 @@ div.mainmenu.budgetreport {
 
 .dashboard_budget .budgetreport-summary-cell {
 	box-sizing: border-box;
-	width: 25%;
-	max-width: 25%;
+	width: 20%;
+	max-width: 20%;
 	padding: 10px 6px 12px;
 	border-right: solid 2px rgba(0,0,0,0.2);
 	border-bottom: solid 2px rgba(0,0,0,0.2);
@@ -298,6 +298,7 @@ div.mainmenu.budgetreport {
 
 .budgetreport-forecast-subtable {
 	width: 100%;
+	table-layout: auto;
 	border-collapse: collapse;
 }
 
@@ -307,13 +308,29 @@ div.mainmenu.budgetreport {
 	border-bottom: 1px solid rgba(0,0,0,0.12);
 }
 
-.budgetreport-forecast-date-col {
+.budgetreport-forecast-ref-col,
+.budgetreport-forecast-status-col,
+.budgetreport-forecast-date-col,
+.budgetreport-forecast-qty-col,
+.budgetreport-forecast-amount-col,
+.budgetreport-forecast-budget-col {
 	width: 1%;
 	white-space: nowrap;
 }
 
-.budgetreport-forecast-line-type {
-	color: #666;
+.budgetreport-forecast-label-col {
+	width: 75px;
+	min-width: 75px;
+	max-width: 75px;
+}
+
+.budgetreport-forecast-label-truncate {
+	display: block;
+	width: 75px;
+	max-width: 75px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .budgetreport-forecast-total-row td {

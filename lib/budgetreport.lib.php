@@ -1266,6 +1266,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$totalsupplierordersremaining = 0;
 		$totalexpenses = 0;
 		$totalorders = 0;
+		$totalcustomerinvoices = 0;
 		$budget = 0;
 
 		$budgetReportProjectId = empty($budgetReportProjectId) ? 0 : (int) $budgetReportProjectId;
@@ -1274,6 +1275,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projectStatusSqlFilter = lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
 		$projectDateSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_date_sql_filter($filters);
 		$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
+		$customerInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND f.fk_projet = ".$budgetReportProjectId : "";
 		$taskProjectSqlFilter = $budgetReportProjectId > 0 ? " AND pt.fk_projet = ".$budgetReportProjectId : "";
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
@@ -1284,6 +1286,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projectEntities = lmdbadvancedproject_get_entity_filter('project', $projectDisplayEntityShared);
 		$projectDataEntities = lmdbadvancedproject_get_entity_filter('project', 1);
 		$orderEntities = lmdbadvancedproject_get_entity_filter('commande', 1);
+		$customerInvoiceEntities = lmdbadvancedproject_get_entity_filter('facture', 1);
 		$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', 1);
 		$supplierOrderEntities = lmdbadvancedproject_get_entity_filter('supplier_order', 1);
 		$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', 1);
@@ -1326,6 +1329,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				"public" => (int) $obj->public,
 				"budget" => $projectBudget,
 				"orders" => $projectOrders,
+				"invoiced" => 0,
 				"spent" => 0,
 			);
 			$budget += $projectBudget;
@@ -1366,6 +1370,30 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 		if ($result) {
 			$db->free($result);
+		}
+
+		$customerinvoices = array();
+		$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(f.total_ht, 0)) AS total_invoice
+			FROM ".MAIN_DB_PREFIX."facture f
+			WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
+			GROUP BY f.fk_projet";
+		$resultCustomerInvoices = $db->query($sqlCustomerInvoices);
+		$nbtotalCustomerInvoices = $resultCustomerInvoices ? $db->num_rows($resultCustomerInvoices) : 0;
+		$i=0;
+		while ($i<$nbtotalCustomerInvoices) {
+			$obj = $db->fetch_object($resultCustomerInvoices);
+			$customerinvoices[$obj->fk_projet] = (float) $obj->total_invoice;
+			$i++;
+		}
+		if ($resultCustomerInvoices) {
+			$db->free($resultCustomerInvoices);
+		}
+
+		foreach ($projects as $pid=>$data) {
+			if (isset($customerinvoices[$pid])) {
+				$projects[$pid]["invoiced"] = (float) $customerinvoices[$pid];
+				$totalcustomerinvoices += (float) $customerinvoices[$pid];
+			}
 		}
 
 		$timespent = array();
@@ -1615,6 +1643,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			'totalsupplierordersremaining' => $totalsupplierordersremaining,
 			'totalexpenses' => $totalexpenses,
 			'totalorders' => $totalorders,
+			'totalcustomerinvoices' => $totalcustomerinvoices,
 			'budget' => $budget,
 			'totalspent' => $totalspent,
 			'balance' => $balance,
@@ -1669,6 +1698,12 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
 			<div class="nowraponall budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
+			</div>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportInvoiced"); ?></div>
+			<div class="nowraponall budgetreport-summary-amount">
+				<?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders).')'; ?>
 			</div>
 		</td>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
