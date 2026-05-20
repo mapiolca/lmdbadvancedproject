@@ -17,8 +17,8 @@
  */
 
 /**
- *  \file       lmdb_advancedproject/myobject_contact.php
- *  \ingroup    lmdb_advancedproject
+ *  \file       lmdbadvancedproject/myobject_contact.php
+ *  \ingroup    lmdbadvancedproject
  *  \brief      Tab for contacts linked to MyObject
  */
 
@@ -55,11 +55,11 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
-dol_include_once('/lmdb_advancedproject/class/myobject.class.php');
-dol_include_once('/lmdb_advancedproject/lib/lmdb_advancedproject_myobject.lib.php');
+dol_include_once('/lmdbadvancedproject/class/myobject.class.php');
+dol_include_once('/lmdbadvancedproject/lib/lmdbadvancedproject_myobject.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("lmdb_advancedproject@lmdb_advancedproject", "companies", "other", "mails"));
+$langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject", "companies", "other", "mails"));
 
 $id     = (GETPOST('id') ?GETPOST('id', 'int') : GETPOST('facid', 'int')); // For backward compatibility
 $ref    = GETPOST('ref', 'alpha');
@@ -70,7 +70,7 @@ $action = GETPOST('action', 'aZ09');
 // Initialize technical objects
 $object = new MyObject($db);
 $extrafields = new ExtraFields($db);
-$diroutputmassaction = $conf->lmdb_advancedproject->dir_output.'/temp/massgeneration/'.$user->id;
+$diroutputmassaction = $conf->lmdbadvancedproject->dir_output.'/temp/massgeneration/'.$user->id;
 $hookmanager->initHooks(array('myobjectcontact', 'globalcard')); // Note that conf->hooks_modules contains array
 // Fetch optionals attributes and labels
 $extrafields->fetch_name_optionals_label($object->table_element);
@@ -78,14 +78,14 @@ $extrafields->fetch_name_optionals_label($object->table_element);
 // Load object
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be include, not include_once  // Must be include, not include_once. Include fetch and fetch_thirdparty but not fetch_optionals
 
-$permission = $user->rights->lmdb_advancedproject->myobject->write;
+$permission = $user->rights->lmdbadvancedproject->myobject->write;
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
 //if ($user->socid > 0) $socid = $user->socid;
 //$isdraft = (($object->status == $object::STATUS_DRAFT) ? 1 : 0);
 //restrictedArea($user, $object->element, $object->id, $object->table_element, '', 'fk_soc', 'rowid', $isdraft);
-//if (empty($conf->lmdb_advancedproject->enabled)) accessforbidden();
+//if (empty($conf->lmdbadvancedproject->enabled)) accessforbidden();
 //if (!$permissiontoread) accessforbidden();
 
 
@@ -154,7 +154,7 @@ if ($object->id) {
 
 	print dol_get_fiche_head($head, 'contact', '', -1, $object->picto);
 
-	$linkback = '<a href="'.dol_buildpath('/lmdb_advancedproject/myobject_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
+	$linkback = '<a href="'.dol_buildpath('/lmdbadvancedproject/myobject_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
 	$morehtmlref = '<div class="refidno">';
 	/*

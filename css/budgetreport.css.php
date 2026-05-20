@@ -16,8 +16,8 @@
  */
 
 /**
- * \file    lmdb_advancedproject/css/budgetreport.css.php
- * \ingroup lmdb_advancedproject
+ * \file    lmdbadvancedproject/css/budgetreport.css.php
+ * \ingroup lmdbadvancedproject
  * \brief   CSS file for the Budget Report feature.
  */
 
@@ -105,27 +105,66 @@ div.mainmenu.budgetreport {
 	background-image: none;
 }
 
+.budgetreport-summary-fullwidth,
+.budgetreport-report,
+.budgetreport-month-section,
+.budgetreport-table-section {
+	clear: both;
+	width: 100%;
+}
+
+.budgetreport-summary-fullwidth {
+	display: block;
+	max-width: none;
+	margin-bottom: 30px;
+	margin-left: 0;
+	margin-right: 0;
+}
+
 .dashboard_budget {
-	column-width: 350px; 
-	column-gap: 0px; 
-	column-span: none; 
-	column-fill: balance;
+	table-layout: fixed;
+	width: 100%;
+	max-width: none;
+	margin: 0;
+	border-spacing: 0;
 }
 
-.dashboard_budget figure {
-	margin:0;
-	flex-flow: column wrap; 
-	page-break-inside: avoid; 
-	break-inside: avoid;
+.dashboard_budget .budgetreport-summary-cell {
+	box-sizing: border-box;
+	width: 25%;
+	max-width: 25%;
+	padding: 10px 6px 12px;
 	border-right: solid 2px rgba(0,0,0,0.2);
-	border-bottom: solid 2px rgba(0,0,0,0.2); 
-	text-align:center;
+	border-bottom: solid 2px rgba(0,0,0,0.2);
 }
 
-.figurein {
-	display:inline-block; 
-	text-align:left; 
-	margin:auto;
+.dashboard_budget .budgetreport-summary-cell:last-child {
+	border-right: 0;
+}
+
+.budgetreport-summary-label {
+	font-size: 110%;
+	line-height: 1.2;
+	overflow-wrap: anywhere;
+}
+
+.budgetreport-summary-amount {
+	display: block;
+	font-size: 2em;
+	line-height: 1.1;
+	color: #333;
+}
+
+.budgetreport-charts-row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 32px;
+	width: 100%;
+	align-items: start;
+}
+
+.budgetreport-chart-panel {
+	min-width: 0;
 }
 
 .budgettitle {
@@ -134,23 +173,29 @@ div.mainmenu.budgetreport {
 	padding-top: 10px;
 }
 
-.figurein .famount {
-	font-size: 300%; 
-	margin-top:-10px;
-	color: #333;
-}
-
 .budgettbl, 
 .budgetchart, 
 .budgetbarchart {
 	margin-top:20px; 
-	width:90%;
+	width:100%;
 	margin-bottom: 30px;
 }
 
-.budgetchart {
-	max-width: 460px;
-}	
+.budgetchart,
+.budgetbarchart {
+	height: 350px;
+	max-height: 350px;
+}
+
+.budgetchart canvas,
+.budgetbarchart canvas {
+	max-width: 100%;
+	max-height: 350px;
+}
+
+.budgetreport-table-section .budgettbl {
+	width: 100%;
+}
 
 .budgettbl th{
 	background: rgba(0,0,0,0.1);
@@ -165,25 +210,137 @@ div.mainmenu.budgetreport {
 	border-bottom: 1px solid rgba(0,0,0,0.2);
 }
 
-@media only screen and (max-width: 1400px) {
-	.dashboard_budget {
-		column-width: 300px; 
-	}	
+.budgetreport-forecast-table td {
+	vertical-align: top;
 }
 
-@media only screen and (max-width: 1200px) {
-	.dashboard_budget {
-		column-width: 250px; 
-	}	
+.budgetreport-expense-comment {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.budgetreport-modal-open {
+	margin: 0 8px 8px 0;
+}
+
+.budgetreport-forecast-subtable {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.budgetreport-forecast-subtable th,
+.budgetreport-forecast-subtable td {
+	padding: 4px 6px;
+	border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.budgetreport-forecast-extra {
+	margin-top: 20px;
+}
+
+.budgetreport-forecast-subtitle {
+	margin-top: 16px;
+}
+
+.budgetreport-modal {
+	display: none;
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+}
+
+.budgetreport-modal.budgetreport-modal-is-open {
+	display: block;
+}
+
+.budgetreport-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.budgetreport-modal-dialog {
+	position: relative;
+	max-width: min(1000px, calc(100vw - 32px));
+	max-height: calc(100vh - 32px);
+	margin: 16px auto;
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+	overflow: hidden;
+}
+
+.budgetreport-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 12px 16px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.budgetreport-modal-title {
+	font-weight: 600;
+}
+
+.budgetreport-modal-body {
+	max-height: calc(100vh - 120px);
+	overflow: auto;
+	padding: 16px;
+}
+
+@media only screen and (max-width: 1400px) {
+	.budgetreport-summary-amount {
+		font-size: 1.8em;
+	}
+}
+
+@media only screen and (max-width: 1180px) {
+	.dashboard_budget .budgetreport-summary-cell {
+		padding-left: 4px;
+		padding-right: 4px;
+	}
+
+	.budgetreport-summary-label {
+		font-size: 100%;
+	}
+
+	.budgetreport-summary-amount {
+		font-size: 1.6em;
+	}
 }
 
 @media only screen and (max-width: 980px) {
-	.dashboard_budget figure {
-		border-right: 0;
+	.budgetreport-charts-row {
+		grid-template-columns: 1fr !important;
 	}
-	.budgettbl, 
-	.budgetchart,
-	.budgetbarchart	{
-		width:100%;
+
+	.dashboard_budget,
+	.dashboard_budget tbody,
+	.dashboard_budget tr,
+	.dashboard_budget .budgetreport-summary-cell {
+		display: block;
+		width: 100%;
+	}
+
+	.dashboard_budget .budgetreport-summary-cell {
+		border-right: 0;
+		max-width: none;
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+
+	.budgetreport-summary-label {
+		font-size: 110%;
+	}
+
+	.budgetreport-summary-amount {
+		font-size: 2em;
+	}
+}
+
+@media only screen and (max-width: 480px) {
+	.budgetreport-summary-amount {
+		font-size: 1.7em;
 	}
 }

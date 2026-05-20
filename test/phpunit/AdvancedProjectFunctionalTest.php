@@ -18,7 +18,7 @@
 
 /**
  * \file    test/phpunit/AdvancedProjectFunctionalTest.php
- * \ingroup lmdb_advancedproject
+ * \ingroup lmdbadvancedproject
  * \brief   Example Selenium test.
  *
  * Put detailed description here.
@@ -39,7 +39,7 @@ use PHPUnit_Extensions_Selenium2TestCase_WebDriverException;
  * @todo Windows support (IE, Google Chrome, Mozilla Firefox, Safari)
  * @todo OSX support (Safari, Google Chrome, Mozilla Firefox)
  *
- * @package Testlmdb_advancedproject
+ * @package Testlmdbadvancedproject
  */
 class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCase
 {
@@ -196,9 +196,9 @@ class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCas
 	 */
 	public function testConfigurationPage()
 	{
-		$this->url('/custom/lmdb_advancedproject/admin/setup.php');
+		$this->url('/custom/lmdbadvancedproject/admin/setup.php');
 		$this->authenticate();
-		return $this->assertContains('lmdb_advancedproject/admin/setup.php', $this->url(), 'Configuration page');
+		return $this->assertContains('lmdbadvancedproject/admin/setup.php', $this->url(), 'Configuration page');
 	}
 
 	/**
@@ -209,9 +209,9 @@ class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCas
 	 */
 	public function testAboutPage()
 	{
-		$this->url('/custom/lmdb_advancedproject/admin/about.php');
+		$this->url('/custom/lmdbadvancedproject/admin/about.php');
 		$this->authenticate();
-		return $this->assertContains('lmdb_advancedproject/admin/about.php', $this->url(), 'About page');
+		return $this->assertContains('lmdbadvancedproject/admin/about.php', $this->url(), 'About page');
 	}
 
 	/**
@@ -222,7 +222,7 @@ class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCas
 	 */
 	public function testAboutPageRendersMarkdownReadme()
 	{
-		$this->url('/custom/lmdb_advancedproject/admin/about.php');
+		$this->url('/custom/lmdbadvancedproject/admin/about.php');
 		$this->authenticate();
 		return $this->assertEquals(
 			'ADVANCED PROJECT FOR DOLIBARR ERP CRM',
@@ -241,7 +241,7 @@ class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCas
 	{
 		$this->url('/admin/boxes.php');
 		$this->authenticate();
-		return $this->assertContains('lmdb_advancedprojectwidget1', $this->source(), "Box enabled");
+		return $this->assertContains('lmdbadvancedprojectwidget1', $this->source(), "Box enabled");
 	}
 
 	/**

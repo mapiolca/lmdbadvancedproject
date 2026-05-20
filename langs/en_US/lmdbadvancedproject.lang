@@ -1,0 +1,67 @@
+# Copyright (C) 2022 SuperAdmin
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+ModuleLmdbAdvancedProjectName = Advanced Project
+ModuleLmdbAdvancedProjectDesc = Advanced Project extends project budget analysis in Dolibarr.
+
+AdvancedProjectSetup = Advanced Project setup
+AdvancedProjectSetupPage = Advanced Project setup page
+AdvancedProjectMulticompanyScope = Multicompany report scope
+AdvancedProjectMulticompanyAllEntities = Show all available entities by default
+AdvancedProjectMulticompanyScopeHelp = When this option is disabled, the report is limited to the current entity.
+AdvancedProjectMulticompanyInactive = The Multicompany module is not enabled; the report remains limited to the current entity.
+AdvancedProjectAbout = About Advanced Project
+AdvancedProjectAboutPage = Advanced Project about page
+ReadBudgetReport = Read Budget Report
+
+BudgetReportArea = Project Budget Report
+BudgetReportProjectTab = Budget report
+BudgetReportProjectNoData = No validated customer order is linked to this project; the budget report has no data.
+BudgetReportMulticompanyInactiveInfo = Multicompany is not enabled; the report is limited to the current entity.
+BudgetReportMulticompanyCurrentEntityInfo = The report only shows projects from the current entity.
+BudgetReportMulticompanyAllEntitiesInfo = The report shows projects from all available entities.
+BudgetReportBudget = Budget
+BudgetReportSpent = Spent
+BudgetReportLeftToSpend = Left to spend
+BudgetReportBudgetByProjects = Budget by projects
+BudgetReportBudgetByCategory = Budget by category
+BudgetReportBudgetVsSpentByProject = Budget vs spent by project
+BudgetReportProject = Project
+BudgetReportMarket = Orders
+BudgetReportGrossMargin = Gross margin
+BudgetReportBalance = Balance
+BudgetReportTotal = Total
+BudgetReportBudgetVsSpent = Budget vs spent
+BudgetReportTimeSpentOnTasks = Time spent on tasks
+BudgetReportVendorInvoices = Vendor invoices
+BudgetReportStaffExpenses = Staff expenses
+BudgetReportBudgetVsSpentByMonth = Budget vs spent by month
+BudgetReportOpenProjectsNote = Only open projects with at least one linked validated order are visible; draft, closed, or orderless projects are not visible.
+BudgetReportMonthlySplitNote = Each project's cost budget is split evenly by month according to the project timeline.
+LMDB_commercialcategories = Commercial categories
+LMDB_CommercialCategoryExtrafield = Commercial category
+LMDB_CodeTooltipHelp = Dictionary entry code
+LMDB_ENtityTooltipHelp = Entity identifier
+LMDB_LabelTooltipHelp = Dictionary entry label
+LMDB_ActiveTooltipHelp = Active status of the dictionary entry
+BudgetReportForecastBudget = Forecast budget
+BudgetReportCategorySummary = Category summary
+BudgetReportOrderAmount = Order amount excl. tax
+BudgetReportOrderBudget = Order budget excl. tax
+BudgetReportSupplierExpenses = Supplier expenses excl. tax
+BudgetReportForecastGap = Budget gap
+BudgetReportUncategorized = Uncategorized
+BudgetReportSupplierOrderNotInvoiced = Supplier order not or partially invoiced
+BudgetReportSupplierInvoice = Supplier invoice
+BudgetReportOrderDetails = Order details
+BudgetReportSupplierDetails = Supplier details
+BudgetReportDetails = Details
+BudgetReportNoDetail = No detail
+BudgetReportTimeSpentTotal = Total time spent
+BudgetReportTimeSpentHours = Hours
+BudgetReportExpenseReportDetails = Expense report details
+BudgetReportExpenseComment = Comment

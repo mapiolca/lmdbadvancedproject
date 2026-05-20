@@ -19,11 +19,11 @@
  */
 
 /**
- * \defgroup   lmdb_advancedproject     Module Advanced Project
+ * \defgroup   lmdbadvancedproject     Module Advanced Project
  * \brief      Advanced Project module descriptor.
  *
- * \file       htdocs/lmdb_advancedproject/core/modules/modLmdbAdvancedProject.class.php
- * \ingroup    lmdb_advancedproject
+ * \file       htdocs/lmdbadvancedproject/core/modules/modLmdbAdvancedProject.class.php
+ * \ingroup    lmdbadvancedproject
  * \brief      Description and activation file for module Advanced Project
  */
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
@@ -40,25 +40,25 @@ class modLmdbAdvancedProject extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf;
+		global $conf, $langs;
 
 		$this->db = $db;
 
-		$this->numero = 302502;
-		$this->rights_class = 'lmdb_advancedproject';
-		$this->family = 'projects';
+		$this->numero = 450021;
+		$this->rights_class = 'lmdbadvancedproject';
+		$this->family = 'Les Métiers du Bâtiment';
 		$this->module_position = '90';
 		$this->name = preg_replace('/^mod/i', '', get_class($this));
 		$this->description = 'ModuleLmdbAdvancedProjectDesc';
 		$this->descriptionlong = 'ModuleLmdbAdvancedProjectDesc';
 
-		$this->editor_name = 'Maii S.';
-		$this->editor_url = 'https://diamubi.com';
-		$this->editor_email = 'doli@diamubi.com';
+		$this->editor_name = 'Les Métiers du Bâtiment';
+		$this->editor_url = 'https://lesmetiersdubatiment.fr';
+		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.1';
-		$this->const_name = 'MAIN_MODULE_LMDB_ADVANCEDPROJECT';
-		$this->picto = 'generic';
+		$this->version = '1.0.1';
+		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
+		$this->picto = 'project';
 
 		$this->module_parts = array(
 			'triggers' => 0,
@@ -71,34 +71,64 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'printing' => 0,
 			'theme' => 0,
 			'css' => array(
-				'/lmdb_advancedproject/css/budgetreport.css.php',
+				'/lmdbadvancedproject/css/budgetreport.css.php',
 			),
 			'js' => array(),
 			'hooks' => array(),
 			'moduleforexternal' => 0,
 		);
 
-		$this->dirs = array('/lmdb_advancedproject/temp');
-		$this->config_page_url = array('setup.php@lmdb_advancedproject');
+		$this->dirs = array('/lmdbadvancedproject/temp');
+		$this->config_page_url = array('setup.php@lmdbadvancedproject');
 
 		$this->hidden = false;
 		$this->depends = array();
 		$this->requiredby = array();
 		$this->conflictwith = array();
-		$this->langfiles = array('lmdb_advancedproject@lmdb_advancedproject');
+		$this->langfiles = array('lmdbadvancedproject@lmdbadvancedproject');
 		$this->phpmin = array(5, 6);
 		$this->need_dolibarr_version = array(11, -3);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array();
 
-		if (!isset($conf->lmdb_advancedproject) || !isset($conf->lmdb_advancedproject->enabled)) {
-			$conf->lmdb_advancedproject = new stdClass();
-			$conf->lmdb_advancedproject->enabled = 0;
+		if (empty($conf->lmdbadvancedproject) || !is_object($conf->lmdbadvancedproject)) {
+			$conf->lmdbadvancedproject = new stdClass();
+		}
+		if (!isset($conf->lmdbadvancedproject->enabled)) {
+			$conf->lmdbadvancedproject->enabled = 0;
 		}
 
 		$this->tabs = array();
-		$this->dictionaries = array();
+		$this->tabs[] = array(
+			'data' => 'project:+budgetreport:BudgetReportProjectTab:lmdbadvancedproject@lmdbadvancedproject:$user->rights->lmdbadvancedproject->budgetreport->read:/lmdbadvancedproject/tabs/project_budgetreport.php?id=__ID__',
+		);
+
+		$commercialCategoryHasEntity = $this->tableExists(MAIN_DB_PREFIX."c_commercial_category") && $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+		$commercialCategorySelectSql = $commercialCategoryHasEntity
+			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
+		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
+		$commercialCategoryHelp = array(
+			'code' => is_object($langs) ? $langs->trans('LMDB_CodeTooltipHelp') : 'LMDB_CodeTooltipHelp',
+			'entity' => is_object($langs) ? $langs->trans('LMDB_ENtityTooltipHelp') : 'LMDB_ENtityTooltipHelp',
+			'label' => is_object($langs) ? $langs->trans('LMDB_LabelTooltipHelp') : 'LMDB_LabelTooltipHelp',
+			'active' => is_object($langs) ? $langs->trans('LMDB_ActiveTooltipHelp') : 'LMDB_ActiveTooltipHelp',
+		);
+
+		$this->dictionaries = array(
+			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
+			'tabname' => array(MAIN_DB_PREFIX."c_commercial_category"),
+			'tablib' => array('LMDB_commercialcategories'),
+			'tabsql' => array($commercialCategorySelectSql),
+			'tabsqlsort' => array('label ASC'),
+			'tabfield' => array('code,label'),
+			'tabfieldvalue' => array($commercialCategoryFieldValue),
+			'tabfieldinsert' => array($commercialCategoryFieldValue),
+			'tabrowid' => array('rowid'),
+			'tabcond' => array(!empty($conf->lmdbadvancedproject->enabled)),
+			'tabhelp' => array($commercialCategoryHelp),
+		);
 		$this->boxes = array();
 		$this->cronjobs = array();
 
@@ -106,7 +136,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$r = 0;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
 		$this->rights[$r][1] = 'ReadBudgetReport';
-		$this->rights[$r][4] = 'myobject';
+		$this->rights[$r][4] = 'budgetreport';
 		$this->rights[$r][5] = 'read';
 
 		$this->menu = array();
@@ -118,11 +148,11 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'type' => 'left',
 			'titre' => 'BudgetReportArea',
 			'prefix' => img_picto('', '', 'class="fas fa-chart-pie paddingright pictofixedwidth valignmiddle"'),
-			'url' => '/lmdb_advancedproject/budgetreportindex.php',
-			'langs' => 'lmdb_advancedproject@lmdb_advancedproject',
+			'url' => '/lmdbadvancedproject/budgetreportindex.php',
+			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
 			'position' => '9',
-			'enabled' => '$conf->lmdb_advancedproject->enabled',
-			'perms' => '$user->rights->lmdb_advancedproject->myobject->read',
+			'enabled' => '$conf->lmdbadvancedproject->enabled',
+			'perms' => '$user->rights->lmdbadvancedproject->budgetreport->read',
 			'target' => '',
 			'user' => 0,
 		);
@@ -136,7 +166,12 @@ class modLmdbAdvancedProject extends DolibarrModules
 	 */
 	public function init($options = '')
 	{
-		$result = $this->_load_tables('/lmdb_advancedproject/sql/');
+		$result = $this->_load_tables('/lmdbadvancedproject/sql/');
+		if ($result < 0) {
+			return -1;
+		}
+
+		$result = $this->ensureCommercialCategoryExtraFields();
 		if ($result < 0) {
 			return -1;
 		}
@@ -144,6 +179,111 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->remove($options);
 
 		return $this->_init(array(), $options);
+	}
+
+	/**
+	 * Check if a table exists.
+	 *
+	 * @param  string $tableName Full table name
+	 * @return bool
+	 */
+	private function tableExists($tableName)
+	{
+		$sql = "SHOW TABLES LIKE '".$this->db->escape($tableName)."'";
+		$resql = $this->db->query($sql);
+
+		return ($resql && $this->db->num_rows($resql) > 0);
+	}
+
+	/**
+	 * Check if a column exists on a table.
+	 *
+	 * @param  string $tableName  Full table name
+	 * @param  string $columnName Column name
+	 * @return bool
+	 */
+	private function columnExists($tableName, $columnName)
+	{
+		$sql = "SHOW COLUMNS FROM ".$tableName." LIKE '".$this->db->escape($columnName)."'";
+		$resql = $this->db->query($sql);
+
+		return ($resql && $this->db->num_rows($resql) > 0);
+	}
+
+	/**
+	 * Create commercial category extrafields when they do not exist yet.
+	 *
+	 * @return int 1 if OK, <0 if KO
+	 */
+	private function ensureCommercialCategoryExtraFields()
+	{
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+
+		$extrafields = new ExtraFields($this->db);
+		$param = array('options' => array('c_commercial_category:label:rowid::(active:=:1)' => null));
+		$fields = array(
+			'product' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+			'propaldet' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+			'commandedet' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+			'facturedet' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+			'commande_fournisseurdet' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+			'facture_fourn_det' => array(
+				'pos' => 100,
+				'enabled' => '$conf->lmdbadvancedproject->enabled',
+			),
+		);
+
+		foreach ($fields as $element => $field) {
+			$extrafields->fetch_name_optionals_label($element);
+			if (!empty($extrafields->attributes[$element]['label']['lmdb_commercial_category'])) {
+				continue;
+			}
+
+			$result = $extrafields->addExtraField(
+				'lmdb_commercial_category',
+				'LMDB_CommercialCategoryExtrafield',
+				'sellist',
+				$field['pos'],
+				255,
+				$element,
+				0,
+				0,
+				'',
+				$param,
+				1,
+				'',
+				-1,
+				'',
+				'',
+				0,
+				'lmdbadvancedproject@lmdbadvancedproject',
+				$field['enabled'],
+				0,
+				0
+			);
+			if ($result < 0) {
+				$this->error = $extrafields->error;
+				$this->errors = $extrafields->errors;
+				return -1;
+			}
+		}
+
+		return 1;
 	}
 
 	/**

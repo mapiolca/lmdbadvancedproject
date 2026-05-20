@@ -19,8 +19,8 @@
  */
 
 /**
- *	\file       lmdb_advancedproject/budgetreportindex.php
- *	\ingroup    lmdb_advancedproject
+ *	\file       lmdbadvancedproject/budgetreportindex.php
+ *	\ingroup    lmdbadvancedproject
  *	\brief      Budget Report page of Advanced Project
  */
 
@@ -56,15 +56,16 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
+require_once __DIR__.'/lib/budgetreport.lib.php';
 
 // Load translation files required by the page
-$langs->loadLangs(array("lmdb_advancedproject@lmdb_advancedproject"));
+$langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject"));
 
 $action = GETPOST('action', 'aZ09');
 
 
 // Security check
-// if (! $user->rights->lmdb_advancedproject->myobject->read) {
+// if (! $user->rights->lmdbadvancedproject->budgetreport->read) {
 // 	accessforbidden();
 // }
 $socid = GETPOST('socid', 'int');
@@ -114,15 +115,11 @@ llxHeader("", $langs->trans("BudgetReportArea"));
 <div >
 
 
-<?php include('budgetreport.php');?>
+<?php lmdbadvancedproject_render_global_budget_report(); ?>
 
 <div class="tabBar" style='clear:both;'>
-<div class="opacitymedium">
-<ul>
-<li><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></li>
-<li><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></li>
-</ul>
-</div>
+<div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>
+<div class="warning"><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></div>
 </div>
 
 <?php

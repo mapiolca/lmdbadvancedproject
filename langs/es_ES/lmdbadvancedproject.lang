@@ -1,0 +1,67 @@
+# Copyright (C) 2022 SuperAdmin
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+ModuleLmdbAdvancedProjectName = Advanced Project
+ModuleLmdbAdvancedProjectDesc = Advanced Project amplía el análisis presupuestario de proyectos en Dolibarr.
+
+AdvancedProjectSetup = Configuración de Advanced Project
+AdvancedProjectSetupPage = Página de configuración de Advanced Project
+AdvancedProjectMulticompanyScope = Ámbito multicompany del informe
+AdvancedProjectMulticompanyAllEntities = Mostrar todas las entidades disponibles por defecto
+AdvancedProjectMulticompanyScopeHelp = Cuando esta opción está desactivada, el informe se limita a la entidad actual.
+AdvancedProjectMulticompanyInactive = El módulo Multicompany no está activado; el informe permanece limitado a la entidad actual.
+AdvancedProjectAbout = Acerca de Advanced Project
+AdvancedProjectAboutPage = Página acerca de Advanced Project
+ReadBudgetReport = Leer informe de presupuesto
+
+BudgetReportArea = Informe de presupuesto de proyectos
+BudgetReportProjectTab = Informe presupuestario
+BudgetReportProjectNoData = No hay ningún pedido de cliente validado vinculado a este proyecto; el informe presupuestario no contiene datos.
+BudgetReportMulticompanyInactiveInfo = Multicompany no está activado; el informe se limita a la entidad actual.
+BudgetReportMulticompanyCurrentEntityInfo = El informe solo muestra los proyectos de la entidad actual.
+BudgetReportMulticompanyAllEntitiesInfo = El informe muestra los proyectos de todas las entidades disponibles.
+BudgetReportBudget = Presupuesto
+BudgetReportSpent = Gastado
+BudgetReportLeftToSpend = Restante por gastar
+BudgetReportBudgetByProjects = Presupuesto por proyecto
+BudgetReportBudgetByCategory = Presupuesto por categoría
+BudgetReportBudgetVsSpentByProject = Presupuesto vs gastado por proyecto
+BudgetReportProject = Proyecto
+BudgetReportMarket = Pedidos
+BudgetReportGrossMargin = Margen bruto
+BudgetReportBalance = Saldo
+BudgetReportTotal = Total
+BudgetReportBudgetVsSpent = Presupuesto vs gastado
+BudgetReportTimeSpentOnTasks = Tiempo dedicado a tareas
+BudgetReportVendorInvoices = Facturas de proveedores
+BudgetReportStaffExpenses = Gastos de personal
+BudgetReportBudgetVsSpentByMonth = Presupuesto vs gastado por mes
+BudgetReportOpenProjectsNote = Solo son visibles los proyectos abiertos con al menos un pedido validado vinculado; los proyectos en borrador, cerrados o sin pedido no son visibles.
+BudgetReportMonthlySplitNote = El presupuesto de coste de cada proyecto se reparte equitativamente por mes según el calendario del proyecto.
+LMDB_commercialcategories = Categorías comerciales
+LMDB_CommercialCategoryExtrafield = Categoría comercial
+LMDB_CodeTooltipHelp = Código de la entrada del diccionario
+LMDB_ENtityTooltipHelp = Identificador de entidad
+LMDB_LabelTooltipHelp = Etiqueta de la entrada del diccionario
+LMDB_ActiveTooltipHelp = Estado activo de la entrada del diccionario
+BudgetReportForecastBudget = Presupuesto previsto
+BudgetReportCategorySummary = Síntesis por categoría
+BudgetReportOrderAmount = Importe pedido sin impuestos
+BudgetReportOrderBudget = Presupuesto pedido sin impuestos
+BudgetReportSupplierExpenses = Gastos proveedor sin impuestos
+BudgetReportForecastGap = Diferencia de presupuesto
+BudgetReportUncategorized = Sin categoría
+BudgetReportSupplierOrderNotInvoiced = Pedido proveedor no facturado o parcialmente facturado
+BudgetReportSupplierInvoice = Factura proveedor
+BudgetReportOrderDetails = Detalle pedidos
+BudgetReportSupplierDetails = Detalle proveedores
+BudgetReportDetails = Detalles
+BudgetReportNoDetail = Sin detalle
+BudgetReportTimeSpentTotal = Tiempo total dedicado
+BudgetReportTimeSpentHours = Horas
+BudgetReportExpenseReportDetails = Detalle de gastos
+BudgetReportExpenseComment = Comentario
