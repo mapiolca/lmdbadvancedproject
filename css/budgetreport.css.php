@@ -307,6 +307,20 @@ div.mainmenu.budgetreport {
 	border-bottom: 1px solid rgba(0,0,0,0.12);
 }
 
+.budgetreport-forecast-date-col {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.budgetreport-forecast-line-type {
+	color: #666;
+}
+
+.budgetreport-forecast-total-row td {
+	font-weight: 600;
+	background: rgba(0,0,0,0.05);
+}
+
 .budgetreport-forecast-extra {
 	margin-top: 20px;
 }
@@ -354,6 +368,16 @@ div.mainmenu.budgetreport {
 
 .budgetreport-modal-title {
 	font-weight: 600;
+}
+
+.budgetreport-modal-close {
+	width: 34px;
+	min-width: 34px;
+	height: 34px;
+	padding: 0;
+	text-align: center;
+	font-weight: 700;
+	line-height: 32px;
 }
 
 .budgetreport-modal-body {
