@@ -493,10 +493,10 @@ if (!function_exists('lmdbadvancedproject_short_line_label')) {
 	{
 		$text = lmdbadvancedproject_full_line_label($label, $description);
 		if (function_exists('dol_trunc')) {
-			return dol_trunc($text, 75);
+			return dol_trunc($text, 50);
 		}
-		if (strlen($text) > 75) {
-			return substr($text, 0, 72).'...';
+		if (strlen($text) > 50) {
+			return substr($text, 0, 47).'...';
 		}
 
 		return $text;
