@@ -54,6 +54,24 @@ if (!function_exists('lmdbadvancedproject_format_margin')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_format_spent_percentage')) {
+	/**
+	 * Format a compact percentage of the total spent amount.
+	 *
+	 * @param  float|int $amount     Partial spent amount
+	 * @param  float|int $totalSpent Total spent amount
+	 * @return string
+	 */
+	function lmdbadvancedproject_format_spent_percentage($amount, $totalSpent)
+	{
+		if ($totalSpent <= 0) {
+			return '0%';
+		}
+
+		return round(((float) $amount / (float) $totalSpent) * 100).'%';
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_trans_chart')) {
 	/**
 	 * Return a translated string suitable for JavaScript chart labels.
@@ -1556,9 +1574,9 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 			</div>
 			<div class="budgetreport-summary-breakdown">
-				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining); ?></strong></div>
-				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining); ?></strong></div>
-				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv); ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
 			</div>
 		</td>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
