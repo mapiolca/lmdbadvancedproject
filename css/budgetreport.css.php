@@ -319,15 +319,15 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-forecast-label-col {
-	width: 75px;
-	min-width: 75px;
-	max-width: 75px;
+	width: 75ch;
+	min-width: 75ch;
+	max-width: 75ch;
 }
 
 .budgetreport-forecast-label-truncate {
 	display: block;
-	width: 75px;
-	max-width: 75px;
+	width: 75ch;
+	max-width: 75ch;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

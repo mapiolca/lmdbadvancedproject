@@ -493,10 +493,10 @@ if (!function_exists('lmdbadvancedproject_short_line_label')) {
 	{
 		$text = lmdbadvancedproject_full_line_label($label, $description);
 		if (function_exists('dol_trunc')) {
-			return dol_trunc($text, 90);
+			return dol_trunc($text, 75);
 		}
-		if (strlen($text) > 90) {
-			return substr($text, 0, 87).'...';
+		if (strlen($text) > 75) {
+			return substr($text, 0, 72).'...';
 		}
 
 		return $text;
@@ -1035,14 +1035,15 @@ if (!function_exists('lmdbadvancedproject_print_forecast_lines')) {
 		foreach ($lines as $line) {
 			$totalAmount += empty($line['amount']) ? 0 : (float) $line['amount'];
 			$totalBudget += empty($line['budget']) ? 0 : (float) $line['budget'];
-			$lineLabel = empty($line['label_full']) ? (empty($line['label']) ? '' : (string) $line['label']) : (string) $line['label_full'];
+			$lineLabel = empty($line['label']) ? '' : (string) $line['label'];
+			$lineLabelFull = empty($line['label_full']) ? $lineLabel : (string) $line['label_full'];
 			print '<tr>';
 			print '<td class="budgetreport-forecast-ref-col">'.lmdbadvancedproject_get_forecast_document_nom_url($line).'</td>';
 			if ($showSupplierStatus) {
 				print '<td class="budgetreport-forecast-status-col">'.lmdbadvancedproject_get_forecast_document_status_badge($line).'</td>';
 			}
 			print '<td class="budgetreport-forecast-date-col">'.lmdbadvancedproject_format_modal_date($line['date']).'</td>';
-			print '<td class="budgetreport-forecast-label-col"><span class="budgetreport-forecast-label-truncate" title="'.lmdbadvancedproject_escape_html($lineLabel).'">'.lmdbadvancedproject_escape_html($lineLabel).'</span></td>';
+			print '<td class="budgetreport-forecast-label-col"><span class="budgetreport-forecast-label-truncate" title="'.lmdbadvancedproject_escape_html($lineLabelFull).'">'.lmdbadvancedproject_escape_html($lineLabel).'</span></td>';
 			print '<td class="budgetreport-forecast-qty-col" align="right">'.price($line['qty']).'</td>';
 			print '<td class="budgetreport-forecast-amount-col" align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
 			if ($showBudget) {
