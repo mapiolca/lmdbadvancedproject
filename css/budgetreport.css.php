@@ -113,6 +113,84 @@ div.mainmenu.budgetreport {
 	width: 100%;
 }
 
+.budgetreport-filters {
+	clear: both;
+	margin: 0 0 20px;
+	padding: 12px;
+	background: rgba(0,0,0,0.03);
+	border: 1px solid rgba(0,0,0,0.12);
+}
+
+.budgetreport-filter-title {
+	font-weight: 600;
+	margin-bottom: 10px;
+}
+
+.budgetreport-filter-fields {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 12px;
+}
+
+.budgetreport-filter-period {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.budgetreport-filter-period-title {
+	width: 100%;
+	font-weight: 600;
+	color: #555;
+}
+
+.budgetreport-filter-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 170px;
+	margin: 0;
+}
+
+.budgetreport-filter-date-field > label:first-child {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.budgetreport-filter-field span {
+	font-size: 90%;
+	color: #555;
+}
+
+.budgetreport-filter-field input,
+.budgetreport-filter-field select {
+	min-height: 32px;
+	box-sizing: border-box;
+}
+
+.budgetreport-filter-checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	font-size: 90%;
+	line-height: 1.2;
+}
+
+.budgetreport-filter-checkbox input[type="checkbox"] {
+	min-height: 0;
+	margin-top: 1px;
+}
+
+.budgetreport-filter-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
 .budgetreport-summary-fullwidth {
 	display: block;
 	max-width: none;
@@ -131,8 +209,8 @@ div.mainmenu.budgetreport {
 
 .dashboard_budget .budgetreport-summary-cell {
 	box-sizing: border-box;
-	width: 25%;
-	max-width: 25%;
+	width: 20%;
+	max-width: 20%;
 	padding: 10px 6px 12px;
 	border-right: solid 2px rgba(0,0,0,0.2);
 	border-bottom: solid 2px rgba(0,0,0,0.2);
@@ -153,6 +231,33 @@ div.mainmenu.budgetreport {
 	font-size: 2em;
 	line-height: 1.1;
 	color: #333;
+}
+
+.budgetreport-summary-breakdown {
+	max-width: 320px;
+	margin: 10px auto 0;
+	padding-top: 8px;
+	border-top: 1px solid rgba(0,0,0,0.14);
+	font-size: 88%;
+	line-height: 1.25;
+	text-align: left;
+	color: #444;
+}
+
+.budgetreport-summary-breakdown div {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	margin-top: 4px;
+}
+
+.budgetreport-summary-breakdown span {
+	overflow-wrap: anywhere;
+}
+
+.budgetreport-summary-breakdown strong {
+	white-space: nowrap;
+	font-weight: 600;
 }
 
 .budgetreport-charts-row {
@@ -214,17 +319,13 @@ div.mainmenu.budgetreport {
 	vertical-align: top;
 }
 
-.budgetreport-expense-comment {
-	white-space: normal;
-	overflow-wrap: anywhere;
-}
-
 .budgetreport-modal-open {
 	margin: 0 8px 8px 0;
 }
 
 .budgetreport-forecast-subtable {
 	width: 100%;
+	table-layout: auto;
 	border-collapse: collapse;
 }
 
@@ -232,6 +333,75 @@ div.mainmenu.budgetreport {
 .budgetreport-forecast-subtable td {
 	padding: 4px 6px;
 	border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.budgetreport-forecast-ref-col,
+.budgetreport-forecast-status-col,
+.budgetreport-forecast-date-col,
+.budgetreport-forecast-qty-col,
+.budgetreport-forecast-amount-col,
+.budgetreport-forecast-budget-col {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.budgetreport-forecast-label-col {
+	width: 50ch;
+	min-width: 50ch;
+	max-width: 50ch;
+}
+
+.budgetreport-forecast-label-truncate {
+	display: block;
+	width: 50ch;
+	max-width: 50ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.budgetreport-forecast-total-row td {
+	font-weight: 600;
+	background: rgba(0,0,0,0.05);
+}
+
+.budgetreport-extra-subtable {
+	table-layout: auto;
+}
+
+.budgetreport-extra-compact-col {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.budgetreport-extra-task-label-col {
+	width: 50ch;
+	min-width: 50ch;
+	max-width: 50ch;
+}
+
+.budgetreport-extra-task-label-truncate {
+	display: block;
+	width: 50ch;
+	max-width: 50ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.budgetreport-extra-expense-comment-col {
+	width: 75ch;
+	min-width: 75ch;
+	max-width: 75ch;
+}
+
+.budgetreport-extra-expense-comment-truncate {
+	display: block;
+	width: 75ch;
+	max-width: 75ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .budgetreport-forecast-extra {
@@ -340,6 +510,15 @@ div.mainmenu.budgetreport {
 }
 
 @media only screen and (max-width: 480px) {
+	.budgetreport-filter-field,
+	.budgetreport-filter-actions {
+		width: 100%;
+	}
+
+	.budgetreport-filter-actions .button {
+		text-align: center;
+	}
+
 	.budgetreport-summary-amount {
 		font-size: 1.7em;
 	}

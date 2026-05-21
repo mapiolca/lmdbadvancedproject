@@ -76,6 +76,13 @@ if (isset($user->socid) && $user->socid > 0) {
 
 $max = 5;
 $now = dol_now();
+$budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
+	'date_start' => GETPOST('date_start', 'alpha'),
+	'date_end' => GETPOST('date_end', 'alpha'),
+	'ignore_started_before' => GETPOST('ignore_started_before', 'alpha'),
+	'ignore_ended_after' => GETPOST('ignore_ended_after', 'alpha'),
+	'project_status' => GETPOST('project_status', 'alpha'),
+));
 
 
 /*
@@ -91,31 +98,22 @@ $now = dol_now();
 
 $form = new Form($db);
 $formfile = new FormFile($db);
+$title = $langs->trans("BudgetReportArea");
+$help_url = '';
 
-llxHeader("", $langs->trans("BudgetReportArea"));
+llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'bodyforlist mod-order page-list');
+
+print_barre_liste($title, 0, $_SERVER["PHP_SELF"], '', '', '', '', 0, 0, 'fa-chart-pie', 0, '', '', 0, 1, 1);
 
 ?>
-<table class="centpercent notopnoleftnoright table-fiche-title">
-	<tr>
-		<td class="nobordernopadding widthpictotitle valignmiddle col-picto">
-			<span class="fas fa-chart-pie infobox-project valignmiddle pictotitle widthpictotitle" style=""></span>
-		</td>
-		<td class="nobordernopadding valignmiddle col-title">
-			<div class="titre inline-block">
-				<span style="padding: 0px; padding-right: 3px !important;"><?php echo $langs->trans("BudgetReportArea"); ?></span>
-			</div>
-		</td>
-		<td class="nobordernopadding valignmiddle col-title" align="right">
-
-		</td>
-	</tr>
-</table>
-
 <div class="fichecenter">
 <div >
 
 
-<?php lmdbadvancedproject_render_global_budget_report(); ?>
+<?php
+lmdbadvancedproject_print_budget_report_filters($budgetReportFilters);
+lmdbadvancedproject_render_global_budget_report($budgetReportFilters);
+?>
 
 <div class="tabBar" style='clear:both;'>
 <div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>

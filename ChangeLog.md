@@ -1,5 +1,13 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.1
+
+- Add date range and project status filters to the global budget report
+- Allow open and closed projects to be shown according to the selected status filter
+- Split supplier spending between ordered supplier orders, delivered supplier orders, and supplier invoices
+- Display supplier spending percentages in the Spent tile
+- Improve order and supplier detail modals with totals, localized dates, Dolibarr document links, and a Dolibarr-style close button
+
 ## 1.0
 
 Initial version
