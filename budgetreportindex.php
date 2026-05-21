@@ -103,6 +103,8 @@ $help_url = '';
 
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'bodyforlist mod-order page-list');
 
+print_barre_liste($title, 0, $_SERVER["PHP_SELF"], '', '', '', '', 0, 0, 'fa-chart-pie', 0, '', '', 0, 1, 1);
+
 ?>
 <div class="fichecenter">
 <div >
