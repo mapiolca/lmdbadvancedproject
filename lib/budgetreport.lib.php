@@ -392,12 +392,16 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 		$normalized = array(
 			'date_start' => '',
 			'date_end' => '',
+			'ignore_started_before' => '0',
+			'ignore_ended_after' => '0',
 			'project_status' => 'open',
 		);
 
 		if (is_array($filters)) {
 			$normalized['date_start'] = lmdbadvancedproject_normalize_report_date(empty($filters['date_start']) ? '' : $filters['date_start']);
 			$normalized['date_end'] = lmdbadvancedproject_normalize_report_date(empty($filters['date_end']) ? '' : $filters['date_end']);
+			$normalized['ignore_started_before'] = empty($filters['ignore_started_before']) ? '0' : '1';
+			$normalized['ignore_ended_after'] = empty($filters['ignore_ended_after']) ? '0' : '1';
 
 			$projectStatus = empty($filters['project_status']) ? 'open' : (string) $filters['project_status'];
 			if (in_array($projectStatus, array('open', 'closed', 'both'), true)) {
@@ -442,6 +446,8 @@ if (!function_exists('lmdbadvancedproject_build_project_date_sql_filter')) {
 
 		$dateStart = empty($filters['date_start']) ? '' : $filters['date_start'];
 		$dateEnd = empty($filters['date_end']) ? '' : $filters['date_end'];
+		$ignoreStartedBefore = !empty($filters['ignore_started_before']) && $filters['ignore_started_before'] === '1';
+		$ignoreEndedAfter = !empty($filters['ignore_ended_after']) && $filters['ignore_ended_after'] === '1';
 		if ($dateStart === '' && $dateEnd === '') {
 			return '';
 		}
@@ -458,6 +464,18 @@ if (!function_exists('lmdbadvancedproject_build_project_date_sql_filter')) {
 
 		if ($dateStart !== '') {
 			$conditions[] = "(p.datee IS NULL OR p.datee = '0000-00-00' OR p.datee = '0000-00-00 00:00:00' OR p.datee < p.dateo OR DATE(p.datee) >= '".$db->escape($dateStart)."')";
+		}
+
+		if ($ignoreStartedBefore && $dateStart !== '') {
+			$conditions[] = "DATE(p.dateo) >= '".$db->escape($dateStart)."'";
+		}
+
+		if ($ignoreEndedAfter && $dateEnd !== '') {
+			$conditions[] = "p.datee IS NOT NULL";
+			$conditions[] = "p.datee <> '0000-00-00'";
+			$conditions[] = "p.datee <> '0000-00-00 00:00:00'";
+			$conditions[] = "DATE(p.datee) >= DATE(p.dateo)";
+			$conditions[] = "DATE(p.datee) <= '".$db->escape($dateEnd)."'";
 		}
 
 		return ' AND '.implode(' AND ', $conditions);
@@ -486,8 +504,17 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 		print '<form method="GET" action="'.lmdbadvancedproject_escape_html($action).'" class="budgetreport-filters">';
 		print '<div class="budgetreport-filter-title">'.$langs->trans('BudgetReportFilters').'</div>';
 		print '<div class="budgetreport-filter-fields">';
-		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterDateStart').'</span><input type="date" class="flat" name="date_start" value="'.lmdbadvancedproject_escape_html($filters['date_start']).'"></label>';
-		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterDateEnd').'</span><input type="date" class="flat" name="date_end" value="'.lmdbadvancedproject_escape_html($filters['date_end']).'"></label>';
+		print '<div class="budgetreport-filter-period">';
+		print '<div class="budgetreport-filter-period-title">'.$langs->trans('BudgetReportObservationPeriod').'</div>';
+		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateStart').'</span><input type="date" class="flat" name="date_start" value="'.lmdbadvancedproject_escape_html($filters['date_start']).'"></label>';
+		print '<label class="budgetreport-filter-checkbox"><input type="checkbox" name="ignore_started_before" value="1"'.($filters['ignore_started_before'] === '1' ? ' checked="checked"' : '').'><span>'.$langs->trans('BudgetReportIgnoreStartedBefore').'</span></label>';
+		print '</div>';
+		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateEnd').'</span><input type="date" class="flat" name="date_end" value="'.lmdbadvancedproject_escape_html($filters['date_end']).'"></label>';
+		print '<label class="budgetreport-filter-checkbox"><input type="checkbox" name="ignore_ended_after" value="1"'.($filters['ignore_ended_after'] === '1' ? ' checked="checked"' : '').'><span>'.$langs->trans('BudgetReportIgnoreEndedAfter').'</span></label>';
+		print '</div>';
+		print '</div>';
 		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterStatus').'</span><select class="flat" name="project_status">';
 		foreach ($statusOptions as $value => $labelKey) {
 			$selected = ($filters['project_status'] === $value) ? ' selected="selected"' : '';

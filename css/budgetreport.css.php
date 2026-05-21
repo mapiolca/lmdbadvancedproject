@@ -133,12 +133,31 @@ div.mainmenu.budgetreport {
 	gap: 12px;
 }
 
+.budgetreport-filter-period {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.budgetreport-filter-period-title {
+	width: 100%;
+	font-weight: 600;
+	color: #555;
+}
+
 .budgetreport-filter-field {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
 	min-width: 170px;
 	margin: 0;
+}
+
+.budgetreport-filter-date-field > label:first-child {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
 }
 
 .budgetreport-filter-field span {
@@ -150,6 +169,19 @@ div.mainmenu.budgetreport {
 .budgetreport-filter-field select {
 	min-height: 32px;
 	box-sizing: border-box;
+}
+
+.budgetreport-filter-checkbox {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	font-size: 90%;
+	line-height: 1.2;
+}
+
+.budgetreport-filter-checkbox input[type="checkbox"] {
+	min-height: 0;
+	margin-top: 1px;
 }
 
 .budgetreport-filter-actions {

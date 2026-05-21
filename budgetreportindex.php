@@ -79,6 +79,8 @@ $now = dol_now();
 $budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
 	'date_start' => GETPOST('date_start', 'alpha'),
 	'date_end' => GETPOST('date_end', 'alpha'),
+	'ignore_started_before' => GETPOST('ignore_started_before', 'alpha'),
+	'ignore_ended_after' => GETPOST('ignore_ended_after', 'alpha'),
 	'project_status' => GETPOST('project_status', 'alpha'),
 ));
 
