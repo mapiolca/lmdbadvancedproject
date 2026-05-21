@@ -98,26 +98,12 @@ $budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array
 
 $form = new Form($db);
 $formfile = new FormFile($db);
+$title = $langs->trans("BudgetReportArea");
+$help_url = '';
 
-llxHeader("", $langs->trans("BudgetReportArea"));
+llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'bodyforlist mod-order page-list');
 
 ?>
-<table class="centpercent notopnoleftnoright table-fiche-title">
-	<tr>
-		<td class="nobordernopadding widthpictotitle valignmiddle col-picto">
-			<span class="fas fa-chart-pie infobox-project valignmiddle pictotitle widthpictotitle" style=""></span>
-		</td>
-		<td class="nobordernopadding valignmiddle col-title">
-			<div class="titre inline-block">
-				<span style="padding: 0px; padding-right: 3px !important;"><?php echo $langs->trans("BudgetReportArea"); ?></span>
-			</div>
-		</td>
-		<td class="nobordernopadding valignmiddle col-title" align="right">
-
-		</td>
-	</tr>
-</table>
-
 <div class="fichecenter">
 <div >
 
