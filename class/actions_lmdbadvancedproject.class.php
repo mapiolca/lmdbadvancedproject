@@ -426,17 +426,21 @@ class ActionsLmdbadvancedproject
 			$entities = function_exists('getEntity') ? getEntity('supplier_invoice', 1) : '1';
 			$sql = "SELECT ffd.rowid AS line_id, ffd.fk_facture_fourn AS invoice_id, ff.ref AS document_ref, ff.datef AS document_date,";
 			$sql .= " ff.fk_soc, ff.fk_projet AS invoice_project_id, ff.entity, ffd.label AS line_label, ffd.description AS line_description,";
+			$sql .= " ffd.fk_product, p.ref AS product_ref, p.label AS product_label, p.description AS product_description,";
 			$sql .= " ffd.qty, ffd.total_ht, ffd.total_ttc, ffd.tva_tx, ffd.product_type";
 			$sql .= " FROM ".MAIN_DB_PREFIX."facture_fourn_det ffd";
 			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = ffd.fk_facture_fourn";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product p ON p.rowid = ffd.fk_product";
 			$sql .= " WHERE ffd.rowid = ".$lineId." AND ff.entity IN (".$entities.")";
 		} else {
 			$entities = function_exists('getEntity') ? getEntity('facture', 1) : '1';
 			$sql = "SELECT fd.rowid AS line_id, fd.fk_facture AS invoice_id, f.ref AS document_ref, f.datef AS document_date,";
 			$sql .= " f.fk_soc, f.fk_projet AS invoice_project_id, f.entity, fd.label AS line_label, fd.description AS line_description,";
+			$sql .= " fd.fk_product, p.ref AS product_ref, p.label AS product_label, p.description AS product_description,";
 			$sql .= " fd.qty, fd.total_ht, fd.total_ttc, fd.tva_tx, fd.product_type";
 			$sql .= " FROM ".MAIN_DB_PREFIX."facturedet fd";
 			$sql .= " INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = fd.fk_facture";
+			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."product p ON p.rowid = fd.fk_product";
 			$sql .= " WHERE fd.rowid = ".$lineId." AND f.entity IN (".$entities.")";
 		}
 
@@ -667,6 +671,7 @@ class ActionsLmdbadvancedproject
 
 		$token = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
 		$actionUrl = $_SERVER['PHP_SELF'].'?facid='.((int) $source->invoice_id).'&lineid='.((int) $source->line_id).'&action=lmdbadvancedproject_update_split';
+		$sourceDisplay = $this->getSourceDisplayParts($source);
 
 		$this->renderSimpleModalMessages($messages, $errors);
 
@@ -675,7 +680,11 @@ class ActionsLmdbadvancedproject
 		print '<input type="hidden" name="lineid" value="'.((int) $source->line_id).'">';
 		print '<div class="lmdbap-split-source">';
 		print '<div><strong>'.$langs->trans('Ref').'</strong> '.$this->escape($source->document_ref).'</div>';
-		print '<div><strong>'.$langs->trans('Label').'</strong> '.$this->escape($this->getSourceLineLabel($source)).'</div>';
+		print '<div><strong>'.$langs->trans('Label').'</strong> '.$this->escape($sourceDisplay['label']);
+		if ($sourceDisplay['description'] !== '') {
+			print ' <span class="fas fa-info-circle classfortooltip lmdbap-source-info" title="'.$this->escapeTooltip($sourceDisplay['description']).'" aria-label="Info"></span>';
+		}
+		print '</div>';
 		print '<div><strong>'.$langs->trans('Qty').'</strong> '.price($source->qty).' &nbsp; <strong>'.$langs->trans('AmountHT').'</strong> '.price($source->total_ht).' &nbsp; <strong>'.$langs->trans('AmountTTC').'</strong> '.price($source->total_ttc).'</div>';
 		print '</div>';
 
@@ -692,14 +701,14 @@ class ActionsLmdbadvancedproject
 		print '</div>';
 
 		print '<table class="noborder centpercent lmdbap-split-table">';
-		print '<thead><tr class="liste_titre"><th>'.$langs->trans('Project').'</th><th class="right">'.$langs->trans('AmountHT').'</th><th class="right">'.$langs->trans('Qty').'</th><th></th></tr></thead>';
+		print '<thead><tr class="liste_titre"><th class="lmdbap-project-col">'.$langs->trans('Project').'</th><th class="right lmdbap-amount-col">'.$langs->trans('AmountHT').'</th><th class="right lmdbap-qty-col">'.$langs->trans('Qty').'</th><th class="lmdbap-action-col"></th></tr></thead>';
 		print '<tbody>';
 		foreach ($parts as $part) {
 			$this->renderSplitRow($projects, $part);
 		}
 		$this->renderSplitRow($projects, array('fk_projet' => 0, 'total_ht' => '', 'qty' => ''), true);
 		print '</tbody>';
-		print '<tfoot><tr><td><strong>'.$langs->trans('BudgetReportTotal').'</strong></td><td class="right" id="lmdbap-total-amount"></td><td class="right" id="lmdbap-total-qty"></td><td></td></tr></tfoot>';
+		print '<tfoot><tr><td><strong>'.$langs->trans('BudgetReportTotal').'</strong></td><td class="right lmdbap-amount-col" id="lmdbap-total-amount"></td><td class="right lmdbap-qty-col" id="lmdbap-total-qty"></td><td></td></tr></tfoot>';
 		print '</table>';
 
 		print '<div class="tabsAction">';
@@ -749,16 +758,16 @@ class ActionsLmdbadvancedproject
 		$qty = array_key_exists('qty', $part) ? $part['qty'] : '';
 
 		print '<tr'.$class.'>';
-		print '<td><select class="flat minwidth300 lmdbap-project-select" name="lmdbap_project[]">';
+		print '<td class="lmdbap-project-col"><select class="flat minwidth300 lmdbap-project-select" name="lmdbap_project[]">';
 		print '<option value="0">&nbsp;</option>';
 		foreach ($projects as $project) {
 			$selected = ((int) $project['id'] === $projectId) ? ' selected' : '';
 			print '<option value="'.((int) $project['id']).'"'.$selected.'>'.$this->escape($project['label']).'</option>';
 		}
 		print '</select></td>';
-		print '<td class="right"><input type="text" class="flat maxwidth75 right lmdbap-amount-input" name="lmdbap_amount[]" value="'.$this->escape($this->formatInputNumber($amount)).'"></td>';
-		print '<td class="right"><input type="text" class="flat maxwidth75 right lmdbap-qty-input" name="lmdbap_qty[]" value="'.$this->escape($this->formatInputNumber($qty)).'"></td>';
-		print '<td class="center"><button type="button" class="button button-delete lmdbap-remove-row" title="'.$this->escape($langs->trans('Delete')).'"><span class="fas fa-trash"></span></button></td>';
+		print '<td class="right lmdbap-amount-col"><input type="text" class="flat maxwidth75 right lmdbap-amount-input" name="lmdbap_amount[]" value="'.$this->escape($this->formatInputNumber($amount)).'"></td>';
+		print '<td class="right lmdbap-qty-col"><input type="text" class="flat maxwidth75 right lmdbap-qty-input" name="lmdbap_qty[]" value="'.$this->escape($this->formatInputNumber($qty)).'"></td>';
+		print '<td class="center lmdbap-action-col"><button type="button" class="lmdbap-icon-button lmdbap-remove-row classfortooltip" title="'.$this->escape($langs->trans('Delete')).'" aria-label="'.$this->escape($langs->trans('Delete')).'"><span class="fas fa-trash"></span></button></td>';
 		print '</tr>';
 	}
 
@@ -782,10 +791,57 @@ class ActionsLmdbadvancedproject
 				return isNaN(number) ? 0 : number;
 			}
 
+			function currentMode() {
+				return $form.find("input[name='lmdbap_mode']:checked").val() || <?php echo json_encode($initialMode); ?>;
+			}
+
+			function initProjectSelects($scope) {
+				if (!$.fn.select2) return;
+				var $dropdownParent = $("#dialogforpopup");
+				if (!$dropdownParent.length) {
+					$dropdownParent = $form.closest(".ui-dialog-content");
+				}
+				if (!$dropdownParent.length) {
+					$dropdownParent = $form;
+				}
+
+				$scope.find("select.lmdbap-project-select").each(function() {
+					var $select = $(this);
+					if ($select.closest(".lmdbap-template-row").length || $select.data("select2") || $select.hasClass("select2-hidden-accessible") || $select.hasClass("select2-offscreen")) {
+						return;
+					}
+					try {
+						$select.select2({
+							width: "100%",
+							dropdownParent: $dropdownParent
+						});
+					} catch (e) {
+						try {
+							$select.select2({width: "100%"});
+						} catch (e2) {}
+					}
+				});
+			}
+
+			function destroyProjectSelects($scope) {
+				if (!$.fn.select2) return;
+				$scope.find("select.lmdbap-project-select").each(function() {
+					var $select = $(this);
+					if ($select.data("select2") || $select.hasClass("select2-hidden-accessible") || $select.hasClass("select2-offscreen")) {
+						try {
+							$select.select2("destroy");
+						} catch (e) {}
+					}
+				});
+			}
+
 			function updateMode() {
-				var mode = $form.find("input[name='lmdbap_mode']:checked").val() || <?php echo json_encode($initialMode); ?>;
-				$form.find(".lmdbap-amount-input").prop("readonly", mode !== "amount");
-				$form.find(".lmdbap-qty-input").prop("readonly", mode !== "quantity");
+				var mode = currentMode();
+				var amountMode = mode === "amount";
+				$form.find(".lmdbap-amount-col").toggle(amountMode);
+				$form.find(".lmdbap-qty-col").toggle(!amountMode);
+				$form.find(".lmdbap-amount-input").prop("disabled", !amountMode);
+				$form.find(".lmdbap-qty-input").prop("disabled", amountMode);
 			}
 
 			function updateTotals() {
@@ -807,7 +863,9 @@ class ActionsLmdbadvancedproject
 			$form.on("click.lmdbap", ".lmdbap-remove-row", function() {
 				var $rows = $form.find("tbody tr.lmdbap-split-row:visible");
 				if ($rows.length <= 1) return;
-				$(this).closest("tr").remove();
+				var $row = $(this).closest("tr");
+				destroyProjectSelects($row);
+				$row.remove();
 				updateTotals();
 			});
 			$form.on("click.lmdbap", ".lmdbap-delete-split", function() {
@@ -825,10 +883,12 @@ class ActionsLmdbadvancedproject
 				$row.find("select").val("0");
 				$row.find("input[type='text']").val("");
 				$template.before($row);
+				initProjectSelects($row);
 				updateMode();
 				updateTotals();
 			});
 
+			initProjectSelects($form);
 			updateMode();
 			updateTotals();
 		});
@@ -940,11 +1000,138 @@ class ActionsLmdbadvancedproject
 	 */
 	private function getSourceLineLabel($source)
 	{
-		$label = trim((string) $source->line_label);
-		if ($label === '') {
-			$label = trim(strip_tags((string) $source->line_description));
+		$display = $this->getSourceDisplayParts($source);
+
+		return $display['label'];
+	}
+
+	/**
+	 * Return display label and tooltip description for the source line.
+	 *
+	 * @param  stdClass $source Source line
+	 * @return array<string,string>
+	 */
+	private function getSourceDisplayParts($source)
+	{
+		$productLabelLines = $this->splitSourceText(empty($source->product_label) ? '' : $source->product_label);
+		$productRefLines = $this->splitSourceText(empty($source->product_ref) ? '' : $source->product_ref);
+		$lineLabelLines = $this->splitSourceText(empty($source->line_label) ? '' : $source->line_label);
+		$lineDescriptionLines = $this->splitSourceText(empty($source->line_description) ? '' : $source->line_description);
+
+		$label = '';
+		if (!empty($source->fk_product) && !empty($productLabelLines)) {
+			$label = $productLabelLines[0];
 		}
-		return $label === '' ? '-' : $label;
+		if (!empty($source->fk_product) && $label === '' && !empty($productRefLines)) {
+			$label = $productRefLines[0];
+		}
+		if ($label === '' && !empty($lineLabelLines)) {
+			$label = $lineLabelLines[0];
+		}
+		if ($label === '' && !empty($lineDescriptionLines)) {
+			$label = $lineDescriptionLines[0];
+		}
+		if ($label === '') {
+			$label = '-';
+		}
+
+		$tooltipParts = array();
+		if (!empty($lineLabelLines)) {
+			if ($this->normalizeComparableText($lineLabelLines[0]) === $this->normalizeComparableText($label)) {
+				array_shift($lineLabelLines);
+			}
+			$this->appendTooltipText($tooltipParts, implode("\n", $lineLabelLines), $label);
+		}
+		$this->appendTooltipText($tooltipParts, empty($source->line_description) ? '' : $source->line_description, $label);
+		$this->appendTooltipText($tooltipParts, empty($source->product_description) ? '' : $source->product_description, $label);
+
+		return array(
+			'label' => $label,
+			'description' => implode("\n\n", $tooltipParts),
+		);
+	}
+
+	/**
+	 * Append a unique tooltip text part.
+	 *
+	 * @param array<string> $parts        Existing text parts
+	 * @param string        $text         New text
+	 * @param string        $visibleLabel Visible label
+	 * @return void
+	 */
+	private function appendTooltipText(&$parts, $text, $visibleLabel)
+	{
+		$text = $this->normalizeSourceText($text);
+		if ($text === '') {
+			return;
+		}
+
+		$comparableText = $this->normalizeComparableText($text);
+		if ($comparableText === '' || $comparableText === $this->normalizeComparableText($visibleLabel)) {
+			return;
+		}
+
+		foreach ($parts as $part) {
+			if ($this->normalizeComparableText($part) === $comparableText) {
+				return;
+			}
+		}
+
+		$parts[] = $text;
+	}
+
+	/**
+	 * Split a source text into non-empty display lines.
+	 *
+	 * @param  string $value Raw text
+	 * @return array<int,string>
+	 */
+	private function splitSourceText($value)
+	{
+		$text = $this->normalizeSourceText($value);
+		if ($text === '') {
+			return array();
+		}
+
+		$lines = preg_split('/\n+/', $text);
+		$result = array();
+		foreach ($lines as $line) {
+			$line = trim($line);
+			if ($line !== '') {
+				$result[] = $line;
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Normalize source text for display.
+	 *
+	 * @param  string $value Raw text
+	 * @return string
+	 */
+	private function normalizeSourceText($value)
+	{
+		$value = str_replace(array("\\r\\n", "\\n", "\\r"), "\n", (string) $value);
+		$value = preg_replace('/<br\s*\/?>/i', "\n", $value);
+		$value = html_entity_decode(strip_tags($value), ENT_QUOTES, 'UTF-8');
+		$value = str_replace(array("\r\n", "\r"), "\n", $value);
+		$value = preg_replace('/[ \t]+/', ' ', $value);
+		$value = preg_replace('/ *\n+ */', "\n", $value);
+
+		return trim($value);
+	}
+
+	/**
+	 * Normalize text for duplicate comparisons.
+	 *
+	 * @param  string $value Raw text
+	 * @return string
+	 */
+	private function normalizeComparableText($value)
+	{
+		return preg_replace('/\s+/', ' ', trim($this->normalizeSourceText($value)));
 	}
 
 	/**
@@ -986,6 +1173,21 @@ class ActionsLmdbadvancedproject
 	{
 		if (function_exists('dol_escape_htmltag')) {
 			return dol_escape_htmltag((string) $value);
+		}
+
+		return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+	}
+
+	/**
+	 * Escape a tooltip value.
+	 *
+	 * @param  string $value Value
+	 * @return string
+	 */
+	private function escapeTooltip($value)
+	{
+		if (function_exists('dol_escape_htmltag')) {
+			return dol_escape_htmltag((string) $value, 1);
 		}
 
 		return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');

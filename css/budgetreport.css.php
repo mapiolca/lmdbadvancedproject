@@ -131,6 +131,12 @@ div.mainmenu.budgetreport {
 	margin-top: 4px;
 }
 
+.lmdbap-source-info {
+	margin-left: 6px;
+	color: #666;
+	cursor: help;
+}
+
 .lmdbap-split-mode {
 	display: flex;
 	flex-wrap: wrap;
@@ -143,10 +149,40 @@ div.mainmenu.budgetreport {
 	vertical-align: middle;
 }
 
-.lmdbap-split-table .button-delete {
-	min-width: 28px;
-	padding-left: 6px;
-	padding-right: 6px;
+.lmdbap-split-table .lmdbap-project-col {
+	min-width: 320px;
+}
+
+.lmdbap-split-table .lmdbap-amount-col,
+.lmdbap-split-table .lmdbap-qty-col {
+	width: 120px;
+}
+
+.lmdbap-split-table .lmdbap-action-col {
+	width: 36px;
+}
+
+.lmdbap-split-table .select2-container {
+	width: 100% !important;
+}
+
+.lmdbap-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #555;
+	cursor: pointer;
+}
+
+.lmdbap-icon-button:hover,
+.lmdbap-icon-button:focus {
+	background: rgba(0,0,0,0.06);
+	color: #222;
 }
 
 .budgetreport-summary-fullwidth,
