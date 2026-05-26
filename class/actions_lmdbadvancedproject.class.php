@@ -25,6 +25,15 @@ class ActionsLmdbadvancedproject
 	/** @var array<string> Errors */
 	public $errors = array();
 
+	/** @var array<string> Warnings */
+	public $warnings = array();
+
+	/** @var array<string,mixed> Hook results */
+	public $results = array();
+
+	/** @var string Hook rendered output */
+	public $resprints = '';
+
 	/**
 	 * Constructor.
 	 *
@@ -58,47 +67,112 @@ class ActionsLmdbadvancedproject
 		$title = $langs->trans('LMDBAdvancedProjectBreakdownByProject');
 		$loading = $langs->trans('Loading');
 
-		$hookmanager->resPrint .= '
+		$html = '
 		<script>
 		jQuery(function($) {
 			var lmdbapToken = '.json_encode($token).';
 			var lmdbapTitle = '.json_encode($title).';
 			var lmdbapLoading = '.json_encode($loading).';
 
-			function lmdbapBuildSplitUrl(href) {
-				if (!href) return "";
-				var url = href.split("#")[0];
-				if (url.indexOf("action=editline") !== -1) {
-					url = url.replace("action=editline", "action=lmdbadvancedproject_edit_split");
-				} else {
-					url += (url.indexOf("?") === -1 ? "?" : "&") + "action=lmdbadvancedproject_edit_split";
+			function lmdbapSetQueryParam(url, key, value) {
+				var hash = "";
+				var hashIndex = url.indexOf("#");
+				if (hashIndex !== -1) {
+					hash = url.substring(hashIndex);
+					url = url.substring(0, hashIndex);
 				}
-				if (url.indexOf("token=") === -1 && lmdbapToken) {
-					url += (url.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(lmdbapToken);
+				var regexp = new RegExp("([?&])" + key + "=[^&]*");
+				if (regexp.test(url)) {
+					return url.replace(regexp, "$1" + key + "=" + encodeURIComponent(value)) + hash;
+				}
+				return url + (url.indexOf("?") === -1 ? "?" : "&") + key + "=" + encodeURIComponent(value) + hash;
+			}
+
+			function lmdbapBuildSplitUrl(lineId) {
+				var url = window.location.pathname + window.location.search;
+				url = lmdbapSetQueryParam(url, "action", "lmdbadvancedproject_edit_split");
+				url = lmdbapSetQueryParam(url, "lineid", lineId);
+				if (lmdbapToken) {
+					url = lmdbapSetQueryParam(url, "token", lmdbapToken);
 				}
 				return url;
 			}
 
-			$("tbody td.linecoledit a").each(function() {
-				var $editLink = $(this);
-				var href = $editLink.attr("href") || "";
-				if (href.indexOf("lineid=") === -1 || href.indexOf("action=editline") === -1 || $editLink.closest("tr").find(".lmdbap-line-split-cell").length) {
+			function lmdbapEnsureHeader($table) {
+				if (!$table.length || $table.data("lmdbap-split-header") || $table.find("thead .lmdbap-line-split-title").length) {
 					return;
 				}
-				var splitUrl = lmdbapBuildSplitUrl(href);
-				if (!splitUrl) return;
-				var html = \'<td class="center lmdbap-line-split-cell"><a class="lmdbap-edit-split classfortooltip" href="\' + splitUrl + \'" title="\' + lmdbapTitle + \'"><span class="fas fa-sitemap"></span></a></td>\';
-				$editLink.closest("td").before(html);
-			});
+				var $headerRow = $table.find("thead tr").last();
+				if (!$headerRow.length) {
+					return;
+				}
+				var $titleCell = $("<th>", {"class": "center lmdbap-line-split-title"}).html("&nbsp;");
+				var $editTitle = $headerRow.children(".linecoledit").first();
+				if ($editTitle.length) {
+					$editTitle.before($titleCell);
+				} else {
+					var $moveTitle = $headerRow.children(".linecolmove").first();
+					if ($moveTitle.length && $moveTitle.attr("colspan")) {
+						$moveTitle.attr("colspan", function(index, value) {
+							var span = parseInt(value, 10);
+							return isNaN(span) ? value : span + 1;
+						});
+					} else {
+						$headerRow.append($titleCell);
+					}
+				}
+				$table.data("lmdbap-split-header", true);
+			}
 
-			$("thead .linecolmove").attr("colspan", function(index, value) {
-				var span = parseInt(value, 10);
-				return isNaN(span) ? value : span + 1;
-			});
-			$("td.linecoledit").last().attr("colspan", function(index, value) {
-				var span = parseInt(value, 10);
-				return isNaN(span) ? value : span + 1;
-			});
+			function lmdbapMakeButtonCell(splitUrl) {
+				var $cell = $("<td>", {"class": "center lmdbap-line-split-cell"});
+				$("<a>", {
+					"class": "lmdbap-edit-split classfortooltip",
+					"href": splitUrl,
+					"title": lmdbapTitle
+				}).append($("<span>", {"class": "fas fa-sitemap"})).appendTo($cell);
+				return $cell;
+			}
+
+			function lmdbapInsertButtonCell($row, $cell) {
+				var $editCell = $row.children("td.linecoledit").first();
+				if ($editCell.length) {
+					$editCell.before($cell);
+					return;
+				}
+
+				var $lastCell = $row.children("td").last();
+				if ($lastCell.length && $lastCell.is("[colspan]")) {
+					var span = parseInt($lastCell.attr("colspan"), 10);
+					if (!isNaN(span) && span > 1) {
+						$lastCell.attr("colspan", span - 1);
+						$lastCell.before($cell);
+						return;
+					}
+				}
+
+				$row.append($cell);
+			}
+
+			function lmdbapInjectSplitButtons() {
+				$("tr[data-id]").each(function() {
+					var $row = $(this);
+					var lineId = $row.attr("data-id");
+					if (!lineId || !/^[0-9]+$/.test(lineId) || $row.children(".lmdbap-line-split-cell").length) {
+						return;
+					}
+
+					var $table = $row.closest("table");
+					if (!$table.find(".linecoldescription,.linecolproduct,.linecolref").length) {
+						return;
+					}
+
+					lmdbapEnsureHeader($table);
+					lmdbapInsertButtonCell($row, lmdbapMakeButtonCell(lmdbapBuildSplitUrl(lineId)));
+				});
+			}
+
+			lmdbapInjectSplitButtons();
 
 			$(document).on("click", ".lmdbap-edit-split", function(event) {
 				event.preventDefault();
@@ -133,6 +207,8 @@ class ActionsLmdbadvancedproject
 			});
 		});
 		</script>';
+
+		$this->resprints .= $html;
 
 		return 0;
 	}

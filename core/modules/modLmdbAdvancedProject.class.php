@@ -268,7 +268,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		foreach ($fields as $element => $field) {
 			$extrafields->fetch_name_optionals_label($element);
 			if (!empty($extrafields->attributes[$element]['label']['lmdb_commercial_category'])) {
-				$result = $this->repairCommercialCategoryExtraFieldEnabled($element, $field['enabled']);
+				$result = $this->repairCommercialCategoryExtraField($element, $field['enabled'], $param);
 				if ($result < 0) {
 					return -1;
 				}
@@ -308,19 +308,24 @@ class modLmdbAdvancedProject extends DolibarrModules
 	}
 
 	/**
-	 * Repair the enabled expression of an existing commercial category extrafield.
+	 * Repair the definition of an existing commercial category extrafield.
 	 *
-	 * @param  string $element Element type
-	 * @param  string $enabled Enabled expression
+	 * @param  string                    $element Element type
+	 * @param  string                    $enabled Enabled expression
+	 * @param  array<string,array<mixed>> $param   Extra field parameters
 	 * @return int             1 if OK, <0 if KO
 	 */
-	private function repairCommercialCategoryExtraFieldEnabled($element, $enabled)
+	private function repairCommercialCategoryExtraField($element, $enabled, $param)
 	{
+		$serializedParam = serialize($param);
+
 		$sql = "UPDATE ".MAIN_DB_PREFIX."extrafields";
-		$sql .= " SET enabled = '".$this->db->escape($enabled)."'";
+		$sql .= " SET enabled = '".$this->db->escape($enabled)."',";
+		$sql .= " param = '".$this->db->escape($serializedParam)."'";
 		$sql .= " WHERE name = 'lmdb_commercial_category'";
 		$sql .= " AND elementtype = '".$this->db->escape($element)."'";
-		$sql .= " AND (enabled IS NULL OR enabled <> '".$this->db->escape($enabled)."')";
+		$sql .= " AND (enabled IS NULL OR enabled <> '".$this->db->escape($enabled)."'";
+		$sql .= " OR param IS NULL OR param <> '".$this->db->escape($serializedParam)."')";
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {
