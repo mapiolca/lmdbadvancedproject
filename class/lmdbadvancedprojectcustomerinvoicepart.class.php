@@ -14,12 +14,31 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
  */
 class LmdbAdvancedProjectCustomerInvoicePart extends CommonObject
 {
+	public $module = 'lmdbadvancedproject';
 	public $element = 'lmdbadvancedproject_customer_invoice_parts';
 	public $table_element = 'lmdbadvancedproject_customer_invoice_parts';
 	public $picto = 'bill';
 
+	public $rowid;
+	public $ref;
+	public $date;
+	public $datep;
+	public $qty;
+	public $total_ht;
+	public $total_ttc;
+	public $amount;
+	public $label;
+	public $note;
+	public $fk_soc;
+	public $fk_projet;
+	public $fk_project;
 	public $fk_facture;
 	public $fk_facture_det;
+	public $entity;
+	public $fk_user_author;
+	public $fk_user_modif;
+	public $status;
+	public $statut;
 
 	/**
 	 * Constructor.
@@ -109,6 +128,7 @@ class LmdbAdvancedProjectCustomerInvoicePart extends CommonObject
 				$this->label = $obj->label;
 				$this->note = $obj->note;
 				$this->fk_soc = (int) $obj->fk_soc;
+				$this->fk_projet = (int) $obj->fk_projet;
 				$this->fk_project = (int) $obj->fk_projet;
 				$this->fk_facture = (int) $obj->fk_facture;
 				$this->fk_facture_det = (int) $obj->fk_facture_det;

@@ -226,14 +226,20 @@ class ActionsLmdbadvancedproject
 	{
 		global $langs;
 
+		if (empty($object) || empty($object->element) || $object->element !== 'project') {
+			return 0;
+		}
+
 		$langs->load('lmdbadvancedproject@lmdbadvancedproject');
+		$results = array();
 
 		if ($this->isFeatureEnabled('invoicesuppliercard') && $this->hasReadAccess('invoicesuppliercard')) {
-			$hookmanager->resArray['lmdbadvancedproject_supplier_invoice_parts'] = array(
+			$results['lmdbadvancedproject_supplier_invoice_parts'] = array(
 				'name' => $langs->trans('LMDBAdvancedProjectSupplierInvoiceParts'),
 				'title' => $langs->trans('LMDBAdvancedProjectSupplierInvoicePartsList'),
 				'class' => 'LmdbAdvancedProjectSupplierInvoicePart',
 				'table' => 'lmdbadvancedproject_supplier_invoice_parts',
+				'project_field' => 'fk_projet',
 				'datefieldname' => 'date',
 				'margin' => 'minus',
 				'disableamount' => 0,
@@ -242,11 +248,12 @@ class ActionsLmdbadvancedproject
 		}
 
 		if ($this->isFeatureEnabled('invoicecard') && $this->hasReadAccess('invoicecard')) {
-			$hookmanager->resArray['lmdbadvancedproject_customer_invoice_parts'] = array(
+			$results['lmdbadvancedproject_customer_invoice_parts'] = array(
 				'name' => $langs->trans('LMDBAdvancedProjectCustomerInvoiceParts'),
 				'title' => $langs->trans('LMDBAdvancedProjectCustomerInvoicePartsList'),
 				'class' => 'LmdbAdvancedProjectCustomerInvoicePart',
 				'table' => 'lmdbadvancedproject_customer_invoice_parts',
+				'project_field' => 'fk_projet',
 				'datefieldname' => 'date',
 				'margin' => 'add',
 				'disableamount' => 0,
@@ -254,7 +261,13 @@ class ActionsLmdbadvancedproject
 			);
 		}
 
-		return 0;
+		if (empty($results)) {
+			return 0;
+		}
+
+		$this->results = $results;
+
+		return 1;
 	}
 
 	/**

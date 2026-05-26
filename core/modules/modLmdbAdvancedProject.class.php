@@ -77,7 +77,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'hooks' => array('data' => array(
 				'invoicesuppliercard',
 				'invoicecard',
+				'projectoverview',
 				'projectOverview',
+				'projectcard',
+				'projectCard',
 			), 'entity' => '0'),
 			'moduleforexternal' => 0,
 		);
