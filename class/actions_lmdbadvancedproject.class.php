@@ -8,6 +8,8 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once dol_buildpath('/lmdbadvancedproject/class/lmdbadvancedprojectsupplierinvoicepart.class.php');
 require_once dol_buildpath('/lmdbadvancedproject/class/lmdbadvancedprojectcustomerinvoicepart.class.php');
 
@@ -66,6 +68,7 @@ class ActionsLmdbadvancedproject
 		$token = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
 		$title = $langs->trans('LMDBAdvancedProjectBreakdownByProject');
 		$loading = $langs->trans('Loading');
+		$ajaxEnabled = $this->isAjaxEnabled();
 
 		$html = '
 		<script>
@@ -73,6 +76,7 @@ class ActionsLmdbadvancedproject
 			var lmdbapToken = '.json_encode($token).';
 			var lmdbapTitle = '.json_encode($title).';
 			var lmdbapLoading = '.json_encode($loading).';
+			var lmdbapAjaxEnabled = '.($ajaxEnabled ? 'true' : 'false').';
 
 			function lmdbapSetQueryParam(url, key, value) {
 				var hash = "";
@@ -175,6 +179,9 @@ class ActionsLmdbadvancedproject
 			lmdbapInjectSplitButtons();
 
 			$(document).on("click", ".lmdbap-edit-split", function(event) {
+				if (!lmdbapAjaxEnabled || !$.fn.dialog) {
+					return true;
+				}
 				event.preventDefault();
 				var $dialog = $("#dialogforpopup");
 				if (!$dialog.length) {
@@ -193,6 +200,9 @@ class ActionsLmdbadvancedproject
 			});
 
 			$(document).on("submit", "#lmdbap-split-form", function(event) {
+				if (!lmdbapAjaxEnabled) {
+					return true;
+				}
 				event.preventDefault();
 				var $form = $(this);
 				$.ajax({
@@ -655,10 +665,11 @@ class ActionsLmdbadvancedproject
 	{
 		global $langs;
 
-		$config = $this->getContextConfig($context);
 		$parts = $this->fetchParts($context, (int) $source->line_id);
 		$hasExistingParts = !empty($parts);
 		$projects = $this->fetchProjects();
+		$editRow = $this->getRequestRowNumber('editrow');
+		$deleteRow = $this->getRequestRowNumber('deleterow');
 		$canAmount = abs((float) $source->total_ht) > 0.00000001;
 		$canQuantity = abs((float) $source->qty) > 0.00000001;
 		$mode = $canAmount ? 'amount' : ($canQuantity ? 'quantity' : 'amount');
@@ -672,6 +683,11 @@ class ActionsLmdbadvancedproject
 			$mode = 'amount';
 		}
 
+		if ($deleteRow !== null && $deleteRow > 0 && isset($parts[$deleteRow - 1])) {
+			array_splice($parts, $deleteRow - 1, 1);
+			$editRow = null;
+		}
+
 		if (empty($parts)) {
 			$parts[] = array(
 				'fk_projet' => empty($source->invoice_project_id) ? 0 : (int) $source->invoice_project_id,
@@ -680,10 +696,13 @@ class ActionsLmdbadvancedproject
 				'total_ttc' => (float) $source->total_ttc,
 				'input_mode' => $mode,
 			);
+			$editRow = 1;
+		} elseif ($editRow !== null && ($editRow < 1 || $editRow > count($parts))) {
+			$editRow = null;
 		}
 
 		$token = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
-		$actionUrl = $_SERVER['PHP_SELF'].'?facid='.((int) $source->invoice_id).'&lineid='.((int) $source->line_id).'&action=lmdbadvancedproject_update_split';
+		$actionUrl = $this->buildSplitModalUrl('lmdbadvancedproject_update_split', $source);
 		$sourceDisplay = $this->getSourceDisplayParts($source);
 
 		$this->renderSimpleModalMessages($messages, $errors);
@@ -693,11 +712,7 @@ class ActionsLmdbadvancedproject
 		print '<input type="hidden" name="lineid" value="'.((int) $source->line_id).'">';
 		print '<div class="lmdbap-split-source">';
 		print '<div><strong>'.$langs->trans('Ref').'</strong> '.$this->escape($source->document_ref).'</div>';
-		print '<div><strong>'.$langs->trans('Label').'</strong> '.$this->escape($sourceDisplay['label']);
-		if ($sourceDisplay['description'] !== '') {
-			print ' <span class="fas fa-info-circle classfortooltip lmdbap-source-info" title="'.$this->escapeTooltip($sourceDisplay['description']).'" aria-label="Info"></span>';
-		}
-		print '</div>';
+		print '<div><strong>'.$langs->trans('Label').'</strong> '.$this->renderSourceLabel($sourceDisplay).'</div>';
 		print '<div><strong>'.$langs->trans('Qty').'</strong> '.price($source->qty).' &nbsp; <strong>'.$langs->trans('AmountHT').'</strong> '.price($source->total_ht).' &nbsp; <strong>'.$langs->trans('AmountTTC').'</strong> '.price($source->total_ttc).'</div>';
 		print '</div>';
 
@@ -716,10 +731,11 @@ class ActionsLmdbadvancedproject
 		print '<table class="noborder centpercent lmdbap-split-table">';
 		print '<thead><tr class="liste_titre"><th class="lmdbap-project-col">'.$langs->trans('Project').'</th><th class="right lmdbap-amount-col">'.$langs->trans('AmountHT').'</th><th class="right lmdbap-qty-col">'.$langs->trans('Qty').'</th><th class="lmdbap-action-col"></th></tr></thead>';
 		print '<tbody>';
-		foreach ($parts as $part) {
-			$this->renderSplitRow($projects, $part);
+		foreach ($parts as $index => $part) {
+			$rowNo = $index + 1;
+			$this->renderSplitRow($projects, $part, $source, $token, $rowNo, $editRow === $rowNo);
 		}
-		$this->renderSplitRow($projects, array('fk_projet' => 0, 'total_ht' => '', 'qty' => ''), true);
+		$this->renderSplitRow($projects, array('fk_projet' => 0, 'total_ht' => '', 'qty' => ''), $source, $token, 0, true, true);
 		print '</tbody>';
 		print '<tfoot><tr><td><strong>'.$langs->trans('BudgetReportTotal').'</strong></td><td class="right lmdbap-amount-col" id="lmdbap-total-amount"></td><td class="right lmdbap-qty-col" id="lmdbap-total-qty"></td><td></td></tr></tfoot>';
 		print '</table>';
@@ -756,31 +772,54 @@ class ActionsLmdbadvancedproject
 	/**
 	 * Render one allocation row.
 	 *
-	 * @param array<int,array<string,string>> $projects Project options
+	 * @param array<int,array<string,string|int>> $projects Project options
 	 * @param array<string,mixed>             $part     Existing/default part
+	 * @param stdClass                       $source   Source line
+	 * @param string                         $token    CSRF token
+	 * @param int                            $rowNo    1-based row number
+	 * @param bool                           $editing  Render row form visible
 	 * @param bool                           $template Is template row
 	 * @return void
 	 */
-	private function renderSplitRow($projects, $part, $template = false)
+	private function renderSplitRow($projects, $part, $source, $token, $rowNo = 0, $editing = false, $template = false)
 	{
 		global $langs;
 
-		$class = $template ? ' class="lmdbap-split-row lmdbap-template-row" style="display:none"' : ' class="lmdbap-split-row oddeven"';
+		$class = $template ? ' class="lmdbap-split-row lmdbap-template-row lmdbap-editing-row" style="display:none"' : ' class="lmdbap-split-row oddeven'.($editing ? ' lmdbap-editing-row' : '').'"';
 		$projectId = empty($part['fk_projet']) ? 0 : (int) $part['fk_projet'];
 		$amount = array_key_exists('total_ht', $part) ? $part['total_ht'] : '';
 		$qty = array_key_exists('qty', $part) ? $part['qty'] : '';
+		$viewStyle = ($editing || $template) ? ' style="display:none"' : '';
+		$editStyle = ($editing || $template) ? '' : ' style="display:none"';
+		$editUrl = $template ? '#' : $this->buildSplitModalUrl('lmdbadvancedproject_edit_split', $source, array('editrow' => $rowNo), $token);
+		$deleteUrl = $template ? '#' : $this->buildSplitModalUrl('lmdbadvancedproject_edit_split', $source, array('deleterow' => $rowNo), $token);
 
 		print '<tr'.$class.'>';
-		print '<td class="lmdbap-project-col"><select class="flat minwidth300 lmdbap-project-select" name="lmdbap_project[]">';
+		print '<td class="lmdbap-project-col">';
+		print '<span class="lmdbap-row-view"'.$viewStyle.'>'.$this->renderProjectDisplay($projects, $projectId).'</span>';
+		print '<span class="lmdbap-row-edit"'.$editStyle.'><select class="flat minwidth300 lmdbap-project-select" name="lmdbap_project[]">';
 		print '<option value="0">&nbsp;</option>';
 		foreach ($projects as $project) {
 			$selected = ((int) $project['id'] === $projectId) ? ' selected' : '';
 			print '<option value="'.((int) $project['id']).'"'.$selected.'>'.$this->escape($project['label']).'</option>';
 		}
-		print '</select></td>';
-		print '<td class="right lmdbap-amount-col"><input type="text" class="flat maxwidth75 right lmdbap-amount-input" name="lmdbap_amount[]" value="'.$this->escape($this->formatInputNumber($amount)).'"></td>';
-		print '<td class="right lmdbap-qty-col"><input type="text" class="flat maxwidth75 right lmdbap-qty-input" name="lmdbap_qty[]" value="'.$this->escape($this->formatInputNumber($qty)).'"></td>';
-		print '<td class="center lmdbap-action-col"><button type="button" class="lmdbap-icon-button lmdbap-remove-row classfortooltip" title="'.$this->escape($langs->trans('Delete')).'" aria-label="'.$this->escape($langs->trans('Delete')).'"><span class="fas fa-trash"></span></button></td>';
+		print '</select></span></td>';
+		print '<td class="right lmdbap-amount-col">';
+		print '<span class="lmdbap-row-view lmdbap-amount-display"'.$viewStyle.'>'.$this->formatDisplayNumber($amount).'</span>';
+		print '<span class="lmdbap-row-edit"'.$editStyle.'><input type="text" class="flat maxwidth75 right lmdbap-amount-input" name="lmdbap_amount[]" value="'.$this->escape($this->formatInputNumber($amount)).'"></span>';
+		print '</td>';
+		print '<td class="right lmdbap-qty-col">';
+		print '<span class="lmdbap-row-view lmdbap-qty-display"'.$viewStyle.'>'.$this->formatDisplayNumber($qty).'</span>';
+		print '<span class="lmdbap-row-edit"'.$editStyle.'><input type="text" class="flat maxwidth75 right lmdbap-qty-input" name="lmdbap_qty[]" value="'.$this->escape($this->formatInputNumber($qty)).'"></span>';
+		print '</td>';
+		print '<td class="center lmdbap-action-col">';
+		print '<span class="lmdbap-row-actions">';
+		if (!$template) {
+			print '<a class="editfielda reposition lmdbap-edit-row classfortooltip" href="'.$this->escape($editUrl).'" title="'.$this->escape($langs->trans('Edit')).'" aria-label="'.$this->escape($langs->trans('Edit')).'">'.$this->renderEditIcon().'</a>';
+		}
+		print '<a class="reposition lmdbap-remove-row classfortooltip" href="'.$this->escape($deleteUrl).'" title="'.$this->escape($langs->trans('Delete')).'" aria-label="'.$this->escape($langs->trans('Delete')).'">'.$this->renderDeleteIcon().'</a>';
+		print '</span>';
+		print '</td>';
 		print '</tr>';
 	}
 
@@ -797,6 +836,7 @@ class ActionsLmdbadvancedproject
 		jQuery(function($) {
 			var $form = $("#lmdbap-split-form");
 			if (!$form.length) return;
+			var lmdbapAjaxEnabled = <?php echo $this->isAjaxEnabled() ? 'true' : 'false'; ?>;
 
 			function parseNumber(value) {
 				value = String(value || "").replace(/\s/g, "").replace(",", ".");
@@ -820,7 +860,7 @@ class ActionsLmdbadvancedproject
 
 				$scope.find("select.lmdbap-project-select").each(function() {
 					var $select = $(this);
-					if ($select.closest(".lmdbap-template-row").length || $select.data("select2") || $select.hasClass("select2-hidden-accessible") || $select.hasClass("select2-offscreen")) {
+					if ($select.closest(".lmdbap-template-row").length || !$select.closest(".lmdbap-row-edit").is(":visible") || $select.data("select2") || $select.hasClass("select2-hidden-accessible") || $select.hasClass("select2-offscreen")) {
 						return;
 					}
 					try {
@@ -873,13 +913,31 @@ class ActionsLmdbadvancedproject
 				updateMode();
 			});
 			$form.on("input.lmdbap", ".lmdbap-amount-input,.lmdbap-qty-input", updateTotals);
-			$form.on("click.lmdbap", ".lmdbap-remove-row", function() {
+			$form.on("click.lmdbap", ".lmdbap-edit-row", function(event) {
+				if (!lmdbapAjaxEnabled) {
+					return true;
+				}
+				event.preventDefault();
+				var $row = $(this).closest("tr.lmdbap-split-row");
+				$row.addClass("lmdbap-editing-row");
+				$row.find(".lmdbap-row-view").hide();
+				$row.find(".lmdbap-row-edit").show();
+				initProjectSelects($row);
+				updateMode();
+				return false;
+			});
+			$form.on("click.lmdbap", ".lmdbap-remove-row", function(event) {
+				if (!lmdbapAjaxEnabled && $(this).attr("href") !== "#") {
+					return true;
+				}
+				event.preventDefault();
 				var $rows = $form.find("tbody tr.lmdbap-split-row:visible");
-				if ($rows.length <= 1) return;
+				if ($rows.length <= 1) return false;
 				var $row = $(this).closest("tr");
 				destroyProjectSelects($row);
 				$row.remove();
 				updateTotals();
+				return false;
 			});
 			$form.on("click.lmdbap", ".lmdbap-delete-split", function() {
 				$form.find("input[name='lmdbap_delete_split']").remove();
@@ -892,7 +950,9 @@ class ActionsLmdbadvancedproject
 			$("#lmdbap-add-row").off("click.lmdbap").on("click.lmdbap", function() {
 				var $template = $form.find("tbody tr.lmdbap-template-row").first();
 				var $row = $template.clone();
-				$row.removeClass("lmdbap-template-row").addClass("oddeven").show();
+				$row.removeClass("lmdbap-template-row").addClass("oddeven lmdbap-editing-row").show();
+				$row.find(".lmdbap-row-view").hide();
+				$row.find(".lmdbap-row-edit").show();
 				$row.find("select").val("0");
 				$row.find("input[type='text']").val("");
 				$template.before($row);
@@ -907,6 +967,143 @@ class ActionsLmdbadvancedproject
 		});
 		</script>
 		<?php
+	}
+
+	/**
+	 * Return a request row number, preserving zero/absent differences.
+	 *
+	 * @param  string $name Request parameter name
+	 * @return int|null
+	 */
+	private function getRequestRowNumber($name)
+	{
+		$isset = function_exists('GETPOSTISSET') ? GETPOSTISSET($name) : (isset($_GET[$name]) || isset($_POST[$name]));
+		if (!$isset) {
+			return null;
+		}
+
+		return (int) GETPOST($name, 'int');
+	}
+
+	/**
+	 * Build a modal URL that keeps the invoice identifier used by the current page.
+	 *
+	 * @param  string              $action Action name
+	 * @param  stdClass            $source Source line
+	 * @param  array<string,mixed> $extra  Extra query parameters
+	 * @param  string              $token  Optional token
+	 * @return string
+	 */
+	private function buildSplitModalUrl($action, $source, $extra = array(), $token = '')
+	{
+		$query = array();
+		$facid = GETPOST('facid', 'int');
+		$id = GETPOST('id', 'int');
+		if ($facid > 0) {
+			$query['facid'] = $facid;
+		} elseif ($id > 0) {
+			$query['id'] = $id;
+		} else {
+			$query['facid'] = (int) $source->invoice_id;
+		}
+
+		$query['lineid'] = (int) $source->line_id;
+		$query['action'] = $action;
+		if ($token !== '') {
+			$query['token'] = $token;
+		}
+		foreach ($extra as $key => $value) {
+			$query[$key] = $value;
+		}
+
+		return $_SERVER['PHP_SELF'].'?'.http_build_query($query, '', '&');
+	}
+
+	/**
+	 * Render the compact source label with a native Dolibarr tooltip.
+	 *
+	 * @param  array<string,string> $sourceDisplay Label/description pair
+	 * @return string
+	 */
+	private function renderSourceLabel($sourceDisplay)
+	{
+		global $form;
+
+		$label = $this->escape($sourceDisplay['label']);
+		$description = empty($sourceDisplay['description']) ? '' : $this->escapeTooltip($sourceDisplay['description']);
+		if ($description === '') {
+			return $label;
+		}
+		if (!is_object($form)) {
+			$form = new Form($this->db);
+		}
+		if (is_object($form) && method_exists($form, 'textwithpicto') && $this->isGlobalFlagEnabled('MAIN_ENABLE_AJAX_TOOLTIP')) {
+			return $label.' '.$form->textwithpicto('', $description);
+		}
+		if (is_object($form) && method_exists($form, 'textwithtooltip')) {
+			return $form->textwithtooltip($label, $description, 3, 0, '', 0, 2);
+		}
+
+		return $label.' <span class="fas fa-info-circle classfortooltip lmdbap-source-info" title="'.$description.'" aria-label="Info"></span>';
+	}
+
+	/**
+	 * Render a project using Dolibarr native project links.
+	 *
+	 * @param  array<int,array<string,string|int>> $projects  Project options
+	 * @param  int                                 $projectId Selected project id
+	 * @return string
+	 */
+	private function renderProjectDisplay($projects, $projectId)
+	{
+		foreach ($projects as $project) {
+			if ((int) $project['id'] !== (int) $projectId) {
+				continue;
+			}
+
+			$projectObject = new Project($this->db);
+			$projectObject->id = (int) $project['id'];
+			$projectObject->ref = (string) $project['ref'];
+			$projectObject->title = (string) $project['title'];
+			$link = method_exists($projectObject, 'getNomUrl') ? $projectObject->getNomUrl(1) : $this->escape($projectObject->ref);
+			$title = trim((string) $project['title']);
+
+			return $link.($title !== '' ? ' - '.$this->escape($title) : '');
+		}
+
+		return '&nbsp;';
+	}
+
+	/**
+	 * Render an edit icon matching Dolibarr native line actions.
+	 *
+	 * @return string
+	 */
+	private function renderEditIcon()
+	{
+		global $langs;
+
+		if (function_exists('img_edit')) {
+			return img_edit($langs->trans('Edit'));
+		}
+
+		return '<span class="fas fa-pencil-alt"></span>';
+	}
+
+	/**
+	 * Render a delete icon matching Dolibarr native line actions.
+	 *
+	 * @return string
+	 */
+	private function renderDeleteIcon()
+	{
+		global $langs;
+
+		if (function_exists('img_delete')) {
+			return img_delete($langs->trans('Delete'));
+		}
+
+		return '<span class="fas fa-trash"></span>';
 	}
 
 	/**
@@ -942,7 +1139,7 @@ class ActionsLmdbadvancedproject
 	/**
 	 * Fetch project options.
 	 *
-	 * @return array<int,array<string,string>>
+	 * @return array<int,array<string,string|int>>
 	 */
 	private function fetchProjects()
 	{
@@ -953,7 +1150,7 @@ class ActionsLmdbadvancedproject
 		if ($resql) {
 			while ($obj = $this->db->fetch_object($resql)) {
 				$label = trim((string) $obj->ref.' - '.(string) $obj->title);
-				$projects[] = array('id' => (int) $obj->rowid, 'label' => $label);
+				$projects[] = array('id' => (int) $obj->rowid, 'ref' => (string) $obj->ref, 'title' => (string) $obj->title, 'label' => $label);
 			}
 			$this->db->free($resql);
 		}
@@ -1174,6 +1371,48 @@ class ActionsLmdbadvancedproject
 		$value = rtrim(rtrim($value, '0'), '.');
 
 		return $value === '-0' ? '0' : $value;
+	}
+
+	/**
+	 * Format a number for read-only display.
+	 *
+	 * @param  mixed $value Value
+	 * @return string
+	 */
+	private function formatDisplayNumber($value)
+	{
+		if ($value === '' || $value === null) {
+			return '&nbsp;';
+		}
+
+		return price((float) $value);
+	}
+
+	/**
+	 * Check a Dolibarr global flag.
+	 *
+	 * @param  string $name Constant name
+	 * @return bool
+	 */
+	private function isGlobalFlagEnabled($name)
+	{
+		global $conf;
+
+		if (function_exists('getDolGlobalInt')) {
+			return (bool) getDolGlobalInt($name);
+		}
+
+		return !empty($conf->global->{$name});
+	}
+
+	/**
+	 * Check if Dolibarr AJAX behaviors are enabled.
+	 *
+	 * @return bool
+	 */
+	private function isAjaxEnabled()
+	{
+		return !$this->isGlobalFlagEnabled('MAIN_DISABLE_AJAX');
 	}
 
 	/**

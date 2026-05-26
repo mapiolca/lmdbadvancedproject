@@ -159,11 +159,28 @@ div.mainmenu.budgetreport {
 }
 
 .lmdbap-split-table .lmdbap-action-col {
-	width: 36px;
+	width: 56px;
 }
 
 .lmdbap-split-table .select2-container {
 	width: 100% !important;
+}
+
+.lmdbap-row-actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	white-space: nowrap;
+}
+
+.lmdbap-row-actions a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	min-height: 18px;
+	text-decoration: none;
 }
 
 .lmdbap-icon-button {
