@@ -56,7 +56,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
@@ -74,7 +74,11 @@ class modLmdbAdvancedProject extends DolibarrModules
 				'/lmdbadvancedproject/css/budgetreport.css.php',
 			),
 			'js' => array(),
-			'hooks' => array(),
+			'hooks' => array('data' => array(
+				'invoicesuppliercard',
+				'invoicecard',
+				'projectOverview',
+			), 'entity' => '0'),
 			'moduleforexternal' => 0,
 		);
 
@@ -90,7 +94,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->need_dolibarr_version = array(11, -3);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
-		$this->const = array();
+		$this->const = array(
+			array('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on supplier invoice lines', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on customer invoice lines', 0, 'current', 0),
+		);
 
 		if (empty($conf->lmdbadvancedproject) || !is_object($conf->lmdbadvancedproject)) {
 			$conf->lmdbadvancedproject = new stdClass();
@@ -138,6 +145,16 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->rights[$r][1] = 'ReadBudgetReport';
 		$this->rights[$r][4] = 'budgetreport';
 		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'ReadInvoiceBreakdown';
+		$this->rights[$r][4] = 'split';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'WriteInvoiceBreakdown';
+		$this->rights[$r][4] = 'split';
+		$this->rights[$r][5] = 'write';
 
 		$this->menu = array();
 		$r = 0;

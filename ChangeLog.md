@@ -1,5 +1,12 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2
+
+- Add project breakdowns for supplier and customer invoice lines behind separate disabled-by-default settings
+- Show allocated invoice parts on project overview pages
+- Include supplier invoice parts in budget report spending and category summaries without double-counting source lines
+- Include customer invoice parts in invoiced totals without changing category summaries
+
 ## 1.1
 
 - Add date range and project status filters to the global budget report
