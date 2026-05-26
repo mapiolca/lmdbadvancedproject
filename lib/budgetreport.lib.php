@@ -1228,7 +1228,7 @@ if (!function_exists('lmdbadvancedproject_print_forecast_lines')) {
 		print '<div class="budgetreport-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="'.$safeModalId.'-title">';
 		print '<div class="budgetreport-modal-header">';
 		print '<div class="budgetreport-modal-title" id="'.$safeModalId.'-title">'.$title.'</div>';
-		print '<button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="Close" data-budgetreport-modal-close="1" aria-label="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>Close</button>';
+		print '<button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'" data-budgetreport-modal-close="1" aria-label="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span></button>';
 		print '</div>';
 		print '<div class="budgetreport-modal-body">';
 		print '<table class="budgetreport-forecast-subtable">';

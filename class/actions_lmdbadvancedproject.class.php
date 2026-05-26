@@ -147,12 +147,8 @@ class ActionsLmdbadvancedproject
 
 				var $lastCell = $row.children("td").last();
 				if ($lastCell.length && $lastCell.is("[colspan]")) {
-					var span = parseInt($lastCell.attr("colspan"), 10);
-					if (!isNaN(span) && span > 1) {
-						$lastCell.attr("colspan", span - 1);
-						$lastCell.before($cell);
-						return;
-					}
+					$lastCell.before($cell);
+					return;
 				}
 
 				$row.append($cell);
@@ -167,7 +163,7 @@ class ActionsLmdbadvancedproject
 					}
 
 					var $table = $row.closest("table");
-					if (!$table.find(".linecoldescription,.linecolproduct,.linecolref").length) {
+					if (!$row.children(".linecoldescription,.linecolproduct,.linecolref").length) {
 						return;
 					}
 
@@ -196,6 +192,7 @@ class ActionsLmdbadvancedproject
 						modal: true,
 						title: lmdbapTitle
 					});
+					$(document).trigger("lmdbap:split-dialog-loaded", [$dialog]);
 				});
 			});
 
@@ -211,6 +208,7 @@ class ActionsLmdbadvancedproject
 					data: $form.serialize(),
 					success: function(result) {
 						$("#dialogforpopup").html(result);
+						$(document).trigger("lmdbap:split-dialog-loaded", [$("#dialogforpopup")]);
 					}
 				});
 				return false;
@@ -703,6 +701,7 @@ class ActionsLmdbadvancedproject
 
 		$token = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
 		$actionUrl = $this->buildSplitModalUrl('lmdbadvancedproject_update_split', $source);
+		$cancelUrl = $this->buildInvoiceCardUrl($source);
 		$sourceDisplay = $this->getSourceDisplayParts($source);
 
 		$this->renderSimpleModalMessages($messages, $errors);
@@ -740,12 +739,15 @@ class ActionsLmdbadvancedproject
 		print '<tfoot><tr><td><strong>'.$langs->trans('BudgetReportTotal').'</strong></td><td class="right lmdbap-amount-col" id="lmdbap-total-amount"></td><td class="right lmdbap-qty-col" id="lmdbap-total-qty"></td><td></td></tr></tfoot>';
 		print '</table>';
 
-		print '<div class="tabsAction">';
+		print '<div class="tabsAction lmdbap-add-actions">';
 		print '<button type="button" class="button" id="lmdbap-add-row">'.$langs->trans('Add').'</button> ';
+		print '</div>';
+		print '<div class="tabsAction lmdbap-dialog-footer">';
+		print '<a class="button lmdbap-cancel-split" href="'.$this->escape($cancelUrl).'">'.$langs->trans('Cancel').'</a> ';
 		if ($hasExistingParts) {
 			print '<button type="button" class="button button-delete lmdbap-delete-split">'.$langs->trans('LMDBAdvancedProjectDeleteBreakdown').'</button> ';
 		}
-		print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'"'.(!$canAmount && !$canQuantity ? ' disabled' : '').'>';
+		print '<input type="submit" form="lmdbap-split-form" class="button button-save" value="'.$langs->trans('Save').'"'.(!$canAmount && !$canQuantity ? ' disabled' : '').'>';
 		print '</div>';
 		print '</form>';
 
@@ -908,6 +910,29 @@ class ActionsLmdbadvancedproject
 				$("#lmdbap-total-qty").text(totalQty.toFixed(6).replace(/0+$/, "").replace(/\.$/, ""));
 			}
 
+			function moveFooterToDialog() {
+				var $dialog = $form.closest(".ui-dialog-content");
+				var $footer = $form.find(".lmdbap-dialog-footer");
+				if (!$dialog.length || !$footer.length || !$.fn.dialog || !$dialog.dialog("instance")) return;
+				var $pane = $dialog.closest(".ui-dialog").find(".ui-dialog-buttonpane");
+				if (!$pane.length) {
+					$pane = $("<div class='ui-dialog-buttonpane ui-widget-content ui-helper-clearfix'><div class='ui-dialog-buttonset'></div></div>");
+					$dialog.after($pane);
+				}
+				var $buttonset = $pane.find(".ui-dialog-buttonset");
+				if (!$buttonset.length) {
+					$buttonset = $("<div class='ui-dialog-buttonset'></div>").appendTo($pane);
+				}
+				$buttonset.empty().append($footer.children().detach());
+				$footer.remove();
+				$pane.show();
+			}
+
+			$(document).off("lmdbap:split-dialog-loaded.lmdbap").on("lmdbap:split-dialog-loaded.lmdbap", function(event, $dialog) {
+				if (!$dialog || !$dialog.find || !$dialog.find("#lmdbap-split-form").length) return;
+				moveFooterToDialog();
+			});
+
 			$form.off("change.lmdbap input.lmdbap click.lmdbap");
 			$form.on("change.lmdbap", "input[name='lmdbap_mode']", function() {
 				updateMode();
@@ -939,13 +964,28 @@ class ActionsLmdbadvancedproject
 				updateTotals();
 				return false;
 			});
-			$form.on("click.lmdbap", ".lmdbap-delete-split", function() {
-				$form.find("input[name='lmdbap_delete_split']").remove();
-				$("<input type='hidden' name='lmdbap_delete_split' value='1'>").appendTo($form);
-				$form.trigger("submit");
+			$(document).off("click.lmdbapDeleteSplit").on("click.lmdbapDeleteSplit", ".lmdbap-delete-split", function(event) {
+				event.preventDefault();
+				var $targetForm = $("#lmdbap-split-form");
+				$targetForm.find("input[name='lmdbap_delete_split']").remove();
+				$("<input type='hidden' name='lmdbap_delete_split' value='1'>").appendTo($targetForm);
+				$targetForm.trigger("submit");
+				return false;
 			});
-			$form.on("click.lmdbap", ".button-save", function() {
-				$form.find("input[name='lmdbap_delete_split']").remove();
+			$(document).off("click.lmdbapCancelSplit").on("click.lmdbapCancelSplit", ".lmdbap-cancel-split", function(event) {
+				if (!lmdbapAjaxEnabled) {
+					return true;
+				}
+				var $dialog = $("#dialogforpopup");
+				if (!$dialog.length || !$.fn.dialog || !$dialog.dialog("instance")) {
+					return true;
+				}
+				event.preventDefault();
+				$dialog.dialog("close");
+				return false;
+			});
+			$(document).off("click.lmdbapSaveSplit").on("click.lmdbapSaveSplit", "#lmdbap-split-form .button-save,.ui-dialog-buttonpane .button-save", function() {
+				$("#lmdbap-split-form").find("input[name='lmdbap_delete_split']").remove();
 			});
 			$("#lmdbap-add-row").off("click.lmdbap").on("click.lmdbap", function() {
 				var $template = $form.find("tbody tr.lmdbap-template-row").first();
@@ -964,6 +1004,7 @@ class ActionsLmdbadvancedproject
 			initProjectSelects($form);
 			updateMode();
 			updateTotals();
+			moveFooterToDialog();
 		});
 		</script>
 		<?php
@@ -1014,6 +1055,28 @@ class ActionsLmdbadvancedproject
 		}
 		foreach ($extra as $key => $value) {
 			$query[$key] = $value;
+		}
+
+		return $_SERVER['PHP_SELF'].'?'.http_build_query($query, '', '&');
+	}
+
+	/**
+	 * Build the current invoice card URL without split modal action parameters.
+	 *
+	 * @param  stdClass $source Source line
+	 * @return string
+	 */
+	private function buildInvoiceCardUrl($source)
+	{
+		$query = array();
+		$facid = GETPOST('facid', 'int');
+		$id = GETPOST('id', 'int');
+		if ($facid > 0) {
+			$query['facid'] = $facid;
+		} elseif ($id > 0) {
+			$query['id'] = $id;
+		} else {
+			$query['facid'] = (int) $source->invoice_id;
 		}
 
 		return $_SERVER['PHP_SELF'].'?'.http_build_query($query, '', '&');
