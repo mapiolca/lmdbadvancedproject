@@ -69,6 +69,13 @@ class ActionsLmdbadvancedproject
 		$title = $langs->trans('LMDBAdvancedProjectBreakdownByProject');
 		$loading = $langs->trans('Loading');
 		$ajaxEnabled = $this->isAjaxEnabled();
+		if (function_exists('img_object')) {
+			$projectIcon = img_object($title, 'project');
+		} elseif (function_exists('img_picto')) {
+			$projectIcon = img_picto($title, 'project');
+		} else {
+			$projectIcon = '<span class="fas fa-project-diagram"></span>';
+		}
 
 		$html = '
 		<script>
@@ -77,6 +84,7 @@ class ActionsLmdbadvancedproject
 			var lmdbapTitle = '.json_encode($title).';
 			var lmdbapLoading = '.json_encode($loading).';
 			var lmdbapAjaxEnabled = '.($ajaxEnabled ? 'true' : 'false').';
+			var lmdbapProjectIcon = '.json_encode($projectIcon).';
 
 			function lmdbapSetQueryParam(url, key, value) {
 				var hash = "";
@@ -134,7 +142,7 @@ class ActionsLmdbadvancedproject
 					"class": "lmdbap-edit-split classfortooltip",
 					"href": splitUrl,
 					"title": lmdbapTitle
-				}).append($("<span>", {"class": "fas fa-sitemap"})).appendTo($cell);
+				}).append(lmdbapProjectIcon).appendTo($cell);
 				return $cell;
 			}
 
