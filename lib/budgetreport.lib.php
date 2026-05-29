@@ -1486,7 +1486,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$budgetReportProjectId = empty($budgetReportProjectId) ? 0 : (int) $budgetReportProjectId;
 		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
 		$projectSqlFilter = $budgetReportProjectId > 0 ? " AND p.rowid = ".$budgetReportProjectId : "";
-		$projectStatusSqlFilter = lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
+		$projectStatusSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
 		$projectDateSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_date_sql_filter($filters);
 		$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
 		$customerInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND f.fk_projet = ".$budgetReportProjectId : "";
