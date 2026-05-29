@@ -340,6 +340,36 @@ if (!function_exists('lmdbadvancedproject_column_exists')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_supplier_invoice_split_report_enabled')) {
+	/**
+	 * Check if supplier invoice split rows must be used by reports.
+	 *
+	 * @return bool
+	 */
+	function lmdbadvancedproject_supplier_invoice_split_report_enabled()
+	{
+		global $conf;
+
+		return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT)
+			&& lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts');
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_customer_invoice_split_report_enabled')) {
+	/**
+	 * Check if customer invoice split rows must be used by reports.
+	 *
+	 * @return bool
+	 */
+	function lmdbadvancedproject_customer_invoice_split_report_enabled()
+	{
+		global $conf;
+
+		return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT)
+			&& lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'lmdbadvancedproject_customer_invoice_parts');
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_escape_html')) {
 	/**
 	 * Escape a string for HTML output.
@@ -665,6 +695,78 @@ if (!function_exists('lmdbadvancedproject_get_linked_supplier_invoice_sql')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql')) {
+	/**
+	 * Exclude source supplier invoice lines that already have project split parts.
+	 *
+	 * @param  string $invoiceAlias            Supplier invoice table alias
+	 * @param  string $lineAlias               Supplier invoice line table alias
+	 * @param  string $supplierInvoiceEntities Supplier invoice entity filter
+	 * @return string
+	 */
+	function lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql($invoiceAlias, $lineAlias, $supplierInvoiceEntities)
+	{
+		if (!lmdbadvancedproject_supplier_invoice_split_report_enabled()) {
+			return '';
+		}
+
+		return " AND NOT EXISTS (
+			SELECT 1
+			FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sipx
+			WHERE sipx.fk_facture_fourn_det = ".$lineAlias.".rowid
+			AND sipx.fk_facture_fourn = ".$invoiceAlias.".rowid
+			AND sipx.entity = ".$invoiceAlias.".entity
+			AND sipx.entity IN (".$supplierInvoiceEntities.")
+		)";
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_supplier_order_split_source_exclusion_sql')) {
+	/**
+	 * Exclude supplier orders linked to supplier invoices that contain split parts.
+	 *
+	 * @param  string $orderAlias              Supplier order table alias
+	 * @param  string $supplierInvoiceEntities Supplier invoice entity filter
+	 * @return string
+	 */
+	function lmdbadvancedproject_supplier_order_split_source_exclusion_sql($orderAlias, $supplierInvoiceEntities)
+	{
+		if (!lmdbadvancedproject_supplier_invoice_split_report_enabled()) {
+			return '';
+		}
+
+		$partTable = MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts';
+		$elementTable = MAIN_DB_PREFIX.'element_element';
+		$invoiceTable = MAIN_DB_PREFIX.'facture_fourn';
+
+		return " AND NOT EXISTS (
+			SELECT 1
+			FROM ".$elementTable." ees
+			INNER JOIN ".$invoiceTable." ffs ON ffs.rowid = ees.fk_target
+			INNER JOIN ".$partTable." sipx ON sipx.fk_facture_fourn = ffs.rowid
+			WHERE ees.fk_source = ".$orderAlias.".rowid
+			AND ees.sourcetype IN ('order_supplier', 'supplier_order')
+			AND ees.targettype IN ('invoice_supplier', 'supplier_invoice')
+			AND ffs.fk_statut IN (1,2)
+			AND ffs.entity IN (".$supplierInvoiceEntities.")
+			AND sipx.entity = ffs.entity
+			AND sipx.entity IN (".$supplierInvoiceEntities.")
+		) AND NOT EXISTS (
+			SELECT 1
+			FROM ".$elementTable." eet
+			INNER JOIN ".$invoiceTable." fft ON fft.rowid = eet.fk_source
+			INNER JOIN ".$partTable." sipy ON sipy.fk_facture_fourn = fft.rowid
+			WHERE eet.fk_target = ".$orderAlias.".rowid
+			AND eet.targettype IN ('order_supplier', 'supplier_order')
+			AND eet.sourcetype IN ('invoice_supplier', 'supplier_invoice')
+			AND fft.fk_statut IN (1,2)
+			AND fft.entity IN (".$supplierInvoiceEntities.")
+			AND sipy.entity = fft.entity
+			AND sipy.entity IN (".$supplierInvoiceEntities.")
+		)";
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_supplier_order_remaining_line_expression')) {
 	/**
 	 * Return the SQL expression used for remaining supplier order line amounts.
@@ -833,12 +935,15 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			$db->free($resql);
 		}
 
+		$supplierInvoiceSplitEnabled = lmdbadvancedproject_supplier_invoice_split_report_enabled();
+		$supplierInvoiceSplitExclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'ffd', $supplierInvoiceEntities);
+
 		$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd');
 		$sql = "SELECT 'supplier_invoice' AS source_type, ff.rowid AS document_id, ff.ref AS document_ref, ff.datef AS document_date, ff.fk_statut AS document_status, ff.paye AS document_paid, 0 AS document_billed, ffd.fk_product, ffd.label AS line_label, ffd.description AS line_description, ffd.qty, ffd.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
 			".$categorySql['join']."
-			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)";
+			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)".$supplierInvoiceSplitExclusion;
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -847,9 +952,31 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			$db->free($resql);
 		}
 
+		if ($supplierInvoiceSplitEnabled) {
+			$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd');
+			$sql = "SELECT 'supplier_invoice' AS source_type, ff.rowid AS document_id, ff.ref AS document_ref, sip.date AS document_date, ff.fk_statut AS document_status, ff.paye AS document_paid, 0 AS document_billed, ffd.fk_product, ffd.label AS line_label, ffd.description AS line_description, sip.qty, sip.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
+				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sip
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.rowid = sip.fk_facture_fourn_det
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = sip.fk_facture_fourn
+				".$categorySql['join']."
+				WHERE sip.fk_projet = ".$projectId."
+				AND ff.fk_statut IN (1,2)
+				AND ff.entity IN (".$supplierInvoiceEntities.")
+				AND sip.entity IN (".$supplierInvoiceEntities.")
+				AND ffd.product_type IN (0,1)";
+			$resql = $db->query($sql);
+			if ($resql) {
+				while ($obj = $db->fetch_object($resql)) {
+					lmdbadvancedproject_add_forecast_line($forecast, $obj, 'supplier_invoice');
+				}
+				$db->free($resql);
+			}
+		}
+
 		$categorySql = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'cfd');
 		$linkedSupplierInvoiceSql = lmdbadvancedproject_get_linked_supplier_invoice_sql($supplierInvoiceEntities);
 		$supplierOrderRemainingExpression = lmdbadvancedproject_supplier_order_remaining_line_expression();
+		$supplierOrderSplitExclusion = lmdbadvancedproject_supplier_order_split_source_exclusion_sql('cf', $supplierInvoiceEntities);
 		$sql = "SELECT CASE WHEN cf.fk_statut = 3 THEN 'supplier_order_ordered' ELSE 'supplier_order_delivered' END AS source_type, cf.rowid AS document_id, cf.ref AS document_ref, COALESCE(cf.date_commande, DATE(cf.date_creation)) AS document_date, cf.fk_statut AS document_status, 0 AS document_paid, COALESCE(cf.billed, 0) AS document_billed, cfd.fk_product, cfd.label AS line_label, cfd.description AS line_description, cfd.qty,
 				".$supplierOrderRemainingExpression." AS amount_ht,
 				0 AS budget_ht, ".$categorySql['select']."
@@ -862,6 +989,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")
 			AND cfd.product_type IN (0,1)
+			".$supplierOrderSplitExclusion."
 			HAVING amount_ht > 0";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -1100,7 +1228,7 @@ if (!function_exists('lmdbadvancedproject_print_forecast_lines')) {
 		print '<div class="budgetreport-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="'.$safeModalId.'-title">';
 		print '<div class="budgetreport-modal-header">';
 		print '<div class="budgetreport-modal-title" id="'.$safeModalId.'-title">'.$title.'</div>';
-		print '<button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="Close" data-budgetreport-modal-close="1" aria-label="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span>Close</button>';
+		print '<button type="button" class="ui-button ui-corner-all ui-widget ui-button-icon-only ui-dialog-titlebar-close" title="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'" data-budgetreport-modal-close="1" aria-label="'.lmdbadvancedproject_escape_html($langs->trans('Close')).'"><span class="ui-button-icon ui-icon ui-icon-closethick"></span><span class="ui-button-icon-space"> </span></button>';
 		print '</div>';
 		print '<div class="budgetreport-modal-body">';
 		print '<table class="budgetreport-forecast-subtable">';
@@ -1358,7 +1486,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$budgetReportProjectId = empty($budgetReportProjectId) ? 0 : (int) $budgetReportProjectId;
 		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
 		$projectSqlFilter = $budgetReportProjectId > 0 ? " AND p.rowid = ".$budgetReportProjectId : "";
-		$projectStatusSqlFilter = lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
+		$projectStatusSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
 		$projectDateSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_date_sql_filter($filters);
 		$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
 		$customerInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND f.fk_projet = ".$budgetReportProjectId : "";
@@ -1459,10 +1587,20 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 
 		$customerinvoices = array();
-		$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(f.total_ht, 0)) AS total_invoice
-			FROM ".MAIN_DB_PREFIX."facture f
-			WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
-			GROUP BY f.fk_projet";
+		$customerInvoiceSplitEnabled = lmdbadvancedproject_customer_invoice_split_report_enabled();
+		if ($customerInvoiceSplitEnabled) {
+			$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(fd.total_ht, 0)) AS total_invoice
+				FROM ".MAIN_DB_PREFIX."facture f
+				INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON fd.fk_facture = f.rowid
+				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
+				AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cipx WHERE cipx.fk_facture_det = fd.rowid)
+				GROUP BY f.fk_projet";
+		} else {
+			$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(f.total_ht, 0)) AS total_invoice
+				FROM ".MAIN_DB_PREFIX."facture f
+				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
+				GROUP BY f.fk_projet";
+		}
 		$resultCustomerInvoices = $db->query($sqlCustomerInvoices);
 		$nbtotalCustomerInvoices = $resultCustomerInvoices ? $db->num_rows($resultCustomerInvoices) : 0;
 		$i=0;
@@ -1473,6 +1611,29 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 		if ($resultCustomerInvoices) {
 			$db->free($resultCustomerInvoices);
+		}
+
+		if ($customerInvoiceSplitEnabled) {
+			$customerInvoicePartProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cip.fk_projet = ".$budgetReportProjectId : "";
+			$sqlCustomerInvoiceParts = "SELECT cip.fk_projet, SUM(COALESCE(cip.total_ht, 0)) AS total_invoice
+				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cip
+				INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = cip.fk_facture
+				WHERE cip.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.") AND cip.entity IN (".$customerInvoiceEntities.")".$customerInvoicePartProjectSqlFilter."
+				GROUP BY cip.fk_projet";
+			$resultCustomerInvoiceParts = $db->query($sqlCustomerInvoiceParts);
+			$nbtotalCustomerInvoiceParts = $resultCustomerInvoiceParts ? $db->num_rows($resultCustomerInvoiceParts) : 0;
+			$i=0;
+			while ($i<$nbtotalCustomerInvoiceParts) {
+				$obj = $db->fetch_object($resultCustomerInvoiceParts);
+				if (!isset($customerinvoices[$obj->fk_projet])) {
+					$customerinvoices[$obj->fk_projet] = 0;
+				}
+				$customerinvoices[$obj->fk_projet] += (float) $obj->total_invoice;
+				$i++;
+			}
+			if ($resultCustomerInvoiceParts) {
+				$db->free($resultCustomerInvoiceParts);
+			}
 		}
 
 		foreach ($projects as $pid=>$data) {
@@ -1527,9 +1688,11 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 
 		$vendorinvs = array();
+		$supplierInvoiceSplitEnabled = lmdbadvancedproject_supplier_invoice_split_report_enabled();
+		$supplierInvoiceSplitExclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'ffd', $supplierInvoiceEntities);
 		$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ffd.total_ht) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
-			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter." GROUP BY ff.fk_projet, ff.datef";
+			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter.$supplierInvoiceSplitExclusion." GROUP BY ff.fk_projet, ff.datef";
 		$result1 = $db->query($sql1);
 		$nbtotal1 = $result1 ? $db->num_rows($result1) : 0;
 		$i=0;
@@ -1543,6 +1706,29 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 		if ($result1) {
 			$db->free($result1);
+		}
+
+		if ($supplierInvoiceSplitEnabled) {
+			$supplierInvoicePartProjectSqlFilter = $budgetReportProjectId > 0 ? " AND sip.fk_projet = ".$budgetReportProjectId : "";
+			$sqlSupplierInvoiceParts = "SELECT sip.date AS datef, sip.fk_projet, SUM(sip.total_ht) AS total_inv
+				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sip
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = sip.fk_facture_fourn
+				WHERE sip.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND sip.entity IN (".$supplierInvoiceEntities.")".$supplierInvoicePartProjectSqlFilter."
+				GROUP BY sip.fk_projet, sip.date";
+			$resultSupplierInvoiceParts = $db->query($sqlSupplierInvoiceParts);
+			$nbtotalSupplierInvoiceParts = $resultSupplierInvoiceParts ? $db->num_rows($resultSupplierInvoiceParts) : 0;
+			$i=0;
+			while ($i<$nbtotalSupplierInvoiceParts) {
+				$obj = $db->fetch_object($resultSupplierInvoiceParts);
+				if (!isset($vendorinvs[$obj->fk_projet][$obj->datef])) {
+					$vendorinvs[$obj->fk_projet][$obj->datef] = 0;
+				}
+				$vendorinvs[$obj->fk_projet][$obj->datef] += (float) $obj->total_inv;
+				$i++;
+			}
+			if ($resultSupplierInvoiceParts) {
+				$db->free($resultSupplierInvoiceParts);
+			}
 		}
 
 		foreach ($projects as $pid=>$data) {
@@ -1564,6 +1750,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$supplierorders = array();
 		$linkedSupplierInvoiceSql = lmdbadvancedproject_get_linked_supplier_invoice_sql($supplierInvoiceEntities);
 		$supplierOrderRemainingExpression = lmdbadvancedproject_supplier_order_remaining_line_expression();
+		$supplierOrderSplitExclusion = lmdbadvancedproject_supplier_order_split_source_exclusion_sql('cf', $supplierInvoiceEntities);
 		$sql3 = "SELECT cf.fk_projet, COALESCE(cf.date_commande, DATE(cf.date_creation)) AS order_date,
 				CASE WHEN cf.fk_statut = 3 THEN 'ordered' ELSE 'delivered' END AS supplier_order_bucket,
 				SUM(".$supplierOrderRemainingExpression.") as total_order_remaining
@@ -1573,7 +1760,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			WHERE cf.fk_projet > 0
 			AND cf.fk_statut IN (3,4,5)
 			AND COALESCE(cf.billed, 0) = 0
-			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter."
+			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter.$supplierOrderSplitExclusion."
 			GROUP BY cf.fk_projet, order_date, supplier_order_bucket";
 		$result3 = $db->query($sql3);
 		$nbtotal3 = $result3 ? $db->num_rows($result3) : 0;

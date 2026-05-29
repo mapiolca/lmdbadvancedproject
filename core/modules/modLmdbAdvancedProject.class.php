@@ -56,7 +56,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.1.0';
+		$this->version = '1.2.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
@@ -74,7 +74,14 @@ class modLmdbAdvancedProject extends DolibarrModules
 				'/lmdbadvancedproject/css/budgetreport.css.php',
 			),
 			'js' => array(),
-			'hooks' => array(),
+			'hooks' => array('data' => array(
+				'invoicesuppliercard',
+				'invoicecard',
+				'projectoverview',
+				'projectOverview',
+				'projectcard',
+				'projectCard',
+			), 'entity' => '0'),
 			'moduleforexternal' => 0,
 		);
 
@@ -90,7 +97,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->need_dolibarr_version = array(11, -3);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
-		$this->const = array();
+		$this->const = array(
+			array('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on supplier invoice lines', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on customer invoice lines', 0, 'current', 0),
+		);
 
 		if (empty($conf->lmdbadvancedproject) || !is_object($conf->lmdbadvancedproject)) {
 			$conf->lmdbadvancedproject = new stdClass();
@@ -138,6 +148,16 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->rights[$r][1] = 'ReadBudgetReport';
 		$this->rights[$r][4] = 'budgetreport';
 		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'ReadInvoiceBreakdown';
+		$this->rights[$r][4] = 'split';
+		$this->rights[$r][5] = 'read';
+		$r++;
+		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][1] = 'WriteInvoiceBreakdown';
+		$this->rights[$r][4] = 'split';
+		$this->rights[$r][5] = 'write';
 
 		$this->menu = array();
 		$r = 0;
@@ -251,6 +271,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 		foreach ($fields as $element => $field) {
 			$extrafields->fetch_name_optionals_label($element);
 			if (!empty($extrafields->attributes[$element]['label']['lmdb_commercial_category'])) {
+				$result = $this->repairCommercialCategoryExtraField($element, $field['enabled'], $param);
+				if ($result < 0) {
+					return -1;
+				}
 				continue;
 			}
 
@@ -281,6 +305,35 @@ class modLmdbAdvancedProject extends DolibarrModules
 				$this->errors = $extrafields->errors;
 				return -1;
 			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Repair the definition of an existing commercial category extrafield.
+	 *
+	 * @param  string                    $element Element type
+	 * @param  string                    $enabled Enabled expression
+	 * @param  array<string,array<mixed>> $param   Extra field parameters
+	 * @return int             1 if OK, <0 if KO
+	 */
+	private function repairCommercialCategoryExtraField($element, $enabled, $param)
+	{
+		$serializedParam = serialize($param);
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."extrafields";
+		$sql .= " SET enabled = '".$this->db->escape($enabled)."',";
+		$sql .= " param = '".$this->db->escape($serializedParam)."'";
+		$sql .= " WHERE name = 'lmdb_commercial_category'";
+		$sql .= " AND elementtype = '".$this->db->escape($element)."'";
+		$sql .= " AND (enabled IS NULL OR enabled <> '".$this->db->escape($enabled)."'";
+		$sql .= " OR param IS NULL OR param <> '".$this->db->escape($serializedParam)."')";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
 		}
 
 		return 1;

@@ -52,6 +52,7 @@ if (!$res) {
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 require_once '../lib/lmdbadvancedproject.lib.php';
 
 $langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
@@ -83,7 +84,30 @@ $action = GETPOST('action', 'aZ09');
 $help_url = '';
 $page_name = 'AdvancedProjectSetup';
 
-if ($action === 'set_multicompany_scope') {
+$switchConstants = array(
+	'LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT' => 1,
+	'LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT' => 1,
+);
+if (lmdbadvancedproject_is_multicompany_enabled()) {
+	$switchConstants['LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES'] = 1;
+}
+
+$switchConstant = '';
+$switchValue = null;
+foreach ($switchConstants as $constantName => $enabled) {
+	if ($action === 'set_'.$constantName) {
+		$switchConstant = $constantName;
+		$switchValue = 1;
+		break;
+	}
+	if ($action === 'del_'.$constantName) {
+		$switchConstant = $constantName;
+		$switchValue = 0;
+		break;
+	}
+}
+
+if ($switchConstant !== '') {
 	$token = GETPOST('token', 'alpha');
 	$expectedToken = '';
 	if (function_exists('currentToken')) {
@@ -96,15 +120,20 @@ if ($action === 'set_multicompany_scope') {
 		accessforbidden('Bad value for token');
 	}
 
-	$value = GETPOST('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES', 'int') ? 1 : 0;
-	$result = dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES', $value, 'chaine', 0, '', $conf->entity);
+	$entityIsSet = function_exists('GETPOSTISSET') ? GETPOSTISSET('entity') : (isset($_GET['entity']) || isset($_POST['entity']));
+	$entity = $entityIsSet ? GETPOST('entity', 'int') : $conf->entity;
+	if ($entity < 0) {
+		$entity = $conf->entity;
+	}
+
+	$result = dolibarr_set_const($db, $switchConstant, (int) $switchValue, 'chaine', 0, '', $entity);
 	if ($result > 0) {
 		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
 		header('Location: '.$_SERVER['PHP_SELF']);
 		exit;
-	} else {
-		dol_print_error($db);
 	}
+
+	dol_print_error($db);
 }
 
 llxHeader('', $langs->trans($page_name), $help_url);
@@ -118,34 +147,43 @@ print dol_get_fiche_head($head, 'settings', $langs->trans($page_name), -1, 'lmdb
 
 print '<span class="opacitymedium">'.$langs->trans('AdvancedProjectSetupPage').'</span><br><br>';
 
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('Parameters').'</td>';
+print '<td class="right">'.$langs->trans('Value').'</td>';
+print '</tr>';
+print '<tr class="oddeven">';
+print '<td>';
+print '<label for="LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT">'.$langs->trans('AdvancedProjectSupplierInvoiceSplit').'</label>';
+print '<br><span class="opacitymedium">'.$langs->trans('AdvancedProjectSupplierInvoiceSplitHelp').'</span>';
+print '</td>';
+print '<td class="right">';
+print ajax_constantonoff('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', array(), $conf->entity, 0, 0, 0, 2, 0, 1);
+print '</td>';
+print '</tr>';
+print '<tr class="oddeven">';
+print '<td>';
+print '<label for="LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT">'.$langs->trans('AdvancedProjectCustomerInvoiceSplit').'</label>';
+print '<br><span class="opacitymedium">'.$langs->trans('AdvancedProjectCustomerInvoiceSplitHelp').'</span>';
+print '</td>';
+print '<td class="right">';
+print ajax_constantonoff('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', array(), $conf->entity, 0, 0, 0, 2, 0, 1);
+print '</td>';
+print '</tr>';
 if (lmdbadvancedproject_is_multicompany_enabled()) {
-	$newToken = function_exists('newToken') ? newToken() : (empty($_SESSION['newtoken']) ? '' : $_SESSION['newtoken']);
-	$multicompanyAllEntities = empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES) ? 0 : 1;
-
-	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
-	print '<input type="hidden" name="token" value="'.$newToken.'">';
-	print '<input type="hidden" name="action" value="set_multicompany_scope">';
-	print '<table class="noborder centpercent">';
-	print '<tr class="liste_titre">';
-	print '<td>'.$langs->trans('Parameters').'</td>';
-	print '<td class="right">'.$langs->trans('Value').'</td>';
-	print '</tr>';
 	print '<tr class="oddeven">';
 	print '<td>';
 	print '<label for="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES">'.$langs->trans('AdvancedProjectMulticompanyScope').'</label>';
 	print '<br><span class="opacitymedium">'.$langs->trans('AdvancedProjectMulticompanyScopeHelp').'</span>';
 	print '</td>';
 	print '<td class="right">';
-	print '<input type="checkbox" class="flat" id="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES" name="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES" value="1"'.($multicompanyAllEntities ? ' checked' : '').'> ';
-	print '<label for="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES">'.$langs->trans('AdvancedProjectMulticompanyAllEntities').'</label>';
+	print ajax_constantonoff('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES', array(), $conf->entity, 0, 0, 0, 2, 0, 1);
 	print '</td>';
 	print '</tr>';
-	print '</table>';
-	print '<div class="tabsAction">';
-	print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
-	print '</div>';
-	print '</form>';
-} else {
+}
+print '</table>';
+
+if (!lmdbadvancedproject_is_multicompany_enabled()) {
 	print '<div class="info">'.$langs->trans('AdvancedProjectMulticompanyInactive').'</div>';
 }
 

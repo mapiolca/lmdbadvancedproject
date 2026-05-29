@@ -105,6 +105,103 @@ div.mainmenu.budgetreport {
 	background-image: none;
 }
 
+.lmdbap-line-split-cell {
+	white-space: nowrap;
+	width: 1%;
+}
+
+.lmdbap-line-split-cell a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	min-height: 24px;
+	color: #444;
+	text-decoration: none;
+}
+
+.lmdbap-split-source {
+	margin-bottom: 12px;
+	padding: 10px;
+	background: rgba(0,0,0,0.03);
+	border: 1px solid rgba(0,0,0,0.12);
+}
+
+.lmdbap-split-source div + div {
+	margin-top: 4px;
+}
+
+.lmdbap-source-info {
+	margin-left: 6px;
+	color: #666;
+	cursor: help;
+}
+
+.lmdbap-split-mode {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin: 12px 0;
+}
+
+.lmdbap-split-table th,
+.lmdbap-split-table td {
+	vertical-align: middle;
+}
+
+.lmdbap-split-table .lmdbap-project-col {
+	min-width: 320px;
+}
+
+.lmdbap-split-table .lmdbap-amount-col,
+.lmdbap-split-table .lmdbap-qty-col {
+	width: 120px;
+}
+
+.lmdbap-split-table .lmdbap-action-col {
+	width: 56px;
+}
+
+.lmdbap-split-table .select2-container {
+	width: 100% !important;
+}
+
+.lmdbap-row-actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	white-space: nowrap;
+}
+
+.lmdbap-row-actions a {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	min-height: 18px;
+	text-decoration: none;
+}
+
+.lmdbap-icon-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #555;
+	cursor: pointer;
+}
+
+.lmdbap-icon-button:hover,
+.lmdbap-icon-button:focus {
+	background: rgba(0,0,0,0.06);
+	color: #222;
+}
+
 .budgetreport-summary-fullwidth,
 .budgetreport-report,
 .budgetreport-month-section,
