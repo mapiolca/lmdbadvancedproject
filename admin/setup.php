@@ -87,6 +87,7 @@ $page_name = 'AdvancedProjectSetup';
 $switchConstants = array(
 	'LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT' => 1,
 	'LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT' => 1,
+	'LMDBADVANCEDPROJECT_WORKFLOW_CLOSE_PROJECT_ON_DELIVERED_ORDERS' => 1,
 );
 if (lmdbadvancedproject_is_multicompany_enabled()) {
 	$switchConstants['LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES'] = 1;
@@ -181,6 +182,18 @@ if (lmdbadvancedproject_is_multicompany_enabled()) {
 	print '</td>';
 	print '</tr>';
 }
+print '<tr class="liste_titre">';
+print '<td colspan="2">'.$langs->trans('AdvancedProjectWorkflow').'</td>';
+print '</tr>';
+print '<tr class="oddeven">';
+print '<td>';
+print '<label for="LMDBADVANCEDPROJECT_WORKFLOW_CLOSE_PROJECT_ON_DELIVERED_ORDERS">'.$langs->trans('AdvancedProjectWorkflowCloseProjectOnDeliveredOrders').'</label>';
+print '<br><span class="opacitymedium">'.$langs->trans('AdvancedProjectWorkflowCloseProjectOnDeliveredOrdersHelp').'</span>';
+print '</td>';
+print '<td class="right">';
+print ajax_constantonoff('LMDBADVANCEDPROJECT_WORKFLOW_CLOSE_PROJECT_ON_DELIVERED_ORDERS', array(), $conf->entity, 0, 0, 0, 2, 0, 1);
+print '</td>';
+print '</tr>';
 print '</table>';
 
 if (!lmdbadvancedproject_is_multicompany_enabled()) {

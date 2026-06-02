@@ -273,7 +273,7 @@ class AdvancedProjectFunctionalTest extends \PHPUnit_Extensions_Selenium2TestCas
 		$this->authenticate();
 		return $this->assertContains(
 			'tick.png',
-			$this->byXPath('//td[text()="interface_99_modLmdbAdvancedProject_MyTrigger.class.php"]/following::img')->attribute('src'),
+			$this->byXPath('//td[text()="interface_99_modLmdbAdvancedProject_AdvancedProjectTriggers.class.php"]/following::img')->attribute('src'),
 			"Trigger enabled"
 		);
 	}

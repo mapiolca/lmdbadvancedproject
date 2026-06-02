@@ -16,6 +16,9 @@ AdvancedProjectMulticompanyScopeHelp = When this option is disabled, the report 
 AdvancedProjectMulticompanyInactive = The Multicompany module is not enabled; the report remains limited to the current entity.
 AdvancedProjectAbout = About Advanced Project
 AdvancedProjectAboutPage = Advanced Project about page
+AdvancedProjectWorkflow = Workflow
+AdvancedProjectWorkflowCloseProjectOnDeliveredOrders = Close project when all customer orders are delivered
+AdvancedProjectWorkflowCloseProjectOnDeliveredOrdersHelp = When the last validated customer order linked to the project is delivered, the module sets project tasks to 100% with the closed status, then closes the project.
 ReadBudgetReport = Read Budget Report
 
 BudgetReportArea = Project Budget Report

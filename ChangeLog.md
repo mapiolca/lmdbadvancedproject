@@ -1,5 +1,9 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3
+
+- Add an optional workflow that closes a project and its tasks when all linked customer orders are delivered
+
 ## 1.2
 
 - Add project breakdowns for supplier and customer invoice lines behind separate disabled-by-default settings

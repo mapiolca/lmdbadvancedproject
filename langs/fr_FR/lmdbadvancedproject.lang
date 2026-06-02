@@ -16,6 +16,9 @@ AdvancedProjectMulticompanyScopeHelp = Si cette option est désactivée, le rapp
 AdvancedProjectMulticompanyInactive = Le module Multicompany n'est pas activé; le rapport reste limité à l'entité courante.
 AdvancedProjectAbout = À propos d'Advanced Project
 AdvancedProjectAboutPage = Page À propos d'Advanced Project
+AdvancedProjectWorkflow = Workflow
+AdvancedProjectWorkflowCloseProjectOnDeliveredOrders = Cloturer le projet quand toutes ses commandes client sont livrees
+AdvancedProjectWorkflowCloseProjectOnDeliveredOrdersHelp = Quand la derniere commande client validee liee au projet passe livree, le module met les taches du projet a 100 % avec le statut ferme, puis cloture le projet.
 ReadBudgetReport = Lire le rapport budgétaire
 
 BudgetReportArea = Rapport budgétaire des projets

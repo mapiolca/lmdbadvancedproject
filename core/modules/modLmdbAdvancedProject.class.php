@@ -56,12 +56,12 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.2.0';
+		$this->version = '1.3.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
 		$this->module_parts = array(
-			'triggers' => 0,
+			'triggers' => 1,
 			'login' => 0,
 			'substitutions' => 0,
 			'menus' => 0,
@@ -100,6 +100,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->const = array(
 			array('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on supplier invoice lines', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on customer invoice lines', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_WORKFLOW_CLOSE_PROJECT_ON_DELIVERED_ORDERS', 'chaine', 0, 'Close project and tasks when all linked customer orders are delivered', 0, 'current', 0),
 		);
 
 		if (empty($conf->lmdbadvancedproject) || !is_object($conf->lmdbadvancedproject)) {
