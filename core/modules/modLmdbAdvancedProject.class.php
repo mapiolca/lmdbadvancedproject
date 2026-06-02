@@ -120,6 +120,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
 			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
 		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
+		$dynamicPricesEnabled = $this->isModuleEnabled('dynamicsprices') || $this->isModuleEnabled('dynamicprices');
 		$commercialCategoryHelp = array(
 			'code' => is_object($langs) ? $langs->trans('LMDB_CodeTooltipHelp') : 'LMDB_CodeTooltipHelp',
 			'entity' => is_object($langs) ? $langs->trans('LMDB_ENtityTooltipHelp') : 'LMDB_ENtityTooltipHelp',
@@ -137,7 +138,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'tabfieldvalue' => array($commercialCategoryFieldValue),
 			'tabfieldinsert' => array($commercialCategoryFieldValue),
 			'tabrowid' => array('rowid'),
-			'tabcond' => array(!empty($conf->lmdbadvancedproject->enabled)),
+			'tabcond' => array(!empty($conf->lmdbadvancedproject->enabled) && !$dynamicPricesEnabled),
 			'tabhelp' => array($commercialCategoryHelp),
 		);
 		$this->boxes = array();
@@ -229,6 +230,28 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$resql = $this->db->query($sql);
 
 		return ($resql && $this->db->num_rows($resql) > 0);
+	}
+
+	/**
+	 * Check if a module is enabled with compatibility for old Dolibarr patterns.
+	 *
+	 * @param  string $moduleKey Module technical key
+	 * @return bool
+	 */
+	private function isModuleEnabled($moduleKey)
+	{
+		global $conf;
+
+		if (function_exists('isModEnabled')) {
+			return isModEnabled($moduleKey);
+		}
+
+		if (!empty($conf->{$moduleKey}->enabled)) {
+			return true;
+		}
+
+		$constName = 'MAIN_MODULE_'.strtoupper($moduleKey);
+		return !empty($conf->global->{$constName});
 	}
 
 	/**

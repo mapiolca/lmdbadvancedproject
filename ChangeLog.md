@@ -3,6 +3,7 @@
 ## 1.3
 
 - Add an optional workflow that closes a project and its tasks when all linked customer orders are delivered
+- Hide the shared commercial categories dictionary from Advanced Project when DynamicPrices owns it
 
 ## 1.2
 
