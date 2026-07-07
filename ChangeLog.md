@@ -1,5 +1,9 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.1
+
+- Skip the Commercial categories dictionary declaration when DynamicsPrices is already enabled
+
 ## 1.2
 
 - Add project breakdowns for supplier and customer invoice lines behind separate disabled-by-default settings
