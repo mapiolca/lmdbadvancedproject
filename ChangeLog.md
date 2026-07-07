@@ -1,12 +1,15 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.1
+
+- Skip the Commercial categories dictionary declaration when DynamicsPrices is already enabled
+
 ## 1.2
 
 - Add project breakdowns for supplier and customer invoice lines behind separate disabled-by-default settings
 - Show allocated invoice parts on project overview pages
 - Include supplier invoice parts in budget report spending and category summaries without double-counting source lines
 - Include customer invoice parts in invoiced totals without changing category summaries
-- Skip the Commercial categories dictionary declaration when DynamicsPrices is already enabled
 
 ## 1.1
 
