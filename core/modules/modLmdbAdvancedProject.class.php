@@ -114,31 +114,34 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'data' => 'project:+budgetreport:BudgetReportProjectTab:lmdbadvancedproject@lmdbadvancedproject:$user->rights->lmdbadvancedproject->budgetreport->read:/lmdbadvancedproject/tabs/project_budgetreport.php?id=__ID__',
 		);
 
-		$commercialCategoryHasEntity = $this->tableExists(MAIN_DB_PREFIX."c_commercial_category") && $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
-		$commercialCategorySelectSql = $commercialCategoryHasEntity
-			? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
-			: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
-		$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
-		$commercialCategoryHelp = array(
-			'code' => is_object($langs) ? $langs->trans('LMDB_CodeTooltipHelp') : 'LMDB_CodeTooltipHelp',
-			'entity' => is_object($langs) ? $langs->trans('LMDB_ENtityTooltipHelp') : 'LMDB_ENtityTooltipHelp',
-			'label' => is_object($langs) ? $langs->trans('LMDB_LabelTooltipHelp') : 'LMDB_LabelTooltipHelp',
-			'active' => is_object($langs) ? $langs->trans('LMDB_ActiveTooltipHelp') : 'LMDB_ActiveTooltipHelp',
-		);
+		$this->dictionaries = array();
+		if (!isModEnabled('dynamicsprices')) {
+			$commercialCategoryHasEntity = $this->tableExists(MAIN_DB_PREFIX."c_commercial_category") && $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+			$commercialCategorySelectSql = $commercialCategoryHasEntity
+				? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+				: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
+			$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
+			$commercialCategoryHelp = array(
+				'code' => is_object($langs) ? $langs->trans('LMDB_CodeTooltipHelp') : 'LMDB_CodeTooltipHelp',
+				'entity' => is_object($langs) ? $langs->trans('LMDB_ENtityTooltipHelp') : 'LMDB_ENtityTooltipHelp',
+				'label' => is_object($langs) ? $langs->trans('LMDB_LabelTooltipHelp') : 'LMDB_LabelTooltipHelp',
+				'active' => is_object($langs) ? $langs->trans('LMDB_ActiveTooltipHelp') : 'LMDB_ActiveTooltipHelp',
+			);
 
-		$this->dictionaries = array(
-			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
-			'tabname' => array(MAIN_DB_PREFIX."c_commercial_category"),
-			'tablib' => array('LMDB_commercialcategories'),
-			'tabsql' => array($commercialCategorySelectSql),
-			'tabsqlsort' => array('label ASC'),
-			'tabfield' => array('code,label'),
-			'tabfieldvalue' => array($commercialCategoryFieldValue),
-			'tabfieldinsert' => array($commercialCategoryFieldValue),
-			'tabrowid' => array('rowid'),
-			'tabcond' => array(!empty($conf->lmdbadvancedproject->enabled)),
-			'tabhelp' => array($commercialCategoryHelp),
-		);
+			$this->dictionaries = array(
+				'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
+				'tabname' => array(MAIN_DB_PREFIX."c_commercial_category"),
+				'tablib' => array('LMDB_commercialcategories'),
+				'tabsql' => array($commercialCategorySelectSql),
+				'tabsqlsort' => array('label ASC'),
+				'tabfield' => array('code,label'),
+				'tabfieldvalue' => array($commercialCategoryFieldValue),
+				'tabfieldinsert' => array($commercialCategoryFieldValue),
+				'tabrowid' => array('rowid'),
+				'tabcond' => array(!empty($conf->lmdbadvancedproject->enabled)),
+				'tabhelp' => array($commercialCategoryHelp),
+			);
+		}
 		$this->boxes = array();
 		$this->cronjobs = array();
 
