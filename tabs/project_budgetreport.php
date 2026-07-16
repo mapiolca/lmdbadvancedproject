@@ -59,10 +59,11 @@ require_once dirname(__DIR__).'/lib/budgetreport.lib.php';
 
 $langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 
-$id = GETPOST('id', 'int');
+$id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
+$action = GETPOST('action', 'aZ09');
 
-if (!$user->rights->projet->lire || empty($user->rights->lmdbadvancedproject->budgetreport->read)) {
+if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 	accessforbidden();
 }
 
@@ -79,6 +80,23 @@ if ($id > 0 || !empty($ref)) {
 }
 
 restrictedArea($user, 'projet', $object->id, 'projet&project');
+
+$projectWriteAccess = $object->restrictedProjectArea($user, 'write') > 0;
+$permissionToGenerate = $user->hasRight('projet', 'creer') && $projectWriteAccess;
+
+if ($action === 'generate_budgetreport') {
+	if (!$permissionToGenerate) {
+		accessforbidden();
+	}
+	$result = $object->generateDocument('budgetreport', $langs);
+	if ($result <= 0) {
+		setEventMessages($object->error, $object->errors, 'errors');
+	} else {
+		$relativeFile = dol_sanitizeFileName($object->ref).'/'.dol_sanitizeFileName($object->ref).'_budgetreport.pdf';
+		header('Location: '.DOL_URL_ROOT.'/document.php?modulepart=project&entity='.(int) $object->entity.'&file='.urlencode($relativeFile));
+		exit;
+	}
+}
 
 $title = $langs->trans('BudgetReportProjectTab').' - '.$object->ref.' '.$object->title;
 llxHeader('', $title);
@@ -102,6 +120,16 @@ if (!empty($object->thirdparty->id)) {
 $morehtmlref .= '</div>';
 
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+
+if ($permissionToGenerate) {
+	print '<div class="tabsAction">';
+	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'?id='.(int) $object->id.'" class="inline-block">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="generate_budgetreport">';
+	print '<button class="butAction" type="submit">'.$langs->trans('BudgetReportGeneratePdf').'</button>';
+	print '</form>';
+	print '</div>';
+}
 
 print '<div class="fichecenter">';
 lmdbadvancedproject_render_project_budget_report((int) $object->id);

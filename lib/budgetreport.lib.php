@@ -13,7 +13,7 @@ if (!function_exists('lmdbadvancedproject_round_amount')) {
 	 */
 	function lmdbadvancedproject_round_amount($amount)
 	{
-		return round((float) $amount, 2);
+		return (float) price2num((float) $amount, 'MT');
 	}
 }
 
@@ -22,15 +22,66 @@ if (!function_exists('lmdbadvancedproject_format_price')) {
 	 * Format amounts with Dolibarr's configured currency.
 	 *
 	 * @param  float|int $amount Amount to format
+	 * @param Translate|null $outputlangs Output language
 	 * @return string
 	 */
-	function lmdbadvancedproject_format_price($amount)
+	function lmdbadvancedproject_format_price($amount, $outputlangs = null)
 	{
 		global $conf, $langs;
 
+		if (!is_object($outputlangs)) {
+			$outputlangs = $langs;
+		}
 		$currencyCode = empty($conf->currency) ? '' : $conf->currency;
 
-		return price(lmdbadvancedproject_round_amount($amount), 0, $langs, 1, 2, 2, $currencyCode);
+		return price(price2num((float) $amount, 'MT'), 0, $outputlangs, 1, -1, -1, $currencyCode);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_format_hours')) {
+	/**
+	 * Format a decimal duration using the current Dolibarr locale.
+	 *
+	 * @param float|int $hours Decimal hours
+	 * @param bool      $withUnit Append the translated hour unit
+	 * @param Translate|null $outputlangs Output language
+	 * @return string
+	 */
+	function lmdbadvancedproject_format_hours($hours, $withUnit = false, $outputlangs = null)
+	{
+		global $langs;
+
+		if (!is_object($outputlangs)) {
+			$outputlangs = $langs;
+		}
+		$value = price((float) $hours, 0, $outputlangs, 0, -1, -1);
+
+		return $withUnit ? $outputlangs->trans('BudgetReportHoursValue', $value) : $value;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_month_label')) {
+	/**
+	 * Return a localized month label for a YYYY-MM key.
+	 *
+	 * @param string    $monthKey YYYY-MM
+	 * @param Translate $outputlangs Output language
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_month_label($monthKey, $outputlangs = null)
+	{
+		global $langs;
+
+		if (!is_object($outputlangs)) {
+			$outputlangs = $langs;
+		}
+		if (!preg_match('/^(\d{4})-(\d{2})$/', (string) $monthKey, $matches)) {
+			return (string) $monthKey;
+		}
+
+		$timestamp = dol_mktime(12, 0, 0, (int) $matches[2], 1, (int) $matches[1]);
+
+		return dol_print_date($timestamp, '%b %Y', false, $outputlangs, true);
 	}
 }
 
@@ -1490,12 +1541,11 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projectDateSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_date_sql_filter($filters);
 		$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
 		$customerInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND f.fk_projet = ".$budgetReportProjectId : "";
-		$taskProjectSqlFilter = $budgetReportProjectId > 0 ? " AND pt.fk_projet = ".$budgetReportProjectId : "";
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 		$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
 
-		$entityShared = (lmdbadvancedproject_is_multicompany_enabled() && !empty($conf->global->LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES)) ? 1 : 0;
+		$entityShared = (lmdbadvancedproject_is_multicompany_enabled() && getDolGlobalInt('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES')) ? 1 : 0;
 		$projectDisplayEntityShared = $budgetReportProjectId > 0 ? 1 : $entityShared;
 		$projectEntities = lmdbadvancedproject_get_entity_filter('project', $projectDisplayEntityShared);
 		$projectDataEntities = lmdbadvancedproject_get_entity_filter('project', 1);
@@ -1644,31 +1694,105 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 
 		$timespent = array();
-		$sql0 = "SELECT pt.fk_projet, ptt.element_date AS task_date, SUM((ptt.element_duration / 3600.0) * CASE
+		$totalTimeHours = 0.0;
+		$timeBreakdown = array(
+			'mode' => $budgetReportProjectId > 0 ? 'task' : 'project',
+			'rows' => array(),
+			'column_totals' => array(),
+			'total_hours' => 0.0,
+		);
+		$selectedProjectIds = array_map('intval', array_keys($projects));
+
+		if ($budgetReportProjectId > 0 && !empty($selectedProjectIds)) {
+			$sqlTasks = "SELECT pt.rowid, pt.fk_projet, pt.ref, pt.label
+				FROM ".MAIN_DB_PREFIX."projet_task pt
+				WHERE pt.fk_projet = ".$budgetReportProjectId."
+				AND pt.entity IN (".$projectDataEntities.")
+				ORDER BY pt.ref ASC, pt.label ASC";
+			$resultTasks = $db->query($sqlTasks);
+			if ($resultTasks) {
+				while (is_object($taskObject = $db->fetch_object($resultTasks))) {
+					$taskId = (int) $taskObject->rowid;
+					$timeBreakdown['rows'][$taskId] = array(
+						'id' => $taskId,
+						'project_id' => (int) $taskObject->fk_projet,
+						'ref' => (string) $taskObject->ref,
+						'label' => (string) $taskObject->label,
+						'months' => array(),
+						'total_hours' => 0.0,
+					);
+				}
+				$db->free($resultTasks);
+			}
+		} else {
+			foreach ($projects as $projectId => $projectData) {
+				$timeBreakdown['rows'][(int) $projectId] = array(
+					'id' => (int) $projectId,
+					'project_id' => (int) $projectId,
+					'ref' => (string) $projectData['project_ref'],
+					'label' => (string) $projectData['title'],
+					'public' => (int) $projectData['public'],
+					'months' => array(),
+					'total_hours' => 0.0,
+				);
+			}
+		}
+
+		if (!empty($selectedProjectIds)) {
+			$groupSelect = $budgetReportProjectId > 0
+				? "pt.rowid AS breakdown_id, pt.ref AS breakdown_ref, pt.label AS breakdown_label,"
+				: "pt.fk_projet AS breakdown_id, '' AS breakdown_ref, '' AS breakdown_label,";
+			$groupBy = $budgetReportProjectId > 0
+				? 'pt.rowid, pt.ref, pt.label, month_key'
+				: 'pt.fk_projet, month_key';
+			$sql0 = "SELECT pt.fk_projet, ".$groupSelect." DATE_FORMAT(ptt.element_date, '%Y-%m') AS month_key,
+				SUM(ptt.element_duration) / 3600.0 AS total_hours,
+				SUM((ptt.element_duration / 3600.0) * CASE
 					WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
 					WHEN u.thm IS NOT NULL AND u.thm > 0 THEN u.thm
 					ELSE 0
 				END) AS totalspent
-			FROM ".MAIN_DB_PREFIX."element_time ptt
-			INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
-			LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
-			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.entity IN (".$projectDataEntities.")".$taskProjectSqlFilter."
-			GROUP BY pt.fk_projet, ptt.element_date";
-		$result0 = $db->query($sql0);
-		$nbtotal0 = $result0 ? $db->num_rows($result0) : 0;
-		$i=0;
-		while ($i<$nbtotal0) {
-			$obj = $db->fetch_object($result0);
-			if ($obj->totalspent>0) {
-				if (!isset($timespent[$obj->fk_projet][$obj->task_date])) {
-					$timespent[$obj->fk_projet][$obj->task_date] = 0;
+				FROM ".MAIN_DB_PREFIX."element_time ptt
+				INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
+				LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
+				WHERE ptt.elementtype = 'task'
+				AND ptt.element_duration > 0
+				AND ptt.element_date IS NOT NULL
+				AND pt.entity IN (".$projectDataEntities.")
+				AND pt.fk_projet IN (".implode(',', $selectedProjectIds).")
+				GROUP BY ".$groupBy."
+				ORDER BY month_key ASC";
+			$result0 = $db->query($sql0);
+			if ($result0) {
+				while (is_object($obj = $db->fetch_object($result0))) {
+					$projectId = (int) $obj->fk_projet;
+					$rowId = (int) $obj->breakdown_id;
+					$monthKey = (string) $obj->month_key;
+					$hours = empty($obj->total_hours) ? 0.0 : (float) $obj->total_hours;
+					$cost = empty($obj->totalspent) ? 0.0 : (float) $obj->totalspent;
+
+					if (!isset($timespent[$projectId][$monthKey])) {
+						$timespent[$projectId][$monthKey] = 0.0;
+					}
+					$timespent[$projectId][$monthKey] += $cost;
+					$cleanmos[$monthKey] = $monthKey;
+
+					if (!isset($timeBreakdown['rows'][$rowId])) {
+						$timeBreakdown['rows'][$rowId] = array(
+							'id' => $rowId,
+							'project_id' => $projectId,
+							'ref' => (string) $obj->breakdown_ref,
+							'label' => (string) $obj->breakdown_label,
+							'months' => array(),
+							'total_hours' => 0.0,
+						);
+					}
+					$timeBreakdown['rows'][$rowId]['months'][$monthKey] = $hours;
+					$timeBreakdown['rows'][$rowId]['total_hours'] += $hours;
+					$totalTimeHours += $hours;
 				}
-				$timespent[$obj->fk_projet][$obj->task_date] += (float) $obj->totalspent;
+				$db->free($result0);
 			}
-			$i++;
-		}
-		if ($result0) {
-			$db->free($result0);
 		}
 
 		foreach ($projects as $pid=>$data) {
@@ -1838,6 +1962,39 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			}
 		}
 
+		ksort($cleanmos);
+		$monthAxis = array();
+		$molabels = array();
+		$mobudgets = array();
+		$mospents = array();
+		$mobudgetFormattedValues = array();
+		$mospentFormattedValues = array();
+		foreach ($cleanmos as $monthKey) {
+			$monthLabel = lmdbadvancedproject_get_month_label($monthKey);
+			$monthBudget = empty($mobudget[$monthKey]) ? 0.0 : (float) $mobudget[$monthKey];
+			$monthSpent = empty($mospent[$monthKey]) ? 0.0 : (float) $mospent[$monthKey];
+			$monthAxis[$monthKey] = array(
+				'key' => $monthKey,
+				'label' => $monthLabel,
+				'budget' => $monthBudget,
+				'spent' => $monthSpent,
+			);
+			$molabels[] = $monthLabel;
+			$mobudgets[] = lmdbadvancedproject_round_amount($monthBudget);
+			$mospents[] = lmdbadvancedproject_round_amount($monthSpent);
+			$mobudgetFormattedValues[] = lmdbadvancedproject_format_price($monthBudget);
+			$mospentFormattedValues[] = lmdbadvancedproject_format_price($monthSpent);
+			$timeBreakdown['column_totals'][$monthKey] = 0.0;
+		}
+		foreach ($timeBreakdown['rows'] as $rowId => $row) {
+			foreach ($monthAxis as $monthKey => $monthData) {
+				$hours = isset($row['months'][$monthKey]) ? (float) $row['months'][$monthKey] : 0.0;
+				$timeBreakdown['rows'][$rowId]['months'][$monthKey] = $hours;
+				$timeBreakdown['column_totals'][$monthKey] += $hours;
+			}
+		}
+		$timeBreakdown['total_hours'] = $totalTimeHours;
+
 		$totalspent = $totaltime+$totalvendinv+$totalsupplierordersremaining+$totalexpenses;
 		$balance = $budget-$totalspent;
 		$blncolor = $balance < 0 ? "red" : "green";
@@ -1904,11 +2061,20 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		return array(
 			'budgetReportProjectId' => $budgetReportProjectId,
+			'filters' => $filters,
 			'budgetReportMulticompanyInfoKey' => $budgetReportMulticompanyInfoKey,
 			'projects' => $projects,
 			'mobudget' => $mobudget,
 			'mospent' => $mospent,
 			'cleanmos' => $cleanmos,
+			'monthAxis' => $monthAxis,
+			'molabels' => $molabels,
+			'mobudgets' => $mobudgets,
+			'mospents' => $mospents,
+			'mobudgetFormattedValues' => $mobudgetFormattedValues,
+			'mospentFormattedValues' => $mospentFormattedValues,
+			'timeBreakdown' => $timeBreakdown,
+			'totalTimeHours' => $totalTimeHours,
 			'totaltime' => $totaltime,
 			'totalvendinv' => $totalvendinv,
 			'totalsupplierordersorderedremaining' => $totalsupplierordersorderedremaining,
@@ -1935,6 +2101,75 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_print_time_breakdown')) {
+	/**
+	 * Print the monthly time breakdown matrix.
+	 *
+	 * @param array<string,mixed> $timeBreakdown Time breakdown data
+	 * @param array<string,mixed> $monthAxis Month axis
+	 * @return void
+	 */
+	function lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis)
+	{
+		global $db, $langs;
+
+		$isProjectMode = isset($timeBreakdown['mode']) && $timeBreakdown['mode'] === 'project';
+		$firstColumnLabel = $isProjectMode ? $langs->trans('BudgetReportProject') : $langs->trans('Task');
+
+		print '<div class="budgetreport-time-section">';
+		print '<div class="budgettitle">'.$langs->trans('BudgetReportTimeBreakdownByMonth').'</div>';
+		print '<div class="budgetreport-time-scroll">';
+		print '<table class="budgettbl budgetreport-time-table">';
+		print '<thead><tr><th class="budgetreport-time-label">'.$firstColumnLabel.'</th>';
+		foreach ($monthAxis as $monthData) {
+			print '<th class="right nowrap">'.lmdbadvancedproject_escape_html($monthData['label']).'</th>';
+		}
+		print '<th class="right nowrap">'.$langs->trans('BudgetReportTotal').'</th></tr></thead>';
+		print '<tbody>';
+
+		if (empty($timeBreakdown['rows'])) {
+			print '<tr class="oddeven"><td colspan="'.(count($monthAxis) + 2).'" class="opacitymedium">'.$langs->trans('NoRecordFound').'</td></tr>';
+		} else {
+			foreach ($timeBreakdown['rows'] as $row) {
+				print '<tr>';
+				print '<td class="budgetreport-time-label">';
+				if ($isProjectMode) {
+					$projectstatic = new Project($db);
+					$projectstatic->id = (int) $row['project_id'];
+					$projectstatic->ref = (string) $row['ref'];
+					$projectstatic->title = (string) $row['label'];
+					$projectstatic->public = empty($row['public']) ? 0 : (int) $row['public'];
+					print $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php');
+				} else {
+					print lmdbadvancedproject_get_task_nom_url(array(
+						'task_id' => (int) $row['id'],
+						'task_ref' => (string) $row['ref'],
+						'task_label' => (string) $row['label'],
+					));
+				}
+				if (!empty($row['label'])) {
+					print '<span class="opacitymedium budgetreport-time-row-label">'.lmdbadvancedproject_escape_html($row['label']).'</span>';
+				}
+				print '</td>';
+				foreach ($monthAxis as $monthKey => $monthData) {
+					$hours = isset($row['months'][$monthKey]) ? (float) $row['months'][$monthKey] : 0.0;
+					print '<td class="right nowrap">'.lmdbadvancedproject_format_hours($hours).'</td>';
+				}
+				print '<td class="right nowrap"><b>'.lmdbadvancedproject_format_hours($row['total_hours']).'</b></td>';
+				print '</tr>';
+			}
+		}
+
+		print '<tr class="liste_total"><td><b>'.$langs->trans('BudgetReportTotal').'</b></td>';
+		foreach ($monthAxis as $monthKey => $monthData) {
+			$hours = isset($timeBreakdown['column_totals'][$monthKey]) ? (float) $timeBreakdown['column_totals'][$monthKey] : 0.0;
+			print '<td class="right nowrap"><b>'.lmdbadvancedproject_format_hours($hours).'</b></td>';
+		}
+		print '<td class="right nowrap"><b>'.lmdbadvancedproject_format_hours($timeBreakdown['total_hours']).'</b></td></tr>';
+		print '</tbody></table></div></div>';
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	/**
 	 * Render the budget report body.
@@ -1947,7 +2182,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	{
 		global $db, $conf, $langs, $user;
 
-		if (!$user->rights->projet->lire || empty($user->rights->lmdbadvancedproject->budgetreport->read)) {
+		if (!$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 			accessforbidden();
 		}
 
@@ -1955,6 +2190,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 		$budgetReportData = lmdbadvancedproject_load_budget_report_data($budgetReportProjectId, $filters);
 		extract($budgetReportData, EXTR_OVERWRITE);
+		$exportParameters = $budgetReportProjectId > 0 ? array('project_id' => $budgetReportProjectId) : $filters;
+		$exportBaseUrl = dol_buildpath('/lmdbadvancedproject/budgetreportexport.php', 1).'?'.http_build_query($exportParameters);
 
 ?>
 
@@ -1963,6 +2200,11 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 <?php if ($budgetReportProjectId > 0 && empty($projects)) { ?>
 <div class="warning"><?php echo $langs->trans("BudgetReportProjectNoData"); ?></div>
 <?php return; } ?>
+
+<div class="tabsAction budgetreport-export-actions">
+	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=xlsx'); ?>"><?php echo $langs->trans('BudgetReportExportXlsx'); ?></a>
+	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=ods'); ?>"><?php echo $langs->trans('BudgetReportExportOds'); ?></a>
+</div>
 
 <div class="budgetreport-summary-fullwidth">
 <table class="noborder centpercent dashboard_budget" role="presentation">
@@ -1991,7 +2233,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 			</div>
 			<div class="budgetreport-summary-breakdown">
-				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).') &middot; '.lmdbadvancedproject_format_hours($totalTimeHours, true); ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
@@ -2168,25 +2410,6 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 
 
-	<?php
-	//clean up data
-	$molabels = array();
-	$mobudgets = array();
-	$mospents = array();
-	$mobudgetFormattedValues = array();
-	$mospentFormattedValues = array();
-	asort($cleanmos);
-	foreach ($cleanmos as $id=>$data) {
-		$monthBudget = empty($mobudget[$data]) ? 0 : $mobudget[$data];
-		$monthSpent = empty($mospent[$data]) ? 0 : $mospent[$data];
-		$molabels[] = date("M'y",strtotime($data."-01"));
-		$mobudgets[] = lmdbadvancedproject_round_amount($monthBudget);
-		$mospents[] = lmdbadvancedproject_round_amount($monthSpent);
-		$mobudgetFormattedValues[] = lmdbadvancedproject_format_price($monthBudget);
-		$mospentFormattedValues[] = lmdbadvancedproject_format_price($monthSpent);
-	}
-	?>
-
 <div class="budgetreport-month-section">
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByMonth"); ?></div>
 	<div class="budgetbarchart">
@@ -2268,6 +2491,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	var chart = new Chart(ctx, month_config);
 	</script>
 </div>
+
+<?php lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis); ?>
 
 <div class="budgetreport-table-section">
 <?php if ($budgetReportProjectId > 0) { ?>

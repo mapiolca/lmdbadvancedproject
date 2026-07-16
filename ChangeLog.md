@@ -1,5 +1,14 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## Unreleased
+
+- Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
+- Display total decimal hours next to the time cost in the Spent tile
+- Add ODS and XLSX exports with report, time, and chart-data sheets; XLSX includes three native charts
+- Add the native `budgetreport` project PDF model with vector charts, category summary, and paginated task/month matrices
+- Add a compatibility settings tab for Dolibarr, PHP, PhpSpreadsheet, ZipArchive, and PDF support
+- Replace report monetary rounding with Dolibarr `price2num(..., 'MT')` and native `price()` formatting
+
 ## 1.2.1
 
 - Skip the Commercial categories dictionary declaration when DynamicsPrices is already enabled

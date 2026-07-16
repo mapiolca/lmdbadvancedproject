@@ -5,6 +5,31 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
+BudgetReportTimeBreakdownByMonth=Monatliche Verteilung der aufgewendeten Zeit
+BudgetReportHoursValue=%s Std.
+BudgetReportExportXlsx=Als XLSX exportieren
+BudgetReportExportOds=Als ODS exportieren
+BudgetReportExportSheetReport=Bericht
+BudgetReportExportSheetTime=Aufgewendete Zeit
+BudgetReportExportSheetCharts=Diagrammdaten
+BudgetReportExportZipMissing=Die PHP-Erweiterung ZipArchive ist für ODS- und XLSX-Exporte erforderlich.
+BudgetReportExportLibraryMissing=Die mit Dolibarr gelieferte PhpSpreadsheet-Bibliothek ist nicht verfügbar.
+BudgetReportGeneratePdf=PDF-Bericht erstellen
+BudgetReportPdfModelDescription=Budgetbericht des Projekts
+BudgetReportPdfTitle=Budgetbericht des Projekts
+Compatibility=Kompatibilität
+BudgetReportSpreadsheetExportFeature=ODS- und XLSX-Exporte
+BudgetReportSpreadsheetExportFeatureDescription=Tabellarische Exporte des Budgetberichts mit nativen Diagrammen in XLSX.
+BudgetReportProjectPdfFeature=PDF-Modell des Projektberichts
+BudgetReportProjectPdfFeatureDescription=Natives Projektdokumentmodell mit dem vollständigen Budgetbericht.
+BudgetReportRequiresDolibarr20=Diese Funktion erfordert Dolibarr 20 oder höher.
+BudgetReportRequiresPhp80=Diese Funktion erfordert PHP 8.0 oder höher.
+BudgetReportPdfLibraryMissing=Die native PDF-Bibliothek von Dolibarr ist nicht verfügbar.
+BudgetReportDetectedDolibarrVersion=Erkannte Dolibarr-Version
+BudgetReportDetectedPhpVersion=Erkannte PHP-Version
+BudgetReportMinimumDolibarrVersion=Minimale Dolibarr-Version
+BudgetReportMinimumPhpVersion=Minimale PHP-Version
+
 ModuleLmdbAdvancedProjectName = Advanced Project
 ModuleLmdbAdvancedProjectDesc = Advanced Project erweitert die Projektbudgetanalyse in Dolibarr.
 

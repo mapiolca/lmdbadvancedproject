@@ -40,6 +40,11 @@ function lmdbadvancedprojectAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
+	$head[$h][0] = dol_buildpath('/lmdbadvancedproject/admin/compatibility.php', 1);
+	$head[$h][1] = $langs->trans('Compatibility');
+	$head[$h][2] = 'compatibility';
+	$h++;
+
 	$head[$h][0] = dol_buildpath('/lmdbadvancedproject/admin/about.php', 1);
 	$head[$h][1] = $langs->trans('About');
 	$head[$h][2] = 'about';

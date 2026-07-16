@@ -505,6 +505,44 @@ div.mainmenu.budgetreport {
 	margin-top: 20px;
 }
 
+.budgetreport-time-section {
+	margin-top: 24px;
+}
+
+.budgetreport-time-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+.budgetreport-time-table {
+	min-width: max-content;
+}
+
+.budgetreport-time-table th,
+.budgetreport-time-table td {
+	min-width: 82px;
+}
+
+.budgetreport-time-table .budgetreport-time-label {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	min-width: 260px;
+	max-width: 360px;
+	background: var(--colorbacklineimpair, #fff);
+}
+
+.budgetreport-time-table thead .budgetreport-time-label {
+	z-index: 2;
+	background: var(--colorbacktitle1, #f2f2f2);
+}
+
+.budgetreport-time-row-label {
+	display: block;
+	margin-top: 2px;
+	white-space: normal;
+}
+
 .budgetreport-forecast-subtitle {
 	margin-top: 16px;
 }

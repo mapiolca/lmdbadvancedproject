@@ -63,12 +63,11 @@ $langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject"));
 
 $action = GETPOST('action', 'aZ09');
 
+if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+	accessforbidden();
+}
 
-// Security check
-// if (! $user->rights->lmdbadvancedproject->budgetreport->read) {
-// 	accessforbidden();
-// }
-$socid = GETPOST('socid', 'int');
+$socid = GETPOSTINT('socid');
 if (isset($user->socid) && $user->socid > 0) {
 	$action = '';
 	$socid = $user->socid;
