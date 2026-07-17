@@ -367,6 +367,7 @@ div.mainmenu.budgetreport {
 
 .budgetreport-chart-panel {
 	min-width: 0;
+	max-width: 100%;
 }
 
 .budgettitle {
@@ -389,6 +390,37 @@ div.mainmenu.budgetreport {
 	max-height: 350px;
 }
 
+.budgetreport-chart-scroll,
+.budgetreport-table-scroll,
+.budgetreport-time-scroll {
+	width: 100%;
+	max-width: 100%;
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+.budgetreport-chart-content {
+	min-width: 560px;
+}
+
+.budgetreport-month-section .budgetbarchart {
+	margin-bottom: 8px;
+}
+
+.budgetreport-month-scrollbar {
+	width: 100%;
+	max-width: 100%;
+	height: 18px;
+	margin-bottom: 30px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+}
+
+.budgetreport-month-scrollbar-track {
+	height: 1px;
+}
+
 .budgetchart canvas,
 .budgetbarchart canvas {
 	max-width: 100%;
@@ -397,6 +429,10 @@ div.mainmenu.budgetreport {
 
 .budgetreport-table-section .budgettbl {
 	width: 100%;
+}
+
+.budgetreport-table-scroll > .budgettbl {
+	min-width: max-content;
 }
 
 .budgettbl th{
@@ -510,8 +546,7 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-time-scroll {
-	overflow-x: auto;
-	max-width: 100%;
+	margin-bottom: 30px;
 }
 
 .budgetreport-time-table {

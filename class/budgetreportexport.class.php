@@ -122,7 +122,8 @@ class LmdbAdvancedProjectBudgetReportExport
 	{
 		global $conf;
 
-		$currencyFormat = '#,##0.00 "'.(empty($conf->currency) ? '' : $conf->currency).'"';
+		$numberFormat = $this->getTotalNumberFormat();
+		$currencyFormat = $numberFormat.' "'.(empty($conf->currency) ? '' : $conf->currency).'"';
 		$sheet->setCellValue('A1', $this->outputlangs->transnoentities('BudgetReportArea'));
 		$sheet->mergeCells('A1:F1');
 		$this->styleTitle($sheet, 'A1:F1');
@@ -173,7 +174,7 @@ class LmdbAdvancedProjectBudgetReportExport
 			$sheet->getStyle($coordinate)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F81BD');
 			$valueCoordinate = Coordinate::stringFromColumnIndex($column).($kpiRow + 1);
 			$sheet->setCellValue($valueCoordinate, $kpi[1]);
-			$sheet->getStyle($valueCoordinate)->getNumberFormat()->setFormatCode($kpi[0] === 'BudgetReportTimeSpentHours' ? '#,##0.00' : $currencyFormat);
+			$sheet->getStyle($valueCoordinate)->getNumberFormat()->setFormatCode($kpi[0] === 'BudgetReportTimeSpentHours' ? $numberFormat : $currencyFormat);
 			$column++;
 		}
 
@@ -238,6 +239,7 @@ class LmdbAdvancedProjectBudgetReportExport
 	/** @param mixed $sheet @return void */
 	private function fillTimeSheet($sheet)
 	{
+		$numberFormat = $this->getTotalNumberFormat();
 		$sheet->setCellValue('A1', $this->outputlangs->transnoentities('BudgetReportTimeBreakdownByMonth'));
 		$lastColumn = count($this->data['monthAxis']) + 2;
 		$sheet->mergeCells('A1:'.Coordinate::stringFromColumnIndex($lastColumn).'1');
@@ -260,7 +262,7 @@ class LmdbAdvancedProjectBudgetReportExport
 				$column++;
 			}
 			$sheet->setCellValue(Coordinate::stringFromColumnIndex($column).$row, (float) $timeRow['total_hours']);
-			$sheet->getStyle('B'.$row.':'.Coordinate::stringFromColumnIndex($column).$row)->getNumberFormat()->setFormatCode('#,##0.00');
+			$sheet->getStyle('B'.$row.':'.Coordinate::stringFromColumnIndex($column).$row)->getNumberFormat()->setFormatCode($numberFormat);
 			$row++;
 		}
 
@@ -272,7 +274,7 @@ class LmdbAdvancedProjectBudgetReportExport
 		}
 		$sheet->setCellValue(Coordinate::stringFromColumnIndex($column).$row, (float) $this->data['timeBreakdown']['total_hours']);
 		$sheet->getStyle('A'.$row.':'.Coordinate::stringFromColumnIndex($column).$row)->getFont()->setBold(true);
-		$sheet->getStyle('B4:'.Coordinate::stringFromColumnIndex($column).$row)->getNumberFormat()->setFormatCode('#,##0.00');
+		$sheet->getStyle('B4:'.Coordinate::stringFromColumnIndex($column).$row)->getNumberFormat()->setFormatCode($numberFormat);
 		$sheet->freezePane('B4');
 		$sheet->getColumnDimension('A')->setWidth(42);
 		for ($index = 2; $index <= $column; $index++) {
@@ -280,9 +282,25 @@ class LmdbAdvancedProjectBudgetReportExport
 		}
 	}
 
+	/** @return string */
+	private function getTotalNumberFormat()
+	{
+		$maxDecimals = max(0, getDolGlobalInt('MAIN_MAX_DECIMALS_TOT', 2));
+		if ($maxDecimals === 0) {
+			return '#,##0';
+		}
+		$minDecimals = min(2, $maxDecimals);
+
+		return '#,##0.'.str_repeat('0', $minDecimals).str_repeat('#', $maxDecimals - $minDecimals);
+	}
+
 	/** @param mixed $sheet @return void */
 	private function fillChartDataSheet($sheet)
 	{
+		global $conf;
+
+		$numberFormat = $this->getTotalNumberFormat();
+		$currencyFormat = $numberFormat.' "'.(empty($conf->currency) ? '' : $conf->currency).'"';
 		$this->setText($sheet, 'A1', $this->outputlangs->transnoentities($this->data['budgetChartTitleKey']));
 		$this->setText($sheet, 'A2', $this->outputlangs->transnoentities('Label'));
 		$this->setText($sheet, 'B2', $this->outputlangs->transnoentities('BudgetReportBudget'));
@@ -313,6 +331,19 @@ class LmdbAdvancedProjectBudgetReportExport
 			$sheet->setCellValue('I'.$row, (float) $monthData['spent']);
 			$sheet->setCellValue('J'.$row, (float) $monthData['time_hours']);
 			$row++;
+		}
+		$budgetLastRow = count($this->data['labels']) + 2;
+		$spentLastRow = count($this->data['spentLabels']) + 2;
+		$monthLastRow = count($this->data['monthAxis']) + 2;
+		if ($budgetLastRow >= 3) {
+			$sheet->getStyle('B3:B'.$budgetLastRow)->getNumberFormat()->setFormatCode($currencyFormat);
+		}
+		if ($spentLastRow >= 3) {
+			$sheet->getStyle('E3:E'.$spentLastRow)->getNumberFormat()->setFormatCode($currencyFormat);
+		}
+		if ($monthLastRow >= 3) {
+			$sheet->getStyle('H3:I'.$monthLastRow)->getNumberFormat()->setFormatCode($currencyFormat);
+			$sheet->getStyle('J3:J'.$monthLastRow)->getNumberFormat()->setFormatCode($numberFormat);
 		}
 		$this->styleHeader($sheet, 'A2:B2');
 		$this->styleHeader($sheet, 'D2:E2');

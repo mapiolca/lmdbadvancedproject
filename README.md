@@ -12,6 +12,8 @@ The report includes a monthly time matrix by project on the global page and by t
 
 The monthly budget-versus-spent chart also overlays recorded hours on a secondary axis. Each series can be shown or hidden from the chart legend, and an information tooltip explains how hours relate to total spending.
 
+Wide charts and report tables remain readable with horizontal scrolling instead of overflowing the browser window. The monthly chart keeps both vertical axes visible while its scrollbar changes the displayed month range. Displayed totals and hours follow Dolibarr's configured maximum number of decimals for total prices.
+
 Reports can be exported as XLSX or ODS. XLSX files contain the report charts, while ODS files contain the same tables and visible chart source data. Individual project reports can also be generated with the native **Project budget report** PDF document model, either from the project document selector or from the Budget report tab.
 
 Spreadsheet exports require the PhpSpreadsheet library bundled with Dolibarr 20 and the PHP `ZipArchive` extension. The module compatibility tab reports the availability of these components.
