@@ -2456,6 +2456,9 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		<?php echo json_encode(array_values($mospentFormattedValues)); ?>,
 		<?php echo json_encode(array_values($motimehourFormattedValues)); ?>
 	];
+	var monthChartTitle = <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpentByMonth")); ?>;
+	var monthHoursAxisTitle = <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportTimeSpentHours")); ?>;
+	var monthHoursAxisMaximum = <?php echo json_encode($motimehourAxisMaximum); ?>;
 	var month_config = {
 			type: 'bar',
 			data: {
@@ -2494,65 +2497,118 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
-				legend: {
-					position: 'top',
-				},
-				title: {
-					display: false,
-					text: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpentByMonth")); ?>
-				},
 				animation: {
 					animateScale: true,
 					animateRotate: true
-				},
-
-				tooltips: {
-				  mode: 'label',
-				  callbacks: {
-						label: function(tooltipItem, data) {
-							var label = data.datasets[tooltipItem.datasetIndex].label || '';
-							return label+': '+monthFormattedValues[tooltipItem.datasetIndex][tooltipItem.index];
-						}
-				  }
-				}, //end tooltips
-
-				scales: {
-					yAxes: [{
-						id: 'y-axis-amount',
-						position: 'left',
-						ticks: {
-							beginAtZero:true,
-							userCallback: function(value, index, values) {
-								return budgetReportFormatChartValue(value);
-							}
-						},
-						scaleLabel: {
-							display: budgetReportCurrencyCode !== '',
-							labelString: budgetReportCurrencyCode
-						}
-					}, {
-						id: 'y-axis-hours',
-						position: 'right',
-						gridLines: {
-							drawOnChartArea: false
-						},
-						ticks: {
-							beginAtZero: true,
-							max: <?php echo json_encode($motimehourAxisMaximum); ?>
-						},
-						scaleLabel: {
-							display: true,
-							labelString: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportTimeSpentHours")); ?>
-						}
-					}],
-					xAxes: [{
-						ticks: {
-						}
-					}]
-				},  //end scales
-
+				}
 			}
 		};
+
+	var usesModernChartApi = typeof Chart.registry !== 'undefined';
+	if (usesModernChartApi) {
+		month_config.options.plugins = {
+			legend: {
+				position: 'top'
+			},
+			title: {
+				display: false,
+				text: monthChartTitle
+			},
+			tooltip: {
+				mode: 'index',
+				callbacks: {
+					label: function(context) {
+						var label = context.dataset.label || '';
+						return label+': '+monthFormattedValues[context.datasetIndex][context.dataIndex];
+					}
+				}
+			}
+		};
+		month_config.options.scales = {
+			'y-axis-amount': {
+				type: 'linear',
+				position: 'left',
+				beginAtZero: true,
+				ticks: {
+					callback: function(value) {
+						return budgetReportFormatChartValue(value);
+					}
+				},
+				title: {
+					display: budgetReportCurrencyCode !== '',
+					text: budgetReportCurrencyCode
+				}
+			},
+			'y-axis-hours': {
+				type: 'linear',
+				position: 'right',
+				beginAtZero: true,
+				max: monthHoursAxisMaximum,
+				suggestedMax: monthHoursAxisMaximum,
+				grid: {
+					drawOnChartArea: false
+				},
+				title: {
+					display: true,
+					text: monthHoursAxisTitle
+				}
+			},
+			x: {
+				type: 'category'
+			}
+		};
+	} else {
+		month_config.options.legend = {
+			position: 'top'
+		};
+		month_config.options.title = {
+			display: false,
+			text: monthChartTitle
+		};
+		month_config.options.tooltips = {
+			mode: 'label',
+			callbacks: {
+				label: function(tooltipItem, data) {
+					var label = data.datasets[tooltipItem.datasetIndex].label || '';
+					return label+': '+monthFormattedValues[tooltipItem.datasetIndex][tooltipItem.index];
+				}
+			}
+		};
+		month_config.options.scales = {
+			yAxes: [{
+				id: 'y-axis-amount',
+				position: 'left',
+				ticks: {
+					beginAtZero: true,
+					userCallback: function(value) {
+						return budgetReportFormatChartValue(value);
+					}
+				},
+				scaleLabel: {
+					display: budgetReportCurrencyCode !== '',
+					labelString: budgetReportCurrencyCode
+				}
+			}, {
+				id: 'y-axis-hours',
+				position: 'right',
+				gridLines: {
+					drawOnChartArea: false
+				},
+				ticks: {
+					beginAtZero: true,
+					max: monthHoursAxisMaximum,
+					suggestedMax: monthHoursAxisMaximum
+				},
+				scaleLabel: {
+					display: true,
+					labelString: monthHoursAxisTitle
+				}
+			}],
+			xAxes: [{
+				ticks: {}
+			}]
+		};
+	}
 
 	var ctx = document.getElementById("canvas_idgraphmonth").getContext("2d");
 	new Chart(ctx, month_config);
