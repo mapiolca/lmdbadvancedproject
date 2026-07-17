@@ -1428,10 +1428,12 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 	/**
 	 * Print project forecast table.
 	 *
-	 * @param array<string,mixed> $forecast Forecast data
+	 * @param array<string,mixed> $forecast      Forecast data
+	 * @param array<string,mixed> $timeBreakdown Monthly time breakdown data
+	 * @param array<string,mixed> $monthAxis     Shared monthly axis
 	 * @return void
 	 */
-	function lmdbadvancedproject_print_project_forecast($forecast)
+	function lmdbadvancedproject_print_project_forecast($forecast, $timeBreakdown, $monthAxis)
 	{
 		global $langs;
 
@@ -1471,6 +1473,8 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 		print '<td></td>';
 		print '</tr>';
 		print '</table>';
+
+		lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis);
 
 		print '<div class="budgetreport-forecast-extra">';
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
@@ -2206,11 +2210,13 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=xlsx'); ?>"><?php echo $langs->trans('BudgetReportExportXlsx'); ?></a>
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=ods'); ?>"><?php echo $langs->trans('BudgetReportExportOds'); ?></a>
 <?php if ($budgetReportProjectId > 0 && $permissionToGeneratePdf) { ?>
-	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" class="inline-block">
+	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" id="budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>" hidden>
 		<input type="hidden" name="token" value="<?php echo newToken(); ?>">
 		<input type="hidden" name="action" value="generate_budgetreport">
-		<button class="butAction" type="submit"><?php echo $langs->trans('BudgetReportGeneratePdf'); ?></button>
 	</form>
+	<div class="inline-block divButAction">
+		<a class="butAction" href="#" role="button" onclick="document.getElementById('budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>').submit(); return false;"><?php echo $langs->trans('BudgetReportGeneratePdf'); ?></a>
+	</div>
 <?php } ?>
 </div>
 
@@ -2500,12 +2506,14 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	</script>
 </div>
 
-<?php lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis); ?>
+<?php if ($budgetReportProjectId <= 0) { ?>
+	<?php lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis); ?>
+<?php } ?>
 
 <div class="budgetreport-table-section">
 <?php if ($budgetReportProjectId > 0) { ?>
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportCategorySummary"); ?></div>
-	<?php lmdbadvancedproject_print_project_forecast($budgetReportForecast); ?>
+	<?php lmdbadvancedproject_print_project_forecast($budgetReportForecast, $timeBreakdown, $monthAxis); ?>
 <?php } else { ?>
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>
 	<table class="budgettbl">
