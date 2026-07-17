@@ -288,6 +288,21 @@ div.mainmenu.budgetreport {
 	align-items: center;
 }
 
+.budgetreport-month-heading {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+}
+
+.budgetreport-month-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	white-space: nowrap;
+}
+
 .budgetreport-summary-fullwidth {
 	display: block;
 	max-width: none;

@@ -3,6 +3,7 @@
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/task.class.php';
 require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 
 if (!function_exists('lmdbadvancedproject_round_amount')) {
 	/**
@@ -1526,6 +1527,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projects = array();
 		$mobudget = array();
 		$mospent = array();
+		$motimecost = array();
 		$cleanmos = array();
 
 		$totaltime = 0;
@@ -1811,6 +1813,10 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 						$mospent[$yrmo] = 0;
 					}
 					$mospent[$yrmo] += (float) $val;
+					if (!isset($motimecost[$yrmo])) {
+						$motimecost[$yrmo] = 0;
+					}
+					$motimecost[$yrmo] += (float) $val;
 				}
 			}
 		}
@@ -1971,23 +1977,29 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$molabels = array();
 		$mobudgets = array();
 		$mospents = array();
+		$motimecosts = array();
 		$mobudgetFormattedValues = array();
 		$mospentFormattedValues = array();
+		$motimecostFormattedValues = array();
 		foreach ($cleanmos as $monthKey) {
 			$monthLabel = lmdbadvancedproject_get_month_label($monthKey);
 			$monthBudget = empty($mobudget[$monthKey]) ? 0.0 : (float) $mobudget[$monthKey];
 			$monthSpent = empty($mospent[$monthKey]) ? 0.0 : (float) $mospent[$monthKey];
+			$monthTimeCost = empty($motimecost[$monthKey]) ? 0.0 : (float) $motimecost[$monthKey];
 			$monthAxis[$monthKey] = array(
 				'key' => $monthKey,
 				'label' => $monthLabel,
 				'budget' => $monthBudget,
 				'spent' => $monthSpent,
+				'time_spent' => $monthTimeCost,
 			);
 			$molabels[] = $monthLabel;
 			$mobudgets[] = lmdbadvancedproject_round_amount($monthBudget);
 			$mospents[] = lmdbadvancedproject_round_amount($monthSpent);
+			$motimecosts[] = lmdbadvancedproject_round_amount($monthTimeCost);
 			$mobudgetFormattedValues[] = lmdbadvancedproject_format_price($monthBudget);
 			$mospentFormattedValues[] = lmdbadvancedproject_format_price($monthSpent);
+			$motimecostFormattedValues[] = lmdbadvancedproject_format_price($monthTimeCost);
 			$timeBreakdown['column_totals'][$monthKey] = 0.0;
 		}
 		foreach ($timeBreakdown['rows'] as $rowId => $row) {
@@ -2070,13 +2082,16 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			'projects' => $projects,
 			'mobudget' => $mobudget,
 			'mospent' => $mospent,
+			'motimecost' => $motimecost,
 			'cleanmos' => $cleanmos,
 			'monthAxis' => $monthAxis,
 			'molabels' => $molabels,
 			'mobudgets' => $mobudgets,
 			'mospents' => $mospents,
+			'motimecosts' => $motimecosts,
 			'mobudgetFormattedValues' => $mobudgetFormattedValues,
 			'mospentFormattedValues' => $mospentFormattedValues,
+			'motimecostFormattedValues' => $motimecostFormattedValues,
 			'timeBreakdown' => $timeBreakdown,
 			'totalTimeHours' => $totalTimeHours,
 			'totaltime' => $totaltime,
@@ -2197,6 +2212,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		extract($budgetReportData, EXTR_OVERWRITE);
 		$exportParameters = $budgetReportProjectId > 0 ? array('project_id' => $budgetReportProjectId) : $filters;
 		$exportBaseUrl = dol_buildpath('/lmdbadvancedproject/budgetreportexport.php', 1).'?'.http_build_query($exportParameters);
+		$formBudgetReport = new Form($db);
+		$monthlyChartTooltip = $formBudgetReport->textwithtooltip('', $langs->trans('BudgetReportMonthlyTimeChartHelp'), 2, 1, img_help(1, ''), '', 3);
 
 ?>
 
@@ -2425,7 +2442,14 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 
 <div class="budgetreport-month-section">
-	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByMonth"); ?></div>
+	<div class="budgetreport-month-heading">
+		<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByMonth").' '.$monthlyChartTooltip; ?></div>
+		<div class="budgetreport-month-toggle">
+			<span><?php echo $langs->trans('BudgetReportShowMonthlyTimeSpent'); ?></span>
+			<span id="budgetreport-show-monthly-time" class="valignmiddle inline-block linkobject hideobject" role="button" tabindex="0" aria-label="<?php echo lmdbadvancedproject_escape_html($langs->trans('BudgetReportShowMonthlyTimeSpent')); ?>"><?php echo img_picto($langs->trans('Disabled'), 'switch_off', '', 0, 0, 0, '', '', 2); ?></span>
+			<span id="budgetreport-hide-monthly-time" class="valignmiddle inline-block linkobject" role="button" tabindex="0" aria-label="<?php echo lmdbadvancedproject_escape_html($langs->trans('BudgetReportHideMonthlyTimeSpent')); ?>"><?php echo img_picto($langs->trans('Enabled'), 'switch_on', '', 0, 0, 0, '', '', 2); ?></span>
+		</div>
+	</div>
 	<div class="budgetbarchart">
 	<canvas id="canvas_idgraphmonth"></canvas>
 	</div>
@@ -2434,7 +2458,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	var color = Chart.helpers.color;
 	var monthFormattedValues = [
 		<?php echo json_encode(array_values($mobudgetFormattedValues)); ?>,
-		<?php echo json_encode(array_values($mospentFormattedValues)); ?>
+		<?php echo json_encode(array_values($mospentFormattedValues)); ?>,
+		<?php echo json_encode(array_values($motimecostFormattedValues)); ?>
 	];
 	var month_config = {
 			type: 'bar',
@@ -2453,6 +2478,16 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 					backgroundColor: color(window.chartColors.red).alpha(0).rgbString(),
 					borderColor: window.chartColors.red,
 					borderWidth: 1,
+					},
+					{
+					label: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportTimeSpentByMonth")); ?>,
+					type: 'line',
+					data: <?php echo json_encode(array_values($motimecosts)); ?>,
+					backgroundColor: color(window.chartColors.greeny).alpha(0).rgbString(),
+					borderColor: window.chartColors.greeny,
+					borderDash: [6, 4],
+					borderWidth: 2,
+					pointBackgroundColor: window.chartColors.greeny,
 					}
 					],
 				labels: <?php echo json_encode(array_values($molabels)); ?>,
@@ -2502,7 +2537,30 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		};
 
 	var ctx = document.getElementById("canvas_idgraphmonth").getContext("2d");
-	var chart = new Chart(ctx, month_config);
+	var monthChart = new Chart(ctx, month_config);
+
+	function budgetReportSetMonthlyTimeVisibility(isVisible) {
+		monthChart.getDatasetMeta(2).hidden = !isVisible;
+		monthChart.update();
+		document.getElementById('budgetreport-show-monthly-time').classList.toggle('hideobject', isVisible);
+		document.getElementById('budgetreport-hide-monthly-time').classList.toggle('hideobject', !isVisible);
+	}
+
+	function budgetReportBindMonthlyTimeSwitch(elementId, isVisible) {
+		var element = document.getElementById(elementId);
+		element.addEventListener('click', function() {
+			budgetReportSetMonthlyTimeVisibility(isVisible);
+		});
+		element.addEventListener('keydown', function(event) {
+			if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault();
+				budgetReportSetMonthlyTimeVisibility(isVisible);
+			}
+		});
+	}
+
+	budgetReportBindMonthlyTimeSwitch('budgetreport-show-monthly-time', true);
+	budgetReportBindMonthlyTimeSwitch('budgetreport-hide-monthly-time', false);
 	</script>
 </div>
 

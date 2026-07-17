@@ -305,16 +305,18 @@ class LmdbAdvancedProjectBudgetReportExport
 		$this->setText($sheet, 'G2', $this->outputlangs->transnoentities('Month'));
 		$this->setText($sheet, 'H2', $this->outputlangs->transnoentities('BudgetReportBudget'));
 		$this->setText($sheet, 'I2', $this->outputlangs->transnoentities('BudgetReportSpent'));
+		$this->setText($sheet, 'J2', $this->outputlangs->transnoentities('BudgetReportTimeSpentByMonth'));
 		$row = 3;
 		foreach ($this->data['monthAxis'] as $monthData) {
 			$this->setText($sheet, 'G'.$row, $monthData['label']);
 			$sheet->setCellValue('H'.$row, (float) $monthData['budget']);
 			$sheet->setCellValue('I'.$row, (float) $monthData['spent']);
+			$sheet->setCellValue('J'.$row, (float) $monthData['time_spent']);
 			$row++;
 		}
 		$this->styleHeader($sheet, 'A2:B2');
 		$this->styleHeader($sheet, 'D2:E2');
-		$this->styleHeader($sheet, 'G2:I2');
+		$this->styleHeader($sheet, 'G2:J2');
 		foreach (array('A', 'D', 'G') as $column) {
 			$sheet->getColumnDimension($column)->setWidth(32);
 		}
@@ -350,7 +352,15 @@ class LmdbAdvancedProjectBudgetReportExport
 				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount)),
 				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$I\$3:\$I\$".($monthCount + 2), null, $monthCount))
 			);
-			$chart = new Chart('BudgetReportMonthlyChart', new Title($this->outputlangs->transnoentities('BudgetReportBudgetVsSpentByMonth')), new Legend(Legend::POSITION_TOP, null, false), new PlotArea(null, array($budgetSeries, $spentSeries)));
+			$timeSeries = new DataSeries(
+				DataSeries::TYPE_LINECHART,
+				DataSeries::GROUPING_STANDARD,
+				array(0),
+				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$J\$2", null, 1)),
+				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount)),
+				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$J\$3:\$J\$".($monthCount + 2), null, $monthCount))
+			);
+			$chart = new Chart('BudgetReportMonthlyChart', new Title($this->outputlangs->transnoentities('BudgetReportBudgetVsSpentByMonth')), new Legend(Legend::POSITION_TOP, null, false), new PlotArea(null, array($budgetSeries, $spentSeries, $timeSeries)));
 			$chart->setTopLeftPosition('A28')->setBottomRightPosition('L44');
 			$reportSheet->addChart($chart);
 		}

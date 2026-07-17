@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
+- Add a switchable monthly time-cost series and explanatory tooltip to the budget-versus-spent chart
+- Register project budget report views in the UserNavHistory navigation bar through the native `globalcard` hook context
 - Display total decimal hours next to the time cost in the Spent tile
 - Add ODS and XLSX exports with report, time, and chart-data sheets; XLSX includes three native charts
 - Add the native `budgetreport` project PDF model with vector charts, category summary, and paginated task/month matrices

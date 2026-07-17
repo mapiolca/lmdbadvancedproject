@@ -63,6 +63,8 @@ $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $action = GETPOST('action', 'aZ09');
 
+$hookmanager->initHooks(array('projectbudgetreport', 'projectcard', 'globalcard'));
+
 if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 	accessforbidden();
 }
@@ -84,7 +86,13 @@ restrictedArea($user, 'projet', $object->id, 'projet&project');
 $projectWriteAccess = $object->restrictedProjectArea($user, 'write') > 0;
 $permissionToGenerate = $user->hasRight('projet', 'creer') && $projectWriteAccess;
 
-if ($action === 'generate_budgetreport') {
+$parameters = array('id' => (int) $object->id);
+$reshook = $hookmanager->executeHooks('doActions', $parameters, $object, $action);
+if ($reshook < 0) {
+	setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
+}
+
+if (empty($reshook) && $action === 'generate_budgetreport') {
 	if (!$permissionToGenerate) {
 		accessforbidden();
 	}

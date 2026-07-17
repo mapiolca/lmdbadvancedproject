@@ -8,6 +8,8 @@ The Budget Report page tracks project budgets, time spent on tasks, vendor invoi
 
 The report includes a monthly time matrix by project on the global page and by task on an individual project. The total time cost and total decimal hours are displayed together in the Spent tile.
 
+The monthly budget-versus-spent chart can also overlay the monthly cost of recorded time. A switch controls this third series, and an information tooltip explains that the time cost is already included in total spending.
+
 Reports can be exported as XLSX or ODS. XLSX files contain the report charts, while ODS files contain the same tables and visible chart source data. Individual project reports can also be generated with the native **Project budget report** PDF document model, either from the project document selector or from the Budget report tab.
 
 Spreadsheet exports require the PhpSpreadsheet library bundled with Dolibarr 20 and the PHP `ZipArchive` extension. The module compatibility tab reports the availability of these components.

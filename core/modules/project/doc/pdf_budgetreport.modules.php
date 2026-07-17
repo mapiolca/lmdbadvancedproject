@@ -262,7 +262,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		$chartH = $h - 18;
 		$maximum = 0.0;
 		foreach ($monthAxis as $month) {
-			$maximum = max($maximum, (float) $month['budget'], (float) $month['spent']);
+			$maximum = max($maximum, (float) $month['budget'], (float) $month['spent'], (float) $month['time_spent']);
 		}
 		$maximum = max(1.0, $maximum);
 		$count = count($monthAxis);
@@ -270,6 +270,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		$pdf->SetDrawColor(160, 160, 160);
 		$pdf->Line($chartX, $chartY + $chartH, $chartX + $chartW, $chartY + $chartH);
 		$previous = null;
+		$previousTime = null;
 		$index = 0;
 		foreach ($monthAxis as $month) {
 			$barHeight = ((float) $month['budget'] / $maximum) * $chartH;
@@ -279,12 +280,20 @@ class pdf_budgetreport extends ModelePDFProjects
 			$pointX = $chartX + ($index * $step) + ($step * 0.55);
 			$pointY = $chartY + $chartH - (((float) $month['spent'] / $maximum) * $chartH);
 			if (is_array($previous)) {
-				$pdf->SetDrawColor(192, 80, 77);
+				$pdf->SetLineStyle(array('width' => 0.3, 'dash' => 0, 'color' => array(192, 80, 77)));
 				$pdf->Line($previous[0], $previous[1], $pointX, $pointY);
 			}
 			$pdf->SetFillColor(192, 80, 77);
 			$pdf->Circle($pointX, $pointY, 0.7, 0, 360, 'F');
 			$previous = array($pointX, $pointY);
+			$timePointY = $chartY + $chartH - (((float) $month['time_spent'] / $maximum) * $chartH);
+			if (is_array($previousTime)) {
+				$pdf->SetLineStyle(array('width' => 0.3, 'dash' => '2,1', 'color' => array(75, 172, 198)));
+				$pdf->Line($previousTime[0], $previousTime[1], $pointX, $timePointY);
+			}
+			$pdf->SetFillColor(75, 172, 198);
+			$pdf->Circle($pointX, $timePointY, 0.6, 0, 360, 'F');
+			$previousTime = array($pointX, $timePointY);
 			if ($count <= 12 || $index % (int) ceil($count / 12) === 0) {
 				$pdf->SetFont('', '', 4.5);
 				$pdf->StartTransform();
@@ -294,6 +303,7 @@ class pdf_budgetreport extends ModelePDFProjects
 			}
 			$index++;
 		}
+		$pdf->SetLineStyle(array('width' => 0.2, 'dash' => 0, 'color' => array(0, 0, 0)));
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $data @param Translate $outputlangs @return void */
