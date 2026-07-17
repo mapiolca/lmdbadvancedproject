@@ -9,8 +9,12 @@
 - Apply Dolibarr's `MAIN_MAX_DECIMALS_TOT` precision to displayed hours and spreadsheet total formats
 - Register project budget report views in the UserNavHistory navigation bar through the native `globalcard` hook context
 - Display total decimal hours next to the time cost in the Spent tile
+- Add distinct contributor counts to the project time detail and the expense-report user to its detail table
+- Include total-time and expense-report detail tables in project XLSX, ODS, and PDF outputs
 - Add ODS and XLSX exports with report, time, and chart-data sheets; XLSX includes three native charts
+- Fix Excel workbook repair warnings by grouping monthly line series and correcting cartesian chart axis references in both global and project XLSX exports
 - Add the native `budgetreport` project PDF model with vector charts, category summary, and paginated task/month matrices
+- Improve the project PDF first page with a full-width monthly chart and monetary values in pie-chart legends
 - Add a compatibility settings tab for Dolibarr, PHP, PhpSpreadsheet, ZipArchive, and PDF support
 - Replace report monetary rounding with Dolibarr `price2num(..., 'MT')` and native `price()` formatting
 

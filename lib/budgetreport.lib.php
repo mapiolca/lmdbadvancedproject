@@ -4,6 +4,7 @@ require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/task.class.php';
 require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
 
 if (!function_exists('lmdbadvancedproject_round_amount')) {
 	/**
@@ -853,6 +854,7 @@ if (!function_exists('lmdbadvancedproject_init_forecast')) {
 			'time' => array(
 				'hours' => 0,
 				'cost' => 0,
+				'contributors' => 0,
 				'lines' => array(),
 			),
 			'expenses' => array(
@@ -1052,7 +1054,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			$db->free($resql);
 		}
 
-		$sql = "SELECT pt.rowid AS task_id, pt.ref AS task_ref, pt.label AS task_label,
+		$sql = "SELECT pt.rowid AS task_id, pt.ref AS task_ref, pt.label AS task_label, ptt.fk_user AS contributor_user_id,
 				SUM(ptt.element_duration) / 3600.0 AS total_hours,
 				SUM((ptt.element_duration / 3600.0) * CASE
 				WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
@@ -1063,39 +1065,70 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 			LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
 			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.fk_projet = ".$projectId." AND pt.entity IN (".$projectEntities.")
-			GROUP BY pt.rowid, pt.ref, pt.label
-			ORDER BY pt.ref ASC, pt.label ASC";
+			GROUP BY pt.rowid, pt.ref, pt.label, ptt.fk_user
+			ORDER BY pt.ref ASC, pt.label ASC, ptt.fk_user ASC";
 		$resql = $db->query($sql);
 		if ($resql) {
+			$timeLineIndexes = array();
+			$projectContributors = array();
 			while ($obj = $db->fetch_object($resql)) {
+				$taskId = empty($obj->task_id) ? 0 : (int) $obj->task_id;
 				$hours = empty($obj->total_hours) ? 0 : (float) $obj->total_hours;
 				$cost = empty($obj->total_cost) ? 0 : (float) $obj->total_cost;
+				$contributorUserId = empty($obj->contributor_user_id) ? 0 : (int) $obj->contributor_user_id;
 				$forecast['time']['hours'] += $hours;
 				$forecast['time']['cost'] += $cost;
-				$forecast['time']['lines'][] = array(
-					'task_id' => empty($obj->task_id) ? 0 : (int) $obj->task_id,
-					'task_ref' => empty($obj->task_ref) ? '' : (string) $obj->task_ref,
-					'task_label' => empty($obj->task_label) ? '' : (string) $obj->task_label,
-					'hours' => $hours,
-					'cost' => $cost,
-				);
+				if (!isset($timeLineIndexes[$taskId])) {
+					$timeLineIndexes[$taskId] = count($forecast['time']['lines']);
+					$forecast['time']['lines'][] = array(
+						'task_id' => $taskId,
+						'task_ref' => empty($obj->task_ref) ? '' : (string) $obj->task_ref,
+						'task_label' => empty($obj->task_label) ? '' : (string) $obj->task_label,
+						'contributors' => 0,
+						'contributor_ids' => array(),
+						'hours' => 0.0,
+						'cost' => 0.0,
+					);
+				}
+				$lineIndex = $timeLineIndexes[$taskId];
+				$forecast['time']['lines'][$lineIndex]['hours'] += $hours;
+				$forecast['time']['lines'][$lineIndex]['cost'] += $cost;
+				if ($contributorUserId > 0) {
+					$forecast['time']['lines'][$lineIndex]['contributor_ids'][$contributorUserId] = true;
+					$projectContributors[$contributorUserId] = true;
+				}
 			}
 			$db->free($resql);
+			foreach ($forecast['time']['lines'] as $lineIndex => $timeLine) {
+				$forecast['time']['lines'][$lineIndex]['contributors'] = count($timeLine['contributor_ids']);
+				unset($forecast['time']['lines'][$lineIndex]['contributor_ids']);
+			}
+			$forecast['time']['contributors'] = count($projectContributors);
 		}
 
-		$sql = "SELECT ex.rowid AS expense_id, ex.ref, ed.date, ed.comments, ed.total_ht
+		$sql = "SELECT ex.rowid AS expense_id, ex.ref, ex.fk_user_author AS user_id, eu.firstname AS user_firstname, eu.lastname AS user_lastname, eu.login AS user_login, ed.date, ed.comments, ed.total_ht
 			FROM ".MAIN_DB_PREFIX."expensereport_det ed
 			LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
+			LEFT JOIN ".MAIN_DB_PREFIX."user eu ON eu.rowid = ex.fk_user_author
 			WHERE ed.fk_projet = ".$projectId." AND ex.fk_user_approve > 0 AND ex.entity IN (".$expenseReportEntities.")
 			ORDER BY ed.date ASC, ex.ref ASC";
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
 				$amount = empty($obj->total_ht) ? 0 : (float) $obj->total_ht;
+				$userName = dolGetFirstLastname(empty($obj->user_firstname) ? '' : $obj->user_firstname, empty($obj->user_lastname) ? '' : $obj->user_lastname);
+				if ($userName === '') {
+					$userName = empty($obj->user_login) ? '' : (string) $obj->user_login;
+				}
 				$forecast['expenses']['total'] += $amount;
 				$forecast['expenses']['lines'][] = array(
 					'id' => empty($obj->expense_id) ? 0 : (int) $obj->expense_id,
 					'ref' => empty($obj->ref) ? '' : (string) $obj->ref,
+					'user_id' => empty($obj->user_id) ? 0 : (int) $obj->user_id,
+					'user_name' => $userName,
+					'user_firstname' => empty($obj->user_firstname) ? '' : (string) $obj->user_firstname,
+					'user_lastname' => empty($obj->user_lastname) ? '' : (string) $obj->user_lastname,
+					'user_login' => empty($obj->user_login) ? '' : (string) $obj->user_login,
 					'date' => empty($obj->date) ? '' : (string) $obj->date,
 					'comment' => empty($obj->comments) ? '' : (string) $obj->comments,
 					'amount' => $amount,
@@ -1425,6 +1458,34 @@ if (!function_exists('lmdbadvancedproject_get_expense_report_nom_url')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_get_user_nom_url')) {
+	/**
+	 * Return the native Dolibarr rendering for a linked user.
+	 *
+	 * @param array<string,mixed> $line Expense detail line
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_user_nom_url($line)
+	{
+		global $db;
+
+		$userId = empty($line['user_id']) ? 0 : (int) $line['user_id'];
+		if ($userId <= 0) {
+			return '';
+		}
+		if (empty($line['user_name']) && empty($line['user_login'])) {
+			return '<span class="opacitymedium">#'.$userId.'</span>';
+		}
+		$userstatic = new User($db);
+		$userstatic->id = $userId;
+		$userstatic->firstname = empty($line['user_firstname']) ? '' : (string) $line['user_firstname'];
+		$userstatic->lastname = empty($line['user_lastname']) ? '' : (string) $line['user_lastname'];
+		$userstatic->login = empty($line['user_login']) ? '' : (string) $line['user_login'];
+
+		return $userstatic->getNomUrl(-1);
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 	/**
 	 * Print project forecast table.
@@ -1483,34 +1544,36 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
 		print '<div class="budgetreport-table-scroll">';
 		print '<table class="budgettbl budgetreport-extra-subtable">';
-		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Task').'</th><th class="budgetreport-extra-task-label-col">'.$langs->trans('Label').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportTimeSpentHours').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportSpent').'</th></tr>';
+		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Task').'</th><th class="budgetreport-extra-task-label-col">'.$langs->trans('Label').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportContributorCount').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportTimeSpentHours').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportSpent').'</th></tr>';
 		foreach ($forecast['time']['lines'] as $line) {
 			$taskLabelParts = lmdbadvancedproject_truncated_text_parts(empty($line['task_label']) ? '' : $line['task_label'], 50);
 			print '<tr>';
 			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_get_task_nom_url($line).'</td>';
 			print '<td class="budgetreport-extra-task-label-col"><span class="budgetreport-extra-task-label-truncate" title="'.$taskLabelParts['full'].'">'.$taskLabelParts['short'].'</span></td>';
+			print '<td class="budgetreport-extra-compact-col" align="right">'.((int) $line['contributors']).'</td>';
 			print '<td class="budgetreport-extra-compact-col" align="right">'.lmdbadvancedproject_format_hours($line['hours']).'</td>';
 			print '<td class="budgetreport-extra-compact-col" align="right">'.lmdbadvancedproject_format_price($line['cost']).'</td>';
 			print '</tr>';
 		}
-		print '<tr><td colspan="2"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_hours($forecast['time']['hours']).'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</b></td></tr>';
+		print '<tr><td colspan="2"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.((int) $forecast['time']['contributors']).'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_hours($forecast['time']['hours']).'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['time']['cost']).'</b></td></tr>';
 		print '</table>';
 		print '</div>';
 
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportExpenseReportDetails').'</div>';
 		print '<div class="budgetreport-table-scroll">';
 		print '<table class="budgettbl budgetreport-extra-subtable">';
-		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Date').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('Ref').'</th><th class="budgetreport-extra-expense-comment-col">'.$langs->trans('BudgetReportExpenseComment').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('AmountHTShort').'</th></tr>';
+		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Date').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('Ref').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('User').'</th><th class="budgetreport-extra-expense-comment-col">'.$langs->trans('BudgetReportExpenseComment').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('AmountHTShort').'</th></tr>';
 		foreach ($forecast['expenses']['lines'] as $line) {
 			$expenseCommentParts = lmdbadvancedproject_truncated_text_parts(empty($line['comment']) ? '' : $line['comment'], 75);
 			print '<tr>';
 			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_format_date($line['date']).'</td>';
 			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_get_expense_report_nom_url($line).'</td>';
+			print '<td class="budgetreport-extra-compact-col">'.lmdbadvancedproject_get_user_nom_url($line).'</td>';
 			print '<td class="budgetreport-extra-expense-comment-col"><span class="budgetreport-extra-expense-comment-truncate" title="'.$expenseCommentParts['full'].'">'.$expenseCommentParts['short'].'</span></td>';
 			print '<td class="budgetreport-extra-compact-col" align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
 			print '</tr>';
 		}
-		print '<tr><td colspan="3"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['expenses']['total']).'</b></td></tr>';
+		print '<tr><td colspan="4"><b>'.$langs->trans('BudgetReportTotal').'</b></td><td class="budgetreport-extra-compact-col" align="right"><b>'.lmdbadvancedproject_format_price($forecast['expenses']['total']).'</b></td></tr>';
 		print '</table>';
 		print '</div>';
 		print '</div>';

@@ -57,14 +57,146 @@ class LmdbAdvancedProjectBudgetReportExport
 		$format = strtolower((string) $format);
 		$withCharts = $format === 'xlsx';
 		$spreadsheet = $this->buildSpreadsheet($withCharts);
-		if ($withCharts) {
-			$writer = new Xlsx($spreadsheet);
-			$writer->setIncludeCharts(true);
-		} else {
-			$writer = new Ods($spreadsheet);
+		try {
+			if ($withCharts) {
+				$writer = new Xlsx($spreadsheet);
+				$writer->setIncludeCharts(true);
+				$this->outputCompatibleXlsx($writer);
+			} else {
+				$writer = new Ods($spreadsheet);
+				$writer->save('php://output');
+			}
+		} finally {
+			$spreadsheet->disconnectWorksheets();
 		}
-		$writer->save('php://output');
-		$spreadsheet->disconnectWorksheets();
+	}
+
+	/**
+	 * Write the XLSX to a temporary file and fix invalid chart axis references
+	 * produced by the PhpSpreadsheet version bundled with older Dolibarr releases.
+	 *
+	 * @param Xlsx $writer XLSX writer
+	 * @return void
+	 */
+	private function outputCompatibleXlsx($writer)
+	{
+		$temporaryFile = tempnam(sys_get_temp_dir(), 'lmdb_budget_report_');
+		if ($temporaryFile === false) {
+			throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+		}
+
+		try {
+			$writer->save($temporaryFile);
+			$this->repairXlsxChartAxes($temporaryFile);
+			$stream = fopen($temporaryFile, 'rb');
+			if ($stream === false) {
+				throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+			}
+			try {
+				fpassthru($stream);
+			} finally {
+				fclose($stream);
+			}
+		} finally {
+			@unlink($temporaryFile);
+		}
+	}
+
+	/**
+	 * Make each cartesian chart axis reference its counterpart.
+	 *
+	 * PhpSpreadsheet bundled with some supported Dolibarr versions writes the
+	 * value-axis cross reference with its own identifier. Excel then removes the
+	 * complete drawing during workbook repair. Pie charts have no axes and remain
+	 * unchanged.
+	 *
+	 * @param string $filename XLSX temporary file
+	 * @return void
+	 */
+	private function repairXlsxChartAxes($filename)
+	{
+		$zip = new ZipArchive();
+		if ($zip->open($filename) !== true) {
+			throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+		}
+
+		try {
+			for ($index = 0; $index < $zip->numFiles; $index++) {
+				$entryName = $zip->getNameIndex($index);
+				if (!is_string($entryName) || !preg_match('~^xl/charts/chart[0-9]+\\.xml$~', $entryName)) {
+					continue;
+				}
+				$xml = $zip->getFromName($entryName);
+				if (!is_string($xml) || $xml === '') {
+					continue;
+				}
+
+				$document = new DOMDocument();
+				$previousInternalErrors = libxml_use_internal_errors(true);
+				$loaded = $document->loadXML($xml, LIBXML_NONET);
+				libxml_clear_errors();
+				libxml_use_internal_errors($previousInternalErrors);
+				if (!$loaded) {
+					throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+				}
+
+				$xpath = new DOMXPath($document);
+				$xpath->registerNamespace('c', 'http://schemas.openxmlformats.org/drawingml/2006/chart');
+				$categoryAxes = $xpath->query('//c:plotArea/c:catAx');
+				$valueAxes = $xpath->query('//c:plotArea/c:valAx');
+				if ($categoryAxes === false || $valueAxes === false) {
+					throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+				}
+
+				$modified = false;
+				$axisPairCount = min($categoryAxes->length, $valueAxes->length);
+				for ($axisIndex = 0; $axisIndex < $axisPairCount; $axisIndex++) {
+					$categoryAxis = $categoryAxes->item($axisIndex);
+					$valueAxis = $valueAxes->item($axisIndex);
+					if (!$categoryAxis instanceof DOMElement || !$valueAxis instanceof DOMElement) {
+						continue;
+					}
+					$categoryId = $this->getChartAxisId($xpath, $categoryAxis);
+					$valueId = $this->getChartAxisId($xpath, $valueAxis);
+					if ($categoryId === '' || $valueId === '') {
+						continue;
+					}
+					$modified = $this->setChartAxisCrossReference($xpath, $categoryAxis, $valueId) || $modified;
+					$modified = $this->setChartAxisCrossReference($xpath, $valueAxis, $categoryId) || $modified;
+				}
+
+				if ($modified) {
+					$normalizedXml = $document->saveXML();
+					if (!is_string($normalizedXml) || !$zip->addFromString($entryName, $normalizedXml)) {
+						throw new RuntimeException($this->outputlangs->transnoentities('BudgetReportExportGenerationFailed'));
+					}
+				}
+			}
+		} finally {
+			$zip->close();
+		}
+	}
+
+	/** @param DOMXPath $xpath @param DOMElement $axis @return string */
+	private function getChartAxisId($xpath, $axis)
+	{
+		$nodes = $xpath->query('./c:axId', $axis);
+		$node = $nodes === false ? null : $nodes->item(0);
+
+		return $node instanceof DOMElement ? (string) $node->getAttribute('val') : '';
+	}
+
+	/** @param DOMXPath $xpath @param DOMElement $axis @param string $crossAxisId @return bool */
+	private function setChartAxisCrossReference($xpath, $axis, $crossAxisId)
+	{
+		$nodes = $xpath->query('./c:crossAx', $axis);
+		$node = $nodes === false ? null : $nodes->item(0);
+		if (!$node instanceof DOMElement || $node->getAttribute('val') === $crossAxisId) {
+			return false;
+		}
+		$node->setAttribute('val', $crossAxisId);
+
+		return true;
 	}
 
 	/**
@@ -220,6 +352,7 @@ class LmdbAdvancedProjectBudgetReportExport
 	/** @param mixed $sheet @param int $row @param string $currencyFormat @return void */
 	private function writeProjectSummary($sheet, $row, $currencyFormat)
 	{
+		$numberFormat = $this->getTotalNumberFormat();
 		$headers = array('LMDB_CommercialCategoryExtrafield', 'BudgetReportOrderAmount', 'BudgetReportOrderBudget', 'BudgetReportSupplierExpenses', 'BudgetReportForecastGap');
 		$this->writeHeaderRow($sheet, $row, $headers);
 		$row++;
@@ -234,6 +367,63 @@ class LmdbAdvancedProjectBudgetReportExport
 			}
 			$row++;
 		}
+
+		$row++;
+		$this->writeSectionTitle($sheet, $row, 'BudgetReportTimeSpentTotal', 'E');
+		$row++;
+		$this->writeHeaderRow($sheet, $row, array('Task', 'Label', 'BudgetReportContributorCount', 'BudgetReportTimeSpentHours', 'BudgetReportSpent'));
+		$row++;
+		foreach ($forecast['time']['lines'] as $line) {
+			$this->setText($sheet, 'A'.$row, $line['task_ref']);
+			$this->setText($sheet, 'B'.$row, $line['task_label']);
+			$sheet->setCellValue('C'.$row, (int) $line['contributors']);
+			$sheet->setCellValue('D'.$row, (float) $line['hours']);
+			$sheet->getStyle('D'.$row)->getNumberFormat()->setFormatCode($numberFormat);
+			$sheet->setCellValue('E'.$row, (float) $line['cost']);
+			$sheet->getStyle('E'.$row)->getNumberFormat()->setFormatCode($currencyFormat);
+			$row++;
+		}
+		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportTotal'));
+		$sheet->mergeCells('A'.$row.':B'.$row);
+		$sheet->setCellValue('C'.$row, (int) $forecast['time']['contributors']);
+		$sheet->setCellValue('D'.$row, (float) $forecast['time']['hours']);
+		$sheet->getStyle('D'.$row)->getNumberFormat()->setFormatCode($numberFormat);
+		$sheet->setCellValue('E'.$row, (float) $forecast['time']['cost']);
+		$sheet->getStyle('E'.$row)->getNumberFormat()->setFormatCode($currencyFormat);
+		$sheet->getStyle('A'.$row.':E'.$row)->getFont()->setBold(true);
+
+		$row += 2;
+		$this->writeSectionTitle($sheet, $row, 'BudgetReportExpenseReportDetails', 'E');
+		$row++;
+		$this->writeHeaderRow($sheet, $row, array('Date', 'Ref', 'User', 'BudgetReportExpenseComment', 'AmountHTShort'));
+		$row++;
+		foreach ($forecast['expenses']['lines'] as $line) {
+			$date = empty($line['date']) ? '' : dol_print_date(strtotime($line['date']), 'day', false, $this->outputlangs);
+			$this->setText($sheet, 'A'.$row, $date);
+			$this->setText($sheet, 'B'.$row, $line['ref']);
+			$this->setText($sheet, 'C'.$row, $line['user_name']);
+			$this->setText($sheet, 'D'.$row, $line['comment']);
+			$sheet->setCellValue('E'.$row, (float) $line['amount']);
+			$sheet->getStyle('E'.$row)->getNumberFormat()->setFormatCode($currencyFormat);
+			$row++;
+		}
+		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportTotal'));
+		$sheet->mergeCells('A'.$row.':D'.$row);
+		$sheet->setCellValue('E'.$row, (float) $forecast['expenses']['total']);
+		$sheet->getStyle('E'.$row)->getNumberFormat()->setFormatCode($currencyFormat);
+		$sheet->getStyle('A'.$row.':E'.$row)->getFont()->setBold(true);
+		$sheet->getColumnDimension('B')->setWidth(30);
+		$sheet->getColumnDimension('C')->setWidth(24);
+		$sheet->getColumnDimension('D')->setWidth(55);
+		$sheet->getColumnDimension('E')->setWidth(20);
+	}
+
+	/** @param mixed $sheet @param int $row @param string $translationKey @param string $lastColumn @return void */
+	private function writeSectionTitle($sheet, $row, $translationKey, $lastColumn)
+	{
+		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities($translationKey));
+		$sheet->mergeCells('A'.$row.':'.$lastColumn.$row);
+		$sheet->getStyle('A'.$row.':'.$lastColumn.$row)->getFont()->setBold(true)->setSize(12);
 	}
 
 	/** @param mixed $sheet @return void */
@@ -375,23 +565,24 @@ class LmdbAdvancedProjectBudgetReportExport
 				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount)),
 				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$H\$3:\$H\$".($monthCount + 2), null, $monthCount))
 			);
-			$spentSeries = new DataSeries(
+			$lineSeries = new DataSeries(
 				DataSeries::TYPE_LINECHART,
 				DataSeries::GROUPING_STANDARD,
-				array(0),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$I\$2", null, 1)),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount)),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$I\$3:\$I\$".($monthCount + 2), null, $monthCount))
+				array(0, 1),
+				array(
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$I\$2", null, 1),
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$J\$2", null, 1),
+				),
+				array(
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount),
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount),
+				),
+				array(
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$I\$3:\$I\$".($monthCount + 2), null, $monthCount),
+					new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$J\$3:\$J\$".($monthCount + 2), null, $monthCount),
+				)
 			);
-			$timeSeries = new DataSeries(
-				DataSeries::TYPE_LINECHART,
-				DataSeries::GROUPING_STANDARD,
-				array(0),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$J\$2", null, 1)),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$G\$3:\$G\$".($monthCount + 2), null, $monthCount)),
-				array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_NUMBER, "'".$sheetName."'!\$J\$3:\$J\$".($monthCount + 2), null, $monthCount))
-			);
-			$chart = new Chart('BudgetReportMonthlyChart', new Title($this->outputlangs->transnoentities('BudgetReportBudgetVsSpentByMonth')), new Legend(Legend::POSITION_TOP, null, false), new PlotArea(null, array($budgetSeries, $spentSeries, $timeSeries)));
+			$chart = new Chart('BudgetReportMonthlyChart', new Title($this->outputlangs->transnoentities('BudgetReportBudgetVsSpentByMonth')), new Legend(Legend::POSITION_TOP, null, false), new PlotArea(null, array($budgetSeries, $lineSeries)));
 			$chart->setTopLeftPosition('A28')->setBottomRightPosition('L44');
 			$reportSheet->addChart($chart);
 		}
