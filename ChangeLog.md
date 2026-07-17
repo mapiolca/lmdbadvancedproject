@@ -1,6 +1,6 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## Unreleased
+## 1.3.0
 
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
 - Add a monthly recorded-hours series on a secondary axis with 10% rounded headroom, Chart.js legacy/modern compatibility, legend toggling, and an explanatory tooltip

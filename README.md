@@ -1,5 +1,7 @@
 # ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+Current version: **1.3.0**
+
 ## Features
 
 Advanced Project extends project budget analysis in Dolibarr.
