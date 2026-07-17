@@ -267,7 +267,7 @@ class pdf_budgetreport extends ModelePDFProjects
 			$hoursMaximum = max($hoursMaximum, (float) $month['time_hours']);
 		}
 		$amountMaximum = max(1.0, $amountMaximum);
-		$hoursMaximum = max(1.0, $hoursMaximum);
+		$hoursMaximum = max(1.0, ceil($hoursMaximum * 1.1));
 		$count = count($monthAxis);
 		$step = $chartW / $count;
 		$pdf->SetDrawColor(160, 160, 160);

@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
-- Add a monthly recorded-hours series on a secondary axis with legend toggling and an explanatory tooltip
+- Add a monthly recorded-hours series on a secondary axis with 10% rounded headroom, legend toggling, and an explanatory tooltip
 - Register project budget report views in the UserNavHistory navigation bar through the native `globalcard` hook context
 - Display total decimal hours next to the time cost in the Spent tile
 - Add ODS and XLSX exports with report, time, and chart-data sheets; XLSX includes three native charts

@@ -2002,6 +2002,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$motimehourFormattedValues[] = lmdbadvancedproject_format_hours($monthTimeHours, true);
 			$timeBreakdown['column_totals'][$monthKey] = 0.0;
 		}
+		$motimehourAxisMaximum = empty($motimehourvalues) ? 1.0 : max(1.0, ceil(max($motimehourvalues) * 1.1));
 		foreach ($timeBreakdown['rows'] as $rowId => $row) {
 			foreach ($monthAxis as $monthKey => $monthData) {
 				$hours = isset($row['months'][$monthKey]) ? (float) $row['months'][$monthKey] : 0.0;
@@ -2089,6 +2090,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			'mobudgets' => $mobudgets,
 			'mospents' => $mospents,
 			'motimehourvalues' => $motimehourvalues,
+			'motimehourAxisMaximum' => $motimehourAxisMaximum,
 			'mobudgetFormattedValues' => $mobudgetFormattedValues,
 			'mospentFormattedValues' => $mospentFormattedValues,
 			'motimehourFormattedValues' => $motimehourFormattedValues,
@@ -2535,7 +2537,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 							drawOnChartArea: false
 						},
 						ticks: {
-							beginAtZero: true
+							beginAtZero: true,
+							max: <?php echo json_encode($motimehourAxisMaximum); ?>
 						},
 						scaleLabel: {
 							display: true,
