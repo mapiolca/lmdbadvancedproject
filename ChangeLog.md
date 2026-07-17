@@ -4,7 +4,8 @@
 
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
 - Add a monthly recorded-hours series on a secondary axis with 10% rounded headroom, Chart.js legacy/modern compatibility, legend toggling, and an explanatory tooltip
-- Keep wide budget-report charts and tables horizontally scrollable while the monthly chart retains both visible vertical axes
+- Keep wide budget-report charts and tables horizontally scrollable without widening the Dolibarr page, while the monthly chart retains both visible vertical axes
+- Add a stylesheet revision to invalidate stale browser caches after report layout updates
 - Apply Dolibarr's `MAIN_MAX_DECIMALS_TOT` precision to displayed hours and spreadsheet total formats
 - Register project budget report views in the UserNavHistory navigation bar through the native `globalcard` hook context
 - Display total decimal hours next to the time cost in the Spent tile

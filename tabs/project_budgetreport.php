@@ -107,7 +107,8 @@ if (empty($reshook) && $action === 'generate_budgetreport') {
 }
 
 $title = $langs->trans('BudgetReportProjectTab').' - '.$object->ref.' '.$object->title;
-llxHeader('', $title);
+$budgetReportCss = array('/lmdbadvancedproject/css/budgetreport.css.php?revision='.(string) filemtime(dirname(__DIR__).'/css/budgetreport.css.php'));
+llxHeader('', $title, '', '', 0, 0, '', $budgetReportCss);
 
 $head = project_prepare_head($object);
 print dol_get_fiche_head($head, 'budgetreport', $langs->trans('Project'), -1, ($object->public ? 'projectpub' : 'project'));
@@ -129,7 +130,7 @@ $morehtmlref .= '</div>';
 
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 
-print '<div class="fichecenter">';
+print '<div class="fichecenter budgetreport-page">';
 lmdbadvancedproject_render_project_budget_report((int) $object->id, $permissionToGenerate);
 print '</div>';
 

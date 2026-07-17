@@ -205,9 +205,27 @@ div.mainmenu.budgetreport {
 .budgetreport-summary-fullwidth,
 .budgetreport-report,
 .budgetreport-month-section,
-.budgetreport-table-section {
+.budgetreport-table-section,
+.budgetreport-time-section {
 	clear: both;
 	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.budgetreport-page,
+.budgetreport-page-inner {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow-x: hidden;
+}
+
+.budgetreport-report {
+	overflow-x: hidden;
 }
 
 .budgetreport-filters {
@@ -362,6 +380,9 @@ div.mainmenu.budgetreport {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 32px;
 	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
 	align-items: start;
 }
 
@@ -393,9 +414,13 @@ div.mainmenu.budgetreport {
 .budgetreport-chart-scroll,
 .budgetreport-table-scroll,
 .budgetreport-time-scroll {
+	display: block;
 	width: 100%;
+	min-width: 0;
 	max-width: 100%;
+	box-sizing: border-box;
 	overflow-x: auto;
+	overflow-y: hidden;
 	-webkit-overflow-scrolling: touch;
 }
 
@@ -432,7 +457,9 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-table-scroll > .budgettbl {
-	min-width: max-content;
+	width: max-content;
+	min-width: 100%;
+	max-width: none;
 }
 
 .budgettbl th{
@@ -550,7 +577,9 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-time-table {
-	min-width: max-content;
+	width: max-content;
+	min-width: 100%;
+	max-width: none;
 }
 
 .budgetreport-time-table th,

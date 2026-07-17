@@ -99,14 +99,15 @@ $form = new Form($db);
 $formfile = new FormFile($db);
 $title = $langs->trans("BudgetReportArea");
 $help_url = '';
+$budgetReportCss = array('/lmdbadvancedproject/css/budgetreport.css.php?revision='.(string) filemtime(__DIR__.'/css/budgetreport.css.php'));
 
-llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'bodyforlist mod-order page-list');
+llxHeader('', $title, $help_url, '', 0, 0, '', $budgetReportCss, '', 'bodyforlist mod-order page-list');
 
 print_barre_liste($title, 0, $_SERVER["PHP_SELF"], '', '', '', '', 0, 0, 'fa-chart-pie', 0, '', '', 0, 1, 1);
 
 ?>
-<div class="fichecenter">
-<div >
+<div class="fichecenter budgetreport-page">
+<div class="budgetreport-page-inner">
 
 
 <?php
@@ -117,6 +118,9 @@ lmdbadvancedproject_render_global_budget_report($budgetReportFilters);
 <div class="tabBar" style='clear:both;'>
 <div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>
 <div class="warning"><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></div>
+</div>
+
+</div>
 </div>
 
 <?php
