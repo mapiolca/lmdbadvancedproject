@@ -18,6 +18,7 @@ BudgetReportExportGenerationFailed=Spreadsheet file generation failed.
 BudgetReportGeneratePdf=Generate PDF report
 BudgetReportPdfModelDescription=Project budget report
 BudgetReportPdfTitle=Project budget report
+BudgetReportPdfDocumentName=Budget Report
 Compatibility=Compatibility
 BudgetReportSpreadsheetExportFeature=ODS and XLSX exports
 BudgetReportSpreadsheetExportFeatureDescription=Tabular budget report exports, with native charts in XLSX.

@@ -18,6 +18,7 @@ BudgetReportExportGenerationFailed=No se pudo generar el archivo de hoja de cál
 BudgetReportGeneratePdf=Generar informe PDF
 BudgetReportPdfModelDescription=Informe presupuestario del proyecto
 BudgetReportPdfTitle=Informe presupuestario del proyecto
+BudgetReportPdfDocumentName=Informe Presupuestario
 Compatibility=Compatibilidad
 BudgetReportSpreadsheetExportFeature=Exportaciones ODS y XLSX
 BudgetReportSpreadsheetExportFeatureDescription=Exportaciones tabulares del informe presupuestario, con gráficos nativos en XLSX.

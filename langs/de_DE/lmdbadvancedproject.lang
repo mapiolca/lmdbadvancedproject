@@ -18,6 +18,7 @@ BudgetReportExportGenerationFailed=Die Tabellendatei konnte nicht erstellt werde
 BudgetReportGeneratePdf=PDF-Bericht erstellen
 BudgetReportPdfModelDescription=Budgetbericht des Projekts
 BudgetReportPdfTitle=Budgetbericht des Projekts
+BudgetReportPdfDocumentName=Budgetbericht
 Compatibility=Kompatibilität
 BudgetReportSpreadsheetExportFeature=ODS- und XLSX-Exporte
 BudgetReportSpreadsheetExportFeatureDescription=Tabellarische Exporte des Budgetberichts mit nativen Diagrammen in XLSX.

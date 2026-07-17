@@ -18,6 +18,7 @@ BudgetReportExportGenerationFailed=Impossibile generare il file del foglio di ca
 BudgetReportGeneratePdf=Genera rapporto PDF
 BudgetReportPdfModelDescription=Rapporto di budget del progetto
 BudgetReportPdfTitle=Rapporto di budget del progetto
+BudgetReportPdfDocumentName=Rapporto di Budget
 Compatibility=Compatibilità
 BudgetReportSpreadsheetExportFeature=Esportazioni ODS e XLSX
 BudgetReportSpreadsheetExportFeatureDescription=Esportazioni tabellari del rapporto di budget, con grafici nativi nel file XLSX.

@@ -92,7 +92,7 @@ class pdf_budgetreport extends ModelePDFProjects
 
 		$objectref = dol_sanitizeFileName($object->ref);
 		$dir = $conf->project->multidir_output[$object->entity].'/'.$objectref;
-		$file = $dir.'/'.$objectref.'_budgetreport.pdf';
+		$file = $dir.'/'.lmdbadvancedproject_budget_report_filename($object->ref, $outputlangs);
 		if (dol_mkdir($dir) < 0) {
 			$this->error = $langs->transnoentities('ErrorCanNotCreateDir', $dir);
 			return -1;
@@ -120,7 +120,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		$pdf->SetAutoPageBreak(true, $this->footerHeight);
 		$pdf->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
 		$pdf->SetFont(pdf_getPDFFont($outputlangs));
-		$pdf->SetTitle($outputlangs->convToOutputCharset($outputlangs->transnoentities('BudgetReportArea').' '.$object->ref));
+		$pdf->SetTitle($outputlangs->convToOutputCharset(lmdbadvancedproject_budget_report_document_title($object->ref, $outputlangs)));
 		$pdf->SetSubject($outputlangs->transnoentities('BudgetReportPdfModelDescription'));
 		$pdf->SetCreator('Dolibarr '.DOL_VERSION);
 		$pdf->SetAuthor($outputlangs->convToOutputCharset($user->getFullName($outputlangs)));
@@ -198,9 +198,17 @@ class pdf_budgetreport extends ModelePDFProjects
 			$outputlangs->transnoentities('BudgetReportTimeSpentTotal').': '.lmdbadvancedproject_format_price($data['totaltime'], $outputlangs).' · '.lmdbadvancedproject_format_hours($data['totalTimeHours'], true, $outputlangs)
 		), 0, 'L');
 
+		$budgetLabels = $data['labels'];
+		if (!empty($data['budgetReportProjectId']) && !empty($data['budgetReportForecast']['categories'])) {
+			$budgetLabels = array();
+			foreach ($data['budgetReportForecast']['categories'] as $categoryKey => $category) {
+				$budgetLabels[] = lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $outputlangs);
+			}
+		}
+
 		$chartGap = 4.0;
 		$pieWidth = ($usable - $chartGap) / 2;
-		$this->drawPie($pdf, $left, 64, $pieWidth, 54, $data['labels'], $data['budgets'], $outputlangs->transnoentities($data['budgetChartTitleKey']), $outputlangs);
+		$this->drawPie($pdf, $left, 64, $pieWidth, 54, $budgetLabels, $data['budgets'], $outputlangs->transnoentities($data['budgetChartTitleKey']), $outputlangs);
 		$this->drawPie($pdf, $left + $pieWidth + $chartGap, 64, $pieWidth, 54, $data['spentLabels'], $data['spentValues'], $outputlangs->transnoentities('BudgetReportBudgetVsSpent'), $outputlangs);
 
 		$monthlyChartY = 121.0;
@@ -334,12 +342,12 @@ class pdf_budgetreport extends ModelePDFProjects
 			$pdf->MultiCell(array_sum($widths), 6, $outputlangs->transnoentities('NoRecordFound'), 1, 'L');
 			return;
 		}
-		foreach ($forecast['categories'] as $category) {
+		foreach ($forecast['categories'] as $categoryKey => $category) {
 			if ($pdf->GetY() > $this->page_hauteur - $this->footerHeight - 16) {
 				$this->addPage($pdf, $object, $outputlangs, true);
 				$this->drawTableHeader($pdf, $headers, $widths, $outputlangs);
 			}
-			$values = array($category['label'], lmdbadvancedproject_format_price($category['order_amount'], $outputlangs), lmdbadvancedproject_format_price($category['order_budget'], $outputlangs), lmdbadvancedproject_format_price($category['supplier_expenses'], $outputlangs), lmdbadvancedproject_format_price($category['forecast_gap'], $outputlangs));
+			$values = array(lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $outputlangs), lmdbadvancedproject_format_price($category['order_amount'], $outputlangs), lmdbadvancedproject_format_price($category['order_budget'], $outputlangs), lmdbadvancedproject_format_price($category['supplier_expenses'], $outputlangs), lmdbadvancedproject_format_price($category['forecast_gap'], $outputlangs));
 			$this->drawTableRow($pdf, $values, $widths, $outputlangs);
 		}
 	}

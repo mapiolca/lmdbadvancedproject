@@ -62,6 +62,40 @@ if (!function_exists('lmdbadvancedproject_format_hours')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_budget_report_document_title')) {
+	/**
+	 * Return the localized project budget report document title.
+	 *
+	 * @param string         $projectRef Project reference
+	 * @param Translate|null $outputlangs Output language
+	 * @return string
+	 */
+	function lmdbadvancedproject_budget_report_document_title($projectRef, $outputlangs = null)
+	{
+		global $langs;
+
+		if (!is_object($outputlangs)) {
+			$outputlangs = $langs;
+		}
+
+		return (string) $projectRef.' - '.$outputlangs->transnoentities('BudgetReportPdfDocumentName');
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_budget_report_filename')) {
+	/**
+	 * Return the localized project budget report filename.
+	 *
+	 * @param string         $projectRef Project reference
+	 * @param Translate|null $outputlangs Output language
+	 * @return string
+	 */
+	function lmdbadvancedproject_budget_report_filename($projectRef, $outputlangs = null)
+	{
+		return dol_sanitizeFileName(lmdbadvancedproject_budget_report_document_title($projectRef, $outputlangs), '_', 0).'.pdf';
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_get_month_label')) {
 	/**
 	 * Return a localized month label for a YYYY-MM key.
@@ -883,19 +917,47 @@ if (!function_exists('lmdbadvancedproject_get_forecast_category')) {
 		$fkProduct = empty($obj->fk_product) ? 0 : (int) $obj->fk_product;
 
 		if ($fkProduct > 0 && $productKey !== '') {
-			return array('key' => 'cat_'.$productKey, 'label' => $productLabel);
+			return array('key' => 'cat_'.$productKey, 'label' => $productLabel, 'translation_key' => '');
 		}
 		if ($fkProduct <= 0 && $lineKey !== '') {
-			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel);
+			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel, 'translation_key' => '');
 		}
 		if ($productKey !== '') {
-			return array('key' => 'cat_'.$productKey, 'label' => $productLabel);
+			return array('key' => 'cat_'.$productKey, 'label' => $productLabel, 'translation_key' => '');
 		}
 		if ($lineKey !== '') {
-			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel);
+			return array('key' => 'cat_'.$lineKey, 'label' => $lineLabel, 'translation_key' => '');
 		}
 
-		return array('key' => 'uncategorized', 'label' => $langs->trans('BudgetReportUncategorized'));
+		return array('key' => 'uncategorized', 'label' => $langs->trans('BudgetReportUncategorized'), 'translation_key' => 'BudgetReportUncategorized');
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_forecast_category_label')) {
+	/**
+	 * Resolve a forecast category label in the requested output language.
+	 *
+	 * @param string              $categoryKey Category identifier
+	 * @param array<string,mixed> $category Category data
+	 * @param Translate|null      $outputlangs Output language
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $outputlangs = null)
+	{
+		global $langs;
+
+		if (!is_object($outputlangs)) {
+			$outputlangs = $langs;
+		}
+		$translationKey = empty($category['translation_key']) ? '' : (string) $category['translation_key'];
+		if ($translationKey === '' && (string) $categoryKey === 'uncategorized') {
+			$translationKey = 'BudgetReportUncategorized';
+		}
+		if ($translationKey !== '') {
+			return $outputlangs->transnoentities($translationKey);
+		}
+
+		return empty($category['label']) ? '' : (string) $category['label'];
 	}
 }
 
@@ -916,6 +978,7 @@ if (!function_exists('lmdbadvancedproject_add_forecast_line')) {
 		if (!isset($forecast['categories'][$key])) {
 			$forecast['categories'][$key] = array(
 				'label' => $category['label'],
+				'translation_key' => $category['translation_key'],
 				'order_amount' => 0,
 				'order_budget' => 0,
 				'supplier_expenses' => 0,
@@ -1514,7 +1577,7 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 			$gapColor = $category['forecast_gap'] >= 0 ? 'green' : 'red';
 			$modalBase = 'budgetreport-forecast-'.preg_replace('/[^a-zA-Z0-9_-]/', '-', (string) $categoryKey);
 			print '<tr>';
-			print '<td>'.lmdbadvancedproject_escape_html($category['label']).'</td>';
+			print '<td>'.lmdbadvancedproject_escape_html(lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $langs)).'</td>';
 			print '<td align="right">'.lmdbadvancedproject_format_price($category['order_amount']).'</td>';
 			print '<td align="right">'.lmdbadvancedproject_format_price($category['order_budget']).'</td>';
 			print '<td align="right">'.lmdbadvancedproject_format_price($category['supplier_expenses']).'</td>';
@@ -2136,9 +2199,9 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$budgets = array();
 			$budgetFormattedValues = array();
 			if (!empty($budgetReportForecast['categories'])) {
-				foreach ($budgetReportForecast['categories'] as $category) {
+				foreach ($budgetReportForecast['categories'] as $categoryKey => $category) {
 					$categoryBudget = empty($category['order_budget']) ? 0 : (float) $category['order_budget'];
-					$labels[] = lmdbadvancedproject_chart_label($category['label']);
+					$labels[] = lmdbadvancedproject_chart_label(lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $langs));
 					$budgets[] = lmdbadvancedproject_round_amount($categoryBudget);
 					$budgetFormattedValues[] = lmdbadvancedproject_format_price($categoryBudget);
 				}

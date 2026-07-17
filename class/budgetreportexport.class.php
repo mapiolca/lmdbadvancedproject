@@ -357,8 +357,8 @@ class LmdbAdvancedProjectBudgetReportExport
 		$this->writeHeaderRow($sheet, $row, $headers);
 		$row++;
 		$forecast = $this->data['budgetReportForecast'];
-		foreach ($forecast['categories'] as $category) {
-			$this->setText($sheet, 'A'.$row, $category['label']);
+		foreach ($forecast['categories'] as $categoryKey => $category) {
+			$this->setText($sheet, 'A'.$row, lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $this->outputlangs));
 			$values = array($category['order_amount'], $category['order_budget'], $category['supplier_expenses'], $category['forecast_gap']);
 			foreach ($values as $index => $value) {
 				$cell = Coordinate::stringFromColumnIndex($index + 2).$row;
@@ -489,13 +489,14 @@ class LmdbAdvancedProjectBudgetReportExport
 	{
 		global $conf;
 
+		$budgetLabels = $this->getBudgetChartLabels();
 		$numberFormat = $this->getTotalNumberFormat();
 		$currencyFormat = $numberFormat.' "'.(empty($conf->currency) ? '' : $conf->currency).'"';
 		$this->setText($sheet, 'A1', $this->outputlangs->transnoentities($this->data['budgetChartTitleKey']));
 		$this->setText($sheet, 'A2', $this->outputlangs->transnoentities('Label'));
 		$this->setText($sheet, 'B2', $this->outputlangs->transnoentities('BudgetReportBudget'));
 		$row = 3;
-		foreach ($this->data['labels'] as $index => $label) {
+		foreach ($budgetLabels as $index => $label) {
 			$this->setText($sheet, 'A'.$row, $label);
 			$sheet->setCellValue('B'.$row, (float) $this->data['budgets'][$index]);
 			$row++;
@@ -522,7 +523,7 @@ class LmdbAdvancedProjectBudgetReportExport
 			$sheet->setCellValue('J'.$row, (float) $monthData['time_hours']);
 			$row++;
 		}
-		$budgetLastRow = count($this->data['labels']) + 2;
+		$budgetLastRow = count($budgetLabels) + 2;
 		$spentLastRow = count($this->data['spentLabels']) + 2;
 		$monthLastRow = count($this->data['monthAxis']) + 2;
 		if ($budgetLastRow >= 3) {
@@ -547,7 +548,7 @@ class LmdbAdvancedProjectBudgetReportExport
 	private function addCharts($reportSheet, $dataSheet)
 	{
 		$sheetName = $dataSheet->getTitle();
-		$budgetCount = count($this->data['labels']);
+		$budgetCount = count($this->getBudgetChartLabels());
 		$spentCount = count($this->data['spentLabels']);
 		$monthCount = count($this->data['monthAxis']);
 		if ($budgetCount > 0) {
@@ -586,6 +587,21 @@ class LmdbAdvancedProjectBudgetReportExport
 			$chart->setTopLeftPosition('A28')->setBottomRightPosition('L44');
 			$reportSheet->addChart($chart);
 		}
+	}
+
+	/** @return array<int,string> */
+	private function getBudgetChartLabels()
+	{
+		if (is_object($this->project) && !empty($this->data['budgetReportForecast']['categories'])) {
+			$labels = array();
+			foreach ($this->data['budgetReportForecast']['categories'] as $categoryKey => $category) {
+				$labels[] = lmdbadvancedproject_get_forecast_category_label($categoryKey, $category, $this->outputlangs);
+			}
+
+			return $labels;
+		}
+
+		return $this->data['labels'];
 	}
 
 	/** @return Chart */

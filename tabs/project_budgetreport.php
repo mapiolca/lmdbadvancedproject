@@ -100,7 +100,7 @@ if (empty($reshook) && $action === 'generate_budgetreport') {
 	if ($result <= 0) {
 		setEventMessages($object->error, $object->errors, 'errors');
 	} else {
-		$relativeFile = dol_sanitizeFileName($object->ref).'/'.dol_sanitizeFileName($object->ref).'_budgetreport.pdf';
+		$relativeFile = dol_sanitizeFileName($object->ref).'/'.lmdbadvancedproject_budget_report_filename($object->ref, $langs);
 		header('Location: '.DOL_URL_ROOT.'/document.php?modulepart=project&entity='.(int) $object->entity.'&file='.urlencode($relativeFile));
 		exit;
 	}

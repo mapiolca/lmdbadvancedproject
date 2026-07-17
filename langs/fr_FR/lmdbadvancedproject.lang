@@ -18,6 +18,7 @@ BudgetReportExportGenerationFailed=La génération du fichier tableur a échoué
 BudgetReportGeneratePdf=Générer le rapport PDF
 BudgetReportPdfModelDescription=Rapport budgétaire du projet
 BudgetReportPdfTitle=Rapport budgétaire du projet
+BudgetReportPdfDocumentName=Rapport Budgétaire
 Compatibility=Compatibilité
 BudgetReportSpreadsheetExportFeature=Exports ODS et XLSX
 BudgetReportSpreadsheetExportFeatureDescription=Exports tabulaires du rapport budgétaire, avec graphiques natifs dans le XLSX.
