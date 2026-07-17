@@ -101,7 +101,7 @@ $title = $langs->trans("BudgetReportArea");
 $help_url = '';
 $budgetReportCss = array('/lmdbadvancedproject/css/budgetreport.css.php?revision='.(string) filemtime(__DIR__.'/css/budgetreport.css.php'));
 
-llxHeader('', $title, $help_url, '', 0, 0, '', $budgetReportCss, '', 'bodyforlist mod-order page-list');
+llxHeader('', $title, $help_url, '', 0, 0, '', $budgetReportCss, '', 'bodyforlist mod-order page-list classforhorizontalscrolloftabs');
 
 print_barre_liste($title, 0, $_SERVER["PHP_SELF"], '', '', '', '', 0, 0, 'fa-chart-pie', 0, '', '', 0, 1, 1);
 
