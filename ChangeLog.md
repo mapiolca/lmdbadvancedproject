@@ -2,6 +2,8 @@
 
 ## 1.3.0
 
+- Add an optional observation-period restriction for all dated budget-report content while retaining selected projects, with matching XLSX/ODS exports
+- Add translated Dolibarr information tooltips to every global budget-report filter and use native date and binary selectors
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
 - Add a monthly recorded-hours series on a secondary axis with 10% rounded headroom, Chart.js legacy/modern compatibility, legend toggling, and an explanatory tooltip
 - Keep wide budget-report charts and tables horizontally scrollable without widening the Dolibarr page, using the native horizontal-scroll page layout while the monthly chart retains both visible vertical axes

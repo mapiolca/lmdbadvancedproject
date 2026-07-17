@@ -511,6 +511,7 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 			'date_end' => '',
 			'ignore_started_before' => '0',
 			'ignore_ended_after' => '0',
+			'exclude_content_outside_period' => '0',
 			'project_status' => 'open',
 		);
 
@@ -519,6 +520,7 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 			$normalized['date_end'] = lmdbadvancedproject_normalize_report_date(empty($filters['date_end']) ? '' : $filters['date_end']);
 			$normalized['ignore_started_before'] = empty($filters['ignore_started_before']) ? '0' : '1';
 			$normalized['ignore_ended_after'] = empty($filters['ignore_ended_after']) ? '0' : '1';
+			$normalized['exclude_content_outside_period'] = empty($filters['exclude_content_outside_period']) ? '0' : '1';
 
 			$projectStatus = empty($filters['project_status']) ? 'open' : (string) $filters['project_status'];
 			if (in_array($projectStatus, array('open', 'closed', 'both'), true)) {
@@ -527,6 +529,24 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 		}
 
 		return $normalized;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_budget_report_request_date')) {
+	/**
+	 * Read a native Dolibarr date selector while keeping legacy ISO query links compatible.
+	 *
+	 * @param  string $prefix Request parameter prefix
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_budget_report_request_date($prefix)
+	{
+		$timestamp = GETPOSTDATE($prefix);
+		if ($timestamp > 0) {
+			return dol_print_date($timestamp, '%Y-%m-%d', 'tzuserrel');
+		}
+
+		return (string) GETPOST($prefix, 'alpha');
 	}
 }
 
@@ -599,6 +619,51 @@ if (!function_exists('lmdbadvancedproject_build_project_date_sql_filter')) {
 	}
 }
 
+if (!function_exists('lmdbadvancedproject_budget_report_content_period_is_active')) {
+	/**
+	 * Check whether dated report content must be restricted to the observation period.
+	 *
+	 * @param  array<string,string> $filters Normalized filters
+	 * @return bool
+	 */
+	function lmdbadvancedproject_budget_report_content_period_is_active($filters)
+	{
+		return !empty($filters['exclude_content_outside_period'])
+			&& $filters['exclude_content_outside_period'] === '1'
+			&& (!empty($filters['date_start']) || !empty($filters['date_end']));
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_build_content_date_sql_condition')) {
+	/**
+	 * Build an inclusive SQL condition for one dated report content source.
+	 *
+	 * The date expression is supplied only by module code and must never contain request data.
+	 *
+	 * @param  string               $dateExpression Trusted SQL date expression
+	 * @param  array<string,string> $filters        Normalized filters
+	 * @return string
+	 */
+	function lmdbadvancedproject_build_content_date_sql_condition($dateExpression, $filters)
+	{
+		global $db;
+
+		if (!lmdbadvancedproject_budget_report_content_period_is_active($filters)) {
+			return '1 = 1';
+		}
+
+		$conditions = array('('.$dateExpression.') IS NOT NULL');
+		if (!empty($filters['date_start'])) {
+			$conditions[] = "DATE(".$dateExpression.") >= '".$db->escape($filters['date_start'])."'";
+		}
+		if (!empty($filters['date_end'])) {
+			$conditions[] = "DATE(".$dateExpression.") <= '".$db->escape($filters['date_end'])."'";
+		}
+
+		return implode(' AND ', $conditions);
+	}
+}
+
 if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 	/**
 	 * Print the global budget report filter form.
@@ -608,15 +673,22 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 	 */
 	function lmdbadvancedproject_print_budget_report_filters($filters)
 	{
-		global $langs;
+		global $db, $langs;
 
 		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		$form = new Form($db);
 		$action = dol_buildpath('/lmdbadvancedproject/budgetreportindex.php', 1);
 		$statusOptions = array(
 			'open' => 'BudgetReportStatusOpen',
 			'closed' => 'BudgetReportStatusClosed',
 			'both' => 'BudgetReportStatusBoth',
 		);
+		$dateStartTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportFilterDateStartHelp'), 2, 1, img_info(''), '', 3);
+		$dateEndTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportFilterDateEndHelp'), 2, 1, img_info(''), '', 3);
+		$ignoreStartedTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportIgnoreStartedBeforeHelp'), 2, 1, img_info(''), '', 3);
+		$ignoreEndedTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportIgnoreEndedAfterHelp'), 2, 1, img_info(''), '', 3);
+		$contentPeriodTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportExcludeContentOutsidePeriodHelp'), 2, 1, img_info(''), '', 3);
+		$statusTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportFilterStatusHelp'), 2, 1, img_info(''), '', 3);
 
 		print '<form method="GET" action="'.lmdbadvancedproject_escape_html($action).'" class="budgetreport-filters">';
 		print '<div class="budgetreport-filter-title">'.$langs->trans('BudgetReportFilters').'</div>';
@@ -624,20 +696,22 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 		print '<div class="budgetreport-filter-period">';
 		print '<div class="budgetreport-filter-period-title">'.$langs->trans('BudgetReportObservationPeriod').'</div>';
 		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
-		print '<label><span>'.$langs->trans('BudgetReportFilterDateStart').'</span><input type="date" class="flat" name="date_start" value="'.lmdbadvancedproject_escape_html($filters['date_start']).'"></label>';
-		print '<label class="budgetreport-filter-checkbox"><input type="checkbox" name="ignore_started_before" value="1"'.($filters['ignore_started_before'] === '1' ? ' checked="checked"' : '').'><span>'.$langs->trans('BudgetReportIgnoreStartedBefore').'</span></label>';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateStart').' '.$dateStartTooltip.'</span>'.$form->selectDate($filters['date_start'] === '' ? -1 : $filters['date_start'], 'date_start', 0, 0, 1, '', 1, 0).'</label>';
+		print '<label class="budgetreport-filter-binary"><span>'.$langs->trans('BudgetReportIgnoreStartedBefore').' '.$ignoreStartedTooltip.'</span>'.$form->selectyesno('ignore_started_before', $filters['ignore_started_before'], 1, false, 0, 1).'</label>';
 		print '</div>';
 		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
-		print '<label><span>'.$langs->trans('BudgetReportFilterDateEnd').'</span><input type="date" class="flat" name="date_end" value="'.lmdbadvancedproject_escape_html($filters['date_end']).'"></label>';
-		print '<label class="budgetreport-filter-checkbox"><input type="checkbox" name="ignore_ended_after" value="1"'.($filters['ignore_ended_after'] === '1' ? ' checked="checked"' : '').'><span>'.$langs->trans('BudgetReportIgnoreEndedAfter').'</span></label>';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateEnd').' '.$dateEndTooltip.'</span>'.$form->selectDate($filters['date_end'] === '' ? -1 : $filters['date_end'], 'date_end', 0, 0, 1, '', 1, 0).'</label>';
+		print '<label class="budgetreport-filter-binary"><span>'.$langs->trans('BudgetReportIgnoreEndedAfter').' '.$ignoreEndedTooltip.'</span>'.$form->selectyesno('ignore_ended_after', $filters['ignore_ended_after'], 1, false, 0, 1).'</label>';
 		print '</div>';
 		print '</div>';
-		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterStatus').'</span><select class="flat" name="project_status">';
+		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportExcludeContentOutsidePeriod').' '.$contentPeriodTooltip.'</span>'.$form->selectyesno('exclude_content_outside_period', $filters['exclude_content_outside_period'], 1, false, 0, 1).'</label>';
+		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterStatus').' '.$statusTooltip.'</span><select class="flat" id="project_status" name="project_status">';
 		foreach ($statusOptions as $value => $labelKey) {
 			$selected = ($filters['project_status'] === $value) ? ' selected="selected"' : '';
 			print '<option value="'.lmdbadvancedproject_escape_html($value).'"'.$selected.'>'.$langs->trans($labelKey).'</option>';
 		}
 		print '</select></label>';
+		print ajax_combobox('project_status');
 		print '<div class="budgetreport-filter-actions">';
 		print '<button type="submit" class="button">'.$langs->trans('BudgetReportApplyFilters').'</button>';
 		print '<a class="button" href="'.lmdbadvancedproject_escape_html($action).'">'.$langs->trans('BudgetReportResetFilters').'</a>';
@@ -1682,6 +1756,19 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 		$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
+		$contentPeriodIsActive = $budgetReportProjectId <= 0 && lmdbadvancedproject_budget_report_content_period_is_active($filters);
+		$contentFilters = $filters;
+		if ($budgetReportProjectId > 0) {
+			$contentFilters['exclude_content_outside_period'] = '0';
+		}
+		$orderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('c.date_commande', $contentFilters);
+		$customerInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('f.datef', $contentFilters);
+		$timeDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ptt.element_date', $contentFilters);
+		$supplierInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ff.datef', $contentFilters);
+		$supplierOrderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('COALESCE(cf.date_commande, DATE(cf.date_creation))', $contentFilters);
+		$expenseDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ed.date', $contentFilters);
+		$contentStartMonth = $contentPeriodIsActive && !empty($filters['date_start']) ? substr($filters['date_start'], 0, 7) : '';
+		$contentEndMonth = $contentPeriodIsActive && !empty($filters['date_end']) ? substr($filters['date_end'], 0, 7) : '';
 
 		$entityShared = (lmdbadvancedproject_is_multicompany_enabled() && getDolGlobalInt('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES')) ? 1 : 0;
 		$projectDisplayEntityShared = $budgetReportProjectId > 0 ? 1 : $entityShared;
@@ -1700,13 +1787,13 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		$sql = "SELECT p.*, cmd.total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget FROM ".MAIN_DB_PREFIX."projet p
 			INNER JOIN (
-				SELECT c.fk_projet, SUM(COALESCE(c.total_ht, 0)) as total_orders
+				SELECT c.fk_projet, SUM(CASE WHEN ".$orderDateCondition." THEN COALESCE(c.total_ht, 0) ELSE 0 END) as total_orders
 				FROM ".MAIN_DB_PREFIX."commande c
 				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
 				GROUP BY c.fk_projet
 			) cmd ON cmd.fk_projet = p.rowid
 			LEFT JOIN (
-				SELECT c.fk_projet, SUM(COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0)) as total_budget
+				SELECT c.fk_projet, SUM(CASE WHEN ".$orderDateCondition." THEN COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0) ELSE 0 END) as total_budget
 				FROM ".MAIN_DB_PREFIX."commande c
 				INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
 				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
@@ -1741,30 +1828,43 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				// Projects without a start date stay in totals but cannot be plotted by month.
 			} elseif (empty($obj->datee) || $obj->datee<$obj->dateo) {
 				$yrmo = date('Y-m', strtotime($obj->dateo));
-				$cleanmos[$yrmo] = $yrmo;
-				if (!isset($mobudget[$yrmo])) {
-					$mobudget[$yrmo] = 0;
+				if ($contentStartMonth !== '' && $yrmo < $contentStartMonth) {
+					$yrmo = $contentStartMonth;
 				}
-				$mobudget[$yrmo] += $projectBudget;
+				if ($contentEndMonth === '' || $yrmo <= $contentEndMonth) {
+					$cleanmos[$yrmo] = $yrmo;
+					if (!isset($mobudget[$yrmo])) {
+						$mobudget[$yrmo] = 0;
+					}
+					$mobudget[$yrmo] += $projectBudget;
+				}
 			} else if ($projectBudget>0) {
 				$j = 0;
 				$molist = array();
 				$yrmo = date('Y-m', strtotime($obj->dateo));
 				$yrme = date('Y-m', strtotime($obj->datee));
+				if ($contentStartMonth !== '' && $yrmo < $contentStartMonth) {
+					$yrmo = $contentStartMonth;
+				}
+				if ($contentEndMonth !== '' && $yrme > $contentEndMonth) {
+					$yrme = $contentEndMonth;
+				}
 
 				while ($yrmo<=$yrme && $j<37) {
 					$molist[$j] = $yrmo;
 					$cleanmos[$yrmo] = $yrmo;
 					$j++;
-					$yrmo = date("Y-m", strtotime($obj->dateo." +$j months"));
+					$yrmo = date('Y-m', strtotime($yrmo.'-01 +1 month'));
 				}
 
-				$permonth = $projectBudget/$j;
-				foreach ($molist as $mos) {
-					if (!isset($mobudget[$mos])) {
-						$mobudget[$mos] = 0;
+				if ($j > 0) {
+					$permonth = $projectBudget/$j;
+					foreach ($molist as $mos) {
+						if (!isset($mobudget[$mos])) {
+							$mobudget[$mos] = 0;
+						}
+						$mobudget[$mos] += $permonth;
 					}
-					$mobudget[$mos] += $permonth;
 				}
 			}
 
@@ -1781,12 +1881,14 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				FROM ".MAIN_DB_PREFIX."facture f
 				INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON fd.fk_facture = f.rowid
 				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
+				AND ".$customerInvoiceDateCondition."
 				AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cipx WHERE cipx.fk_facture_det = fd.rowid)
 				GROUP BY f.fk_projet";
 		} else {
 			$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(f.total_ht, 0)) AS total_invoice
 				FROM ".MAIN_DB_PREFIX."facture f
 				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
+				AND ".$customerInvoiceDateCondition."
 				GROUP BY f.fk_projet";
 		}
 		$resultCustomerInvoices = $db->query($sqlCustomerInvoices);
@@ -1807,6 +1909,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cip
 				INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = cip.fk_facture
 				WHERE cip.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.") AND cip.entity IN (".$customerInvoiceEntities.")".$customerInvoicePartProjectSqlFilter."
+				AND ".$customerInvoiceDateCondition."
 				GROUP BY cip.fk_projet";
 			$resultCustomerInvoiceParts = $db->query($sqlCustomerInvoiceParts);
 			$nbtotalCustomerInvoiceParts = $resultCustomerInvoiceParts ? $db->num_rows($resultCustomerInvoiceParts) : 0;
@@ -1896,6 +1999,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				WHERE ptt.elementtype = 'task'
 				AND ptt.element_duration > 0
 				AND ptt.element_date IS NOT NULL
+				AND ".$timeDateCondition."
 				AND pt.entity IN (".$projectDataEntities.")
 				AND pt.fk_projet IN (".implode(',', $selectedProjectIds).")
 				GROUP BY ".$groupBy."
@@ -1958,7 +2062,9 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$supplierInvoiceSplitExclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'ffd', $supplierInvoiceEntities);
 		$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ffd.total_ht) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
-			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter.$supplierInvoiceSplitExclusion." GROUP BY ff.fk_projet, ff.datef";
+			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter.$supplierInvoiceSplitExclusion."
+			AND ".$supplierInvoiceDateCondition."
+			GROUP BY ff.fk_projet, ff.datef";
 		$result1 = $db->query($sql1);
 		$nbtotal1 = $result1 ? $db->num_rows($result1) : 0;
 		$i=0;
@@ -1976,11 +2082,12 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		if ($supplierInvoiceSplitEnabled) {
 			$supplierInvoicePartProjectSqlFilter = $budgetReportProjectId > 0 ? " AND sip.fk_projet = ".$budgetReportProjectId : "";
-			$sqlSupplierInvoiceParts = "SELECT sip.date AS datef, sip.fk_projet, SUM(sip.total_ht) AS total_inv
+			$sqlSupplierInvoiceParts = "SELECT ff.datef, sip.fk_projet, SUM(sip.total_ht) AS total_inv
 				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sip
 				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = sip.fk_facture_fourn
 				WHERE sip.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND sip.entity IN (".$supplierInvoiceEntities.")".$supplierInvoicePartProjectSqlFilter."
-				GROUP BY sip.fk_projet, sip.date";
+				AND ".$supplierInvoiceDateCondition."
+				GROUP BY sip.fk_projet, ff.datef";
 			$resultSupplierInvoiceParts = $db->query($sqlSupplierInvoiceParts);
 			$nbtotalSupplierInvoiceParts = $resultSupplierInvoiceParts ? $db->num_rows($resultSupplierInvoiceParts) : 0;
 			$i=0;
@@ -2027,6 +2134,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			AND cf.fk_statut IN (3,4,5)
 			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter.$supplierOrderSplitExclusion."
+			AND ".$supplierOrderDateCondition."
 			GROUP BY cf.fk_projet, order_date, supplier_order_bucket";
 		$result3 = $db->query($sql3);
 		$nbtotal3 = $result3 ? $db->num_rows($result3) : 0;
@@ -2072,7 +2180,9 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$expenses = array();
 		$sql2 = "SELECT ed.date, ed.fk_projet, SUM(ed.total_ht) as total_exp FROM ".MAIN_DB_PREFIX."expensereport_det ed
 			LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
-			WHERE ed.fk_projet > 0 AND ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.")".$expenseProjectSqlFilter." GROUP BY ed.fk_projet, ed.date ";
+			WHERE ed.fk_projet > 0 AND ex.fk_user_approve>0 AND ex.entity IN (".$expenseReportEntities.")".$expenseProjectSqlFilter."
+			AND ".$expenseDateCondition."
+			GROUP BY ed.fk_projet, ed.date ";
 		$result2 = $db->query($sql2);
 		$nbtotal2 = $result2 ? $db->num_rows($result2) : 0;
 		$i=0;

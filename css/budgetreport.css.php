@@ -275,7 +275,8 @@ div.mainmenu.budgetreport {
 	gap: 4px;
 }
 
-.budgetreport-filter-field span {
+.budgetreport-filter-field > span,
+.budgetreport-filter-field > label > span {
 	font-size: 90%;
 	color: #555;
 }
@@ -286,17 +287,11 @@ div.mainmenu.budgetreport {
 	box-sizing: border-box;
 }
 
-.budgetreport-filter-checkbox {
+.budgetreport-filter-binary {
 	display: flex;
-	align-items: flex-start;
-	gap: 6px;
-	font-size: 90%;
-	line-height: 1.2;
-}
-
-.budgetreport-filter-checkbox input[type="checkbox"] {
-	min-height: 0;
-	margin-top: 1px;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 100%;
 }
 
 .budgetreport-filter-actions {

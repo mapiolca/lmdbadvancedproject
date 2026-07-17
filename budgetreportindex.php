@@ -76,10 +76,11 @@ if (isset($user->socid) && $user->socid > 0) {
 $max = 5;
 $now = dol_now();
 $budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
-	'date_start' => GETPOST('date_start', 'alpha'),
-	'date_end' => GETPOST('date_end', 'alpha'),
+	'date_start' => lmdbadvancedproject_get_budget_report_request_date('date_start'),
+	'date_end' => lmdbadvancedproject_get_budget_report_request_date('date_end'),
 	'ignore_started_before' => GETPOST('ignore_started_before', 'alpha'),
 	'ignore_ended_after' => GETPOST('ignore_ended_after', 'alpha'),
+	'exclude_content_outside_period' => GETPOST('exclude_content_outside_period', 'alpha'),
 	'project_status' => GETPOST('project_status', 'alpha'),
 ));
 

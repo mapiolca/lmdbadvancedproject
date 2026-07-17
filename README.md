@@ -8,6 +8,8 @@ Advanced Project extends project budget analysis in Dolibarr.
 
 The Budget Report page tracks project budgets, time spent on tasks, vendor invoices, staff expenses, and remaining balances with Dolibarr's configured currency. You can access this feature from the Project module.
 
+The global report can restrict dated project content to an inclusive observation period while keeping the projects selected by the existing project date and status filters. In this mode, customer orders and budgets, customer and supplier invoices, supplier orders, expense reports, and time entries outside the period are excluded from screen totals, monthly charts, and spreadsheet exports.
+
 The report includes a monthly time matrix by project on the global page and by task on an individual project. The total time cost and total decimal hours are displayed together in the Spent tile.
 
 The monthly budget-versus-spent chart also overlays recorded hours on a secondary axis. Each series can be shown or hidden from the chart legend, and an information tooltip explains how hours relate to total spending.
