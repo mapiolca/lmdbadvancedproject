@@ -14,7 +14,7 @@ The monthly budget-versus-spent chart also overlays recorded hours on a secondar
 
 Wide charts and report tables remain readable with horizontal scrolling instead of overflowing the browser window. The monthly chart keeps both vertical axes visible while its scrollbar changes the displayed month range. Displayed totals and hours follow Dolibarr's configured maximum number of decimals for total prices.
 
-Reports can be exported as XLSX or ODS. Both formats include the total-time detail with contributor counts and the expense-report detail with users; XLSX files also contain the report charts, while ODS files contain visible chart source data. Individual project reports can also be generated with the native **Project budget report** PDF document model, including both detail tables, either from the project document selector or from the Budget report tab.
+Reports can be exported as XLSX or ODS. Both formats include the total-time detail with contributor counts and the expense-report detail with users; XLSX files also contain the report charts, while ODS files contain visible chart source data. Individual project reports can also be generated with the native **Project budget report** PDF document model, including both detail tables, either from the project document selector or from the Budget report tab. The generated PDF follows Dolibarr's `MAIN_DISABLE_FORCE_SAVEAS` setting: inline documents open in a new tab, while forced downloads retain the native download behavior.
 
 Spreadsheet exports require the PhpSpreadsheet library bundled with Dolibarr 20 and the PHP `ZipArchive` extension. The module compatibility tab reports the availability of these components.
 

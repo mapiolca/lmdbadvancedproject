@@ -2284,6 +2284,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		$monthlyChartMinWidth = max(720, (count($monthAxis) * 90) + 180);
 		$exportParameters = $budgetReportProjectId > 0 ? array('project_id' => $budgetReportProjectId) : $filters;
 		$exportBaseUrl = dol_buildpath('/lmdbadvancedproject/budgetreportexport.php', 1).'?'.http_build_query($exportParameters);
+		$pdfFormTarget = getDolGlobalInt('MAIN_DISABLE_FORCE_SAVEAS') ? ' target="_blank"' : '';
 		$formBudgetReport = new Form($db);
 		$monthlyChartTooltip = $formBudgetReport->textwithtooltip('', $langs->trans('BudgetReportMonthlyTimeChartHelp'), 2, 1, img_help(1, ''), '', 3);
 
@@ -2299,7 +2300,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=xlsx'); ?>"><?php echo $langs->trans('BudgetReportExportXlsx'); ?></a>
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=ods'); ?>"><?php echo $langs->trans('BudgetReportExportOds'); ?></a>
 <?php if ($budgetReportProjectId > 0 && $permissionToGeneratePdf) { ?>
-	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" id="budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>" hidden>
+	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" id="budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>"<?php echo $pdfFormTarget; ?> hidden>
 		<input type="hidden" name="token" value="<?php echo newToken(); ?>">
 		<input type="hidden" name="action" value="generate_budgetreport">
 	</form>

@@ -15,6 +15,7 @@
 - Fix Excel workbook repair warnings by grouping monthly line series and correcting cartesian chart axis references in both global and project XLSX exports
 - Add the native `budgetreport` project PDF model with vector charts, category summary, and paginated task/month matrices
 - Improve the project PDF first page with a full-width monthly chart and monetary values in pie-chart legends
+- Open inline project budget PDFs in a new browser tab while preserving Dolibarr's `MAIN_DISABLE_FORCE_SAVEAS` download behavior
 - Add a compatibility settings tab for Dolibarr, PHP, PhpSpreadsheet, ZipArchive, and PDF support
 - Replace report monetary rounding with Dolibarr `price2num(..., 'MT')` and native `price()` formatting
 
