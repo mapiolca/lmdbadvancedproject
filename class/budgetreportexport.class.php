@@ -311,7 +311,7 @@ class LmdbAdvancedProjectBudgetReportExport
 			$this->setText($sheet, 'G'.$row, $monthData['label']);
 			$sheet->setCellValue('H'.$row, (float) $monthData['budget']);
 			$sheet->setCellValue('I'.$row, (float) $monthData['spent']);
-			$sheet->setCellValue('J'.$row, (float) $monthData['time_spent']);
+			$sheet->setCellValue('J'.$row, (float) $monthData['time_hours']);
 			$row++;
 		}
 		$this->styleHeader($sheet, 'A2:B2');

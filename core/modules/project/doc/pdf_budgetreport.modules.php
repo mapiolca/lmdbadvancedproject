@@ -260,11 +260,14 @@ class pdf_budgetreport extends ModelePDFProjects
 		$chartY = $y + 10;
 		$chartW = $w - 10;
 		$chartH = $h - 18;
-		$maximum = 0.0;
+		$amountMaximum = 0.0;
+		$hoursMaximum = 0.0;
 		foreach ($monthAxis as $month) {
-			$maximum = max($maximum, (float) $month['budget'], (float) $month['spent'], (float) $month['time_spent']);
+			$amountMaximum = max($amountMaximum, (float) $month['budget'], (float) $month['spent']);
+			$hoursMaximum = max($hoursMaximum, (float) $month['time_hours']);
 		}
-		$maximum = max(1.0, $maximum);
+		$amountMaximum = max(1.0, $amountMaximum);
+		$hoursMaximum = max(1.0, $hoursMaximum);
 		$count = count($monthAxis);
 		$step = $chartW / $count;
 		$pdf->SetDrawColor(160, 160, 160);
@@ -273,12 +276,12 @@ class pdf_budgetreport extends ModelePDFProjects
 		$previousTime = null;
 		$index = 0;
 		foreach ($monthAxis as $month) {
-			$barHeight = ((float) $month['budget'] / $maximum) * $chartH;
+			$barHeight = ((float) $month['budget'] / $amountMaximum) * $chartH;
 			$barX = $chartX + ($index * $step) + ($step * 0.15);
 			$pdf->SetFillColor(151, 187, 225);
 			$pdf->Rect($barX, $chartY + $chartH - $barHeight, max(0.8, $step * 0.45), $barHeight, 'F');
 			$pointX = $chartX + ($index * $step) + ($step * 0.55);
-			$pointY = $chartY + $chartH - (((float) $month['spent'] / $maximum) * $chartH);
+			$pointY = $chartY + $chartH - (((float) $month['spent'] / $amountMaximum) * $chartH);
 			if (is_array($previous)) {
 				$pdf->SetLineStyle(array('width' => 0.3, 'dash' => 0, 'color' => array(192, 80, 77)));
 				$pdf->Line($previous[0], $previous[1], $pointX, $pointY);
@@ -286,7 +289,7 @@ class pdf_budgetreport extends ModelePDFProjects
 			$pdf->SetFillColor(192, 80, 77);
 			$pdf->Circle($pointX, $pointY, 0.7, 0, 360, 'F');
 			$previous = array($pointX, $pointY);
-			$timePointY = $chartY + $chartH - (((float) $month['time_spent'] / $maximum) * $chartH);
+			$timePointY = $chartY + $chartH - (((float) $month['time_hours'] / $hoursMaximum) * $chartH);
 			if (is_array($previousTime)) {
 				$pdf->SetLineStyle(array('width' => 0.3, 'dash' => '2,1', 'color' => array(75, 172, 198)));
 				$pdf->Line($previousTime[0], $previousTime[1], $pointX, $timePointY);
