@@ -121,18 +121,8 @@ $morehtmlref .= '</div>';
 
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 
-if ($permissionToGenerate) {
-	print '<div class="tabsAction">';
-	print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'?id='.(int) $object->id.'" class="inline-block">';
-	print '<input type="hidden" name="token" value="'.newToken().'">';
-	print '<input type="hidden" name="action" value="generate_budgetreport">';
-	print '<button class="butAction" type="submit">'.$langs->trans('BudgetReportGeneratePdf').'</button>';
-	print '</form>';
-	print '</div>';
-}
-
 print '<div class="fichecenter">';
-lmdbadvancedproject_render_project_budget_report((int) $object->id);
+lmdbadvancedproject_render_project_budget_report((int) $object->id, $permissionToGenerate);
 print '</div>';
 
 print dol_get_fiche_end();

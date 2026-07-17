@@ -2174,11 +2174,12 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	/**
 	 * Render the budget report body.
 	 *
-	 * @param  int                 $budgetReportProjectId Project id for project tab, 0 for global report
-	 * @param  array<string,mixed> $filters               Global report filters
+	 * @param  int                 $budgetReportProjectId  Project id for project tab, 0 for global report
+	 * @param  array<string,mixed> $filters                Global report filters
+	 * @param  bool                $permissionToGeneratePdf Whether PDF generation is allowed
 	 * @return void
 	 */
-	function lmdbadvancedproject_render_budget_report($budgetReportProjectId = 0, $filters = array())
+	function lmdbadvancedproject_render_budget_report($budgetReportProjectId = 0, $filters = array(), $permissionToGeneratePdf = false)
 	{
 		global $db, $conf, $langs, $user;
 
@@ -2204,6 +2205,13 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 <div class="tabsAction budgetreport-export-actions">
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=xlsx'); ?>"><?php echo $langs->trans('BudgetReportExportXlsx'); ?></a>
 	<a class="butAction" href="<?php echo lmdbadvancedproject_escape_html($exportBaseUrl.'&format=ods'); ?>"><?php echo $langs->trans('BudgetReportExportOds'); ?></a>
+<?php if ($budgetReportProjectId > 0 && $permissionToGeneratePdf) { ?>
+	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" class="inline-block">
+		<input type="hidden" name="token" value="<?php echo newToken(); ?>">
+		<input type="hidden" name="action" value="generate_budgetreport">
+		<button class="butAction" type="submit"><?php echo $langs->trans('BudgetReportGeneratePdf'); ?></button>
+	</form>
+<?php } ?>
 </div>
 
 <div class="budgetreport-summary-fullwidth">
@@ -2575,11 +2583,12 @@ if (!function_exists('lmdbadvancedproject_render_project_budget_report')) {
 	/**
 	 * Render the budget report for a single project.
 	 *
-	 * @param  int $projectId Project id
+	 * @param  int  $projectId               Project id
+	 * @param  bool $permissionToGeneratePdf Whether PDF generation is allowed
 	 * @return void
 	 */
-	function lmdbadvancedproject_render_project_budget_report($projectId)
+	function lmdbadvancedproject_render_project_budget_report($projectId, $permissionToGeneratePdf = false)
 	{
-		lmdbadvancedproject_render_budget_report((int) $projectId);
+		lmdbadvancedproject_render_budget_report((int) $projectId, array(), $permissionToGeneratePdf);
 	}
 }
