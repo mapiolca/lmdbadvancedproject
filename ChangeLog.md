@@ -5,6 +5,7 @@
 - Add native customer-order list links and evenly spaced detail tooltips to global report totals, plus an access-aware project multiselect filter shared with exports
 - Add per-project invoiced totals and invoicing rates to the global budget table, with native invoice links, contribution tooltips, and numeric ODS/XLSX columns
 - Add an optional observation-period restriction for all dated budget-report content while retaining selected projects, with matching XLSX/ODS exports
+- Add the same inclusive content-period filters to individual project reports, forecasts, XLSX/ODS exports, and page-generated PDFs while keeping the project visible
 - Add translated Dolibarr information tooltips to every global budget-report filter and use native date and binary selectors
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
 - Add a monthly recorded-hours series on a secondary axis with 10% rounded headroom, Chart.js legacy/modern compatibility, legend toggling, and an explanatory tooltip

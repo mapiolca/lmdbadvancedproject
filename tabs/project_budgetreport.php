@@ -62,6 +62,11 @@ $langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $action = GETPOST('action', 'aZ09');
+$budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
+	'date_start' => lmdbadvancedproject_get_budget_report_request_date('date_start'),
+	'date_end' => lmdbadvancedproject_get_budget_report_request_date('date_end'),
+	'exclude_content_outside_period' => GETPOST('exclude_content_outside_period', 'alpha'),
+));
 
 $hookmanager->initHooks(array('projectbudgetreport', 'projectcard', 'globalcard'));
 
@@ -86,7 +91,7 @@ restrictedArea($user, 'projet', $object->id, 'projet&project');
 $projectWriteAccess = $object->restrictedProjectArea($user, 'write') > 0;
 $permissionToGenerate = $user->hasRight('projet', 'creer') && $projectWriteAccess;
 
-$parameters = array('id' => (int) $object->id);
+$parameters = array('id' => (int) $object->id, 'budgetreport_filters' => $budgetReportFilters);
 $reshook = $hookmanager->executeHooks('doActions', $parameters, $object, $action);
 if ($reshook < 0) {
 	setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
@@ -96,6 +101,10 @@ if (empty($reshook) && $action === 'generate_budgetreport') {
 	if (!$permissionToGenerate) {
 		accessforbidden();
 	}
+	if (!isset($object->context) || !is_array($object->context)) {
+		$object->context = array();
+	}
+	$object->context['budgetreport_filters'] = $budgetReportFilters;
 	$result = $object->generateDocument('budgetreport', $langs);
 	if ($result <= 0) {
 		setEventMessages($object->error, $object->errors, 'errors');
@@ -130,8 +139,10 @@ $morehtmlref .= '</div>';
 
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 
+lmdbadvancedproject_print_project_budget_report_filters((int) $object->id, $budgetReportFilters);
+
 print '<div class="fichecenter budgetreport-page">';
-lmdbadvancedproject_render_project_budget_report((int) $object->id, $permissionToGenerate);
+lmdbadvancedproject_render_project_budget_report((int) $object->id, $permissionToGenerate, $budgetReportFilters);
 print '</div>';
 
 print dol_get_fiche_end();

@@ -111,7 +111,12 @@ class pdf_budgetreport extends ModelePDFProjects
 			return -1;
 		}
 
-		$data = lmdbadvancedproject_load_budget_report_data((int) $object->id);
+		$filters = array();
+		if (isset($object->context) && is_array($object->context) && isset($object->context['budgetreport_filters']) && is_array($object->context['budgetreport_filters'])) {
+			$filters = $object->context['budgetreport_filters'];
+		}
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		$data = lmdbadvancedproject_load_budget_report_data((int) $object->id, $filters);
 		$pdf = pdf_getInstance($this->format);
 		if (class_exists('TCPDF')) {
 			$pdf->setPrintHeader(false);
@@ -196,6 +201,11 @@ class pdf_budgetreport extends ModelePDFProjects
 		$pdf->SetXY($left, 55);
 		$pdf->MultiCell($usable, 4, $outputlangs->convToOutputCharset(
 			$outputlangs->transnoentities('BudgetReportTimeSpentTotal').': '.lmdbadvancedproject_format_price($data['totaltime'], $outputlangs).' · '.lmdbadvancedproject_format_hours($data['totalTimeHours'], true, $outputlangs)
+		), 0, 'L');
+
+		$pdf->SetXY($left, 59);
+		$pdf->MultiCell($usable, 4, $outputlangs->convToOutputCharset(
+			$outputlangs->transnoentities('BudgetReportObservationPeriod').': '.lmdbadvancedproject_get_budget_report_period_label($data['filters'], $outputlangs)
 		), 0, 'L');
 
 		$budgetLabels = $data['labels'];

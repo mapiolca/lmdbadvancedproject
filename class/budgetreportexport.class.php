@@ -269,6 +269,19 @@ class LmdbAdvancedProjectBudgetReportExport
 			$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('ThirdParty'));
 			$this->setText($sheet, 'B'.$row, is_object($this->project->thirdparty) ? $this->project->thirdparty->name : '');
 			$row++;
+			$filters = lmdbadvancedproject_normalize_budget_report_filters(isset($this->data['filters']) && is_array($this->data['filters']) ? $this->data['filters'] : array());
+			$dateStart = $filters['date_start'] === '' ? $this->outputlangs->transnoentities('NotDefined') : dol_print_date(strtotime($filters['date_start']), 'day', false, $this->outputlangs);
+			$dateEnd = $filters['date_end'] === '' ? $this->outputlangs->transnoentities('NotDefined') : dol_print_date(strtotime($filters['date_end']), 'day', false, $this->outputlangs);
+			$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportFilterDateStart'));
+			$this->setText($sheet, 'B'.$row, $dateStart);
+			$this->setText($sheet, 'D'.$row, $this->outputlangs->transnoentities('BudgetReportFilterDateEnd'));
+			$this->setText($sheet, 'E'.$row, $dateEnd);
+			$row++;
+			$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportExcludeContentOutsidePeriod'));
+			$this->setText($sheet, 'B'.$row, $this->outputlangs->transnoentities($filters['exclude_content_outside_period'] === '1' ? 'Yes' : 'No'));
+			$this->setText($sheet, 'D'.$row, $this->outputlangs->transnoentities('Date'));
+			$this->setText($sheet, 'E'.$row, dol_print_date(dol_now(), 'dayhour', false, $this->outputlangs));
+			$row++;
 		} elseif (!empty($this->data['filters'])) {
 			$statusLabels = array('open' => 'BudgetReportStatusOpen', 'closed' => 'BudgetReportStatusClosed', 'both' => 'BudgetReportStatusBoth');
 			$projectFilterValue = $this->outputlangs->transnoentities('BudgetReportAllProjects');
@@ -301,8 +314,10 @@ class LmdbAdvancedProjectBudgetReportExport
 			}
 			$row = 6;
 		}
-		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('Date'));
-		$this->setText($sheet, 'B'.$row, dol_print_date(dol_now(), 'dayhour', false, $this->outputlangs));
+		if (!is_object($this->project)) {
+			$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('Date'));
+			$this->setText($sheet, 'B'.$row, dol_print_date(dol_now(), 'dayhour', false, $this->outputlangs));
+		}
 
 		$kpiRow = 7;
 		$kpis = array(

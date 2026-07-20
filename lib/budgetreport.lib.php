@@ -501,7 +501,7 @@ if (!function_exists('lmdbadvancedproject_normalize_report_date')) {
 
 if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 	/**
-	 * Normalize global budget report filters.
+	 * Normalize global or project budget report filters.
 	 *
 	 * @param  array<string,mixed> $filters Raw filters
 	 * @return array<string,mixed>
@@ -930,6 +930,79 @@ if (!function_exists('lmdbadvancedproject_build_content_date_sql_condition')) {
 		}
 
 		return implode(' AND ', $conditions);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_budget_report_period_label')) {
+	/**
+	 * Return the translated label of the effective content period.
+	 *
+	 * @param  array<string,mixed> $filters Normalized report filters
+	 * @param  Translate           $langs   Translation handler
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_budget_report_period_label($filters, $langs)
+	{
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		if (!lmdbadvancedproject_budget_report_content_period_is_active($filters)) {
+			return $langs->transnoentities('BudgetReportAllDates');
+		}
+
+		$dateStart = empty($filters['date_start']) ? '' : dol_print_date(strtotime($filters['date_start']), 'day', false, $langs);
+		$dateEnd = empty($filters['date_end']) ? '' : dol_print_date(strtotime($filters['date_end']), 'day', false, $langs);
+		if ($dateStart !== '' && $dateEnd !== '') {
+			return $langs->transnoentities('BudgetReportPeriodFromTo', $dateStart, $dateEnd);
+		}
+		if ($dateStart !== '') {
+			return $langs->transnoentities('BudgetReportPeriodFrom', $dateStart);
+		}
+
+		return $langs->transnoentities('BudgetReportPeriodUntil', $dateEnd);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_print_project_budget_report_filters')) {
+	/**
+	 * Print content period filters for a single project report.
+	 *
+	 * @param  int                 $projectId Project id
+	 * @param  array<string,mixed> $filters   Normalized filters
+	 * @return void
+	 */
+	function lmdbadvancedproject_print_project_budget_report_filters($projectId, $filters)
+	{
+		global $db, $langs;
+
+		$projectId = (int) $projectId;
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		$form = new Form($db);
+		$action = dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1);
+		$resetUrl = $action.'?id='.$projectId;
+		$dateStartTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportProjectFilterDateStartHelp'), 2, 1, img_info(''), '', 3);
+		$dateEndTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportProjectFilterDateEndHelp'), 2, 1, img_info(''), '', 3);
+		$contentPeriodTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportProjectExcludeContentOutsidePeriodHelp'), 2, 1, img_info(''), '', 3);
+
+		print '<form method="GET" action="'.lmdbadvancedproject_escape_html($action).'" class="budgetreport-filters">';
+		print '<input type="hidden" name="id" value="'.$projectId.'">';
+		print '<div class="budgetreport-filter-title">'.$langs->trans('BudgetReportFilters').'</div>';
+		print '<div class="budgetreport-filter-fields">';
+		print '<div class="budgetreport-filter-period">';
+		print '<div class="budgetreport-filter-period-title">'.$langs->trans('BudgetReportObservationPeriod').'</div>';
+		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateStart').' '.$dateStartTooltip.'</span>'.$form->selectDate($filters['date_start'] === '' ? -1 : $filters['date_start'], 'date_start', 0, 0, 1, '', 1, 0).'</label>';
+		print '</div>';
+		print '<div class="budgetreport-filter-field budgetreport-filter-date-field">';
+		print '<label><span>'.$langs->trans('BudgetReportFilterDateEnd').' '.$dateEndTooltip.'</span>'.$form->selectDate($filters['date_end'] === '' ? -1 : $filters['date_end'], 'date_end', 0, 0, 1, '', 1, 0).'</label>';
+		print '</div>';
+		print '</div>';
+		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportExcludeContentOutsidePeriod').' '.$contentPeriodTooltip.'</span>'.$form->selectyesno('exclude_content_outside_period', $filters['exclude_content_outside_period'], 1, false, 0, 1).'</label>';
+		print ajax_combobox('exclude_content_outside_period');
+		print '<div class="budgetreport-filter-actions">';
+		print '<button type="submit" class="button">'.$langs->trans('BudgetReportApplyFilters').'</button>';
+		print '<a class="button" href="'.lmdbadvancedproject_escape_html($resetUrl).'">'.$langs->trans('BudgetReportResetFilters').'</a>';
+		print '</div>';
+		print '</div>';
+		print '</form>';
 	}
 }
 
@@ -1377,22 +1450,30 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 	 * @param  string $orderEntities           Customer order entity filter
 	 * @param  string $supplierInvoiceEntities Supplier invoice entity filter
 	 * @param  string $supplierOrderEntities   Supplier order entity filter
-	 * @param  string $expenseReportEntities   Expense report entity filter
+	 * @param  string               $expenseReportEntities Expense report entity filter
+	 * @param  array<string,mixed>  $filters              Normalized report filters
 	 * @return array<string,mixed>
 	 */
-	function lmdbadvancedproject_load_project_forecast($projectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities)
+	function lmdbadvancedproject_load_project_forecast($projectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters = array())
 	{
 		global $db;
 
 		$forecast = lmdbadvancedproject_init_forecast();
 		$projectId = (int) $projectId;
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		$orderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('c.date_commande', $filters);
+		$supplierInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ff.datef', $filters);
+		$supplierOrderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('COALESCE(cf.date_commande, DATE(cf.date_creation))', $filters);
+		$timeDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ptt.element_date', $filters);
+		$expenseDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ed.date', $filters);
 
 		$categorySql = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'cd');
 		$sql = "SELECT 'customer_order' AS source_type, c.rowid AS document_id, c.ref AS document_ref, c.date_commande AS document_date, c.fk_statut AS document_status, 0 AS document_paid, 0 AS document_billed, cd.fk_product, cd.label AS line_label, cd.description AS line_description, cd.qty, cd.total_ht AS amount_ht, (COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0)) AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."commande c
 			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
 			".$categorySql['join']."
-			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.") AND cd.product_type IN (0,1)";
+			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.") AND cd.product_type IN (0,1)
+			AND ".$orderDateCondition;
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -1409,7 +1490,8 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
 			".$categorySql['join']."
-			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)".$supplierInvoiceSplitExclusion;
+			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)
+			AND ".$supplierInvoiceDateCondition.$supplierInvoiceSplitExclusion;
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -1429,7 +1511,8 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 				AND ff.fk_statut IN (1,2)
 				AND ff.entity IN (".$supplierInvoiceEntities.")
 				AND sip.entity IN (".$supplierInvoiceEntities.")
-				AND ffd.product_type IN (0,1)";
+				AND ffd.product_type IN (0,1)
+				AND ".$supplierInvoiceDateCondition;
 			$resql = $db->query($sql);
 			if ($resql) {
 				while ($obj = $db->fetch_object($resql)) {
@@ -1455,6 +1538,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")
 			AND cfd.product_type IN (0,1)
+			AND ".$supplierOrderDateCondition."
 			".$supplierOrderSplitExclusion."
 			HAVING amount_ht > 0";
 		$resql = $db->query($sql);
@@ -1477,6 +1561,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			INNER JOIN ".MAIN_DB_PREFIX."projet_task pt ON ptt.fk_element = pt.rowid
 			LEFT JOIN ".MAIN_DB_PREFIX."user u ON u.rowid = ptt.fk_user
 			WHERE ptt.elementtype = 'task' AND ptt.element_duration > 0 AND pt.fk_projet = ".$projectId." AND pt.entity IN (".$projectEntities.")
+			AND ".$timeDateCondition."
 			GROUP BY pt.rowid, pt.ref, pt.label, ptt.fk_user
 			ORDER BY pt.ref ASC, pt.label ASC, ptt.fk_user ASC";
 		$resql = $db->query($sql);
@@ -1523,6 +1608,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			LEFT JOIN ".MAIN_DB_PREFIX."expensereport ex ON ed.fk_expensereport = ex.rowid
 			LEFT JOIN ".MAIN_DB_PREFIX."user eu ON eu.rowid = ex.fk_user_author
 			WHERE ed.fk_projet = ".$projectId." AND ex.fk_user_approve > 0 AND ex.entity IN (".$expenseReportEntities.")
+			AND ".$expenseDateCondition."
 			ORDER BY ed.date ASC, ex.ref ASC";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -1998,7 +2084,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 	 * Load all data needed by the global and project budget reports.
 	 *
 	 * @param  int                 $budgetReportProjectId Project id for project tab, 0 for global report
-	 * @param  array<string,mixed> $filters               Global report filters
+	 * @param  array<string,mixed> $filters               Global or project report filters
 	 * @return array<string,mixed>
 	 */
 	function lmdbadvancedproject_load_budget_report_data($budgetReportProjectId = 0, $filters = array())
@@ -2051,11 +2137,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				$expenseProjectSqlFilter .= ' AND ed.fk_projet IN ('.$restrictedProjectsSql.')';
 			}
 		}
-		$contentPeriodIsActive = $budgetReportProjectId <= 0 && lmdbadvancedproject_budget_report_content_period_is_active($filters);
+		$contentPeriodIsActive = lmdbadvancedproject_budget_report_content_period_is_active($filters);
 		$contentFilters = $filters;
-		if ($budgetReportProjectId > 0) {
-			$contentFilters['exclude_content_outside_period'] = '0';
-		}
 		$orderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('c.date_commande', $contentFilters);
 		$customerInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('f.datef', $contentFilters);
 		$timeDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ptt.element_date', $contentFilters);
@@ -2634,7 +2717,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		$budgetReportForecast = array();
 		if ($budgetReportProjectId > 0 && !empty($projects)) {
-			$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectDataEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities);
+			$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectDataEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters);
 		}
 
 		$budgetChartTitleKey = "BudgetReportBudgetByProjects";
@@ -2773,7 +2856,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	 * Render the budget report body.
 	 *
 	 * @param  int                 $budgetReportProjectId  Project id for project tab, 0 for global report
-	 * @param  array<string,mixed> $filters                Global report filters
+	 * @param  array<string,mixed> $filters                Global or project report filters
 	 * @param  bool                $permissionToGeneratePdf Whether PDF generation is allowed
 	 * @return void
 	 */
@@ -2790,7 +2873,15 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		$budgetReportData = lmdbadvancedproject_load_budget_report_data($budgetReportProjectId, $filters);
 		extract($budgetReportData, EXTR_OVERWRITE);
 		$monthlyChartMinWidth = max(720, (count($monthAxis) * 90) + 180);
-		$exportParameters = $budgetReportProjectId > 0 ? array('project_id' => $budgetReportProjectId) : $filters;
+		$exportParameters = $filters;
+		if ($budgetReportProjectId > 0) {
+			$exportParameters = array(
+				'project_id' => $budgetReportProjectId,
+				'date_start' => $filters['date_start'],
+				'date_end' => $filters['date_end'],
+				'exclude_content_outside_period' => $filters['exclude_content_outside_period'],
+			);
+		}
 		$exportBaseUrl = dol_buildpath('/lmdbadvancedproject/budgetreportexport.php', 1).'?'.http_build_query($exportParameters);
 		$pdfFormTarget = getDolGlobalInt('MAIN_DISABLE_FORCE_SAVEAS') ? ' target="_blank"' : '';
 		$formBudgetReport = new Form($db);
@@ -2811,6 +2902,9 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	<form method="POST" action="<?php echo lmdbadvancedproject_escape_html(dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $budgetReportProjectId); ?>" id="budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>"<?php echo $pdfFormTarget; ?> hidden>
 		<input type="hidden" name="token" value="<?php echo newToken(); ?>">
 		<input type="hidden" name="action" value="generate_budgetreport">
+		<input type="hidden" name="date_start" value="<?php echo lmdbadvancedproject_escape_html($filters['date_start']); ?>">
+		<input type="hidden" name="date_end" value="<?php echo lmdbadvancedproject_escape_html($filters['date_end']); ?>">
+		<input type="hidden" name="exclude_content_outside_period" value="<?php echo lmdbadvancedproject_escape_html($filters['exclude_content_outside_period']); ?>">
 	</form>
 	<div class="inline-block divButAction">
 		<a class="butAction" href="#" role="button" onclick="document.getElementById('budgetreport-pdf-form-<?php echo (int) $budgetReportProjectId; ?>').submit(); return false;"><?php echo $langs->trans('BudgetReportGeneratePdf'); ?></a>
@@ -3370,12 +3464,13 @@ if (!function_exists('lmdbadvancedproject_render_project_budget_report')) {
 	/**
 	 * Render the budget report for a single project.
 	 *
-	 * @param  int  $projectId               Project id
-	 * @param  bool $permissionToGeneratePdf Whether PDF generation is allowed
+	 * @param  int                 $projectId               Project id
+	 * @param  bool                $permissionToGeneratePdf Whether PDF generation is allowed
+	 * @param  array<string,mixed> $filters                 Project report filters
 	 * @return void
 	 */
-	function lmdbadvancedproject_render_project_budget_report($projectId, $permissionToGeneratePdf = false)
+	function lmdbadvancedproject_render_project_budget_report($projectId, $permissionToGeneratePdf = false, $filters = array())
 	{
-		lmdbadvancedproject_render_budget_report((int) $projectId, array(), $permissionToGeneratePdf);
+		lmdbadvancedproject_render_budget_report((int) $projectId, $filters, $permissionToGeneratePdf);
 	}
 }
