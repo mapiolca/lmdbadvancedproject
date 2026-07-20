@@ -3,6 +3,7 @@
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/task.class.php';
 require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
+require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
@@ -503,7 +504,7 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 	 * Normalize global budget report filters.
 	 *
 	 * @param  array<string,mixed> $filters Raw filters
-	 * @return array<string,string>
+	 * @return array<string,mixed>
 	 */
 	function lmdbadvancedproject_normalize_budget_report_filters($filters = array())
 	{
@@ -514,6 +515,7 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 			'ignore_ended_after' => '0',
 			'exclude_content_outside_period' => '0',
 			'project_status' => 'open',
+			'project_ids' => array(),
 		);
 
 		if (is_array($filters)) {
@@ -527,9 +529,186 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 			if (in_array($projectStatus, array('open', 'closed', 'both'), true)) {
 				$normalized['project_status'] = $projectStatus;
 			}
+
+			$projectIds = isset($filters['project_ids']) ? $filters['project_ids'] : array();
+			if (!is_array($projectIds)) {
+				$projectIds = explode(',', (string) $projectIds);
+			}
+			$normalizedProjectIds = array();
+			foreach ($projectIds as $projectId) {
+				$projectId = (int) $projectId;
+				if ($projectId > 0) {
+					$normalizedProjectIds[$projectId] = $projectId;
+				}
+			}
+			$normalized['project_ids'] = array_values($normalizedProjectIds);
 		}
 
 		return $normalized;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_budget_report_authorized_project_ids')) {
+	/**
+	 * Return project ids available to the current user, or null when unrestricted by assignment.
+	 *
+	 * Entity and Multicompany filters are applied separately to each report query.
+	 *
+	 * @return list<int>|null
+	 */
+	function lmdbadvancedproject_get_budget_report_authorized_project_ids()
+	{
+		global $db, $user;
+
+		static $loaded = false;
+		static $authorizedProjectIds = null;
+		if ($loaded) {
+			return $authorizedProjectIds;
+		}
+		$loaded = true;
+
+		if (!empty($user->admin) || (empty($user->socid) && $user->hasRight('projet', 'all', 'lire'))) {
+			return null;
+		}
+
+		$projectStatic = new Project($db);
+		$authorizedProjectList = $projectStatic->getProjectsAuthorizedForUser($user, 0, 1, empty($user->socid) ? 0 : (int) $user->socid);
+		$authorizedProjectIds = array();
+		$authorizedProjectCandidates = is_array($authorizedProjectList)
+			? array_keys($authorizedProjectList)
+			: explode(',', (string) $authorizedProjectList);
+		foreach ($authorizedProjectCandidates as $projectId) {
+			$projectId = (int) $projectId;
+			if ($projectId > 0) {
+				$authorizedProjectIds[] = $projectId;
+			}
+		}
+
+		return $authorizedProjectIds;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_budget_report_project_options')) {
+	/**
+	 * Return projects available in the global budget report filter.
+	 *
+	 * @return array<int,string>
+	 */
+	function lmdbadvancedproject_get_budget_report_project_options()
+	{
+		global $db;
+
+		$entityShared = (lmdbadvancedproject_is_multicompany_enabled() && getDolGlobalInt('LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES')) ? 1 : 0;
+		$projectEntities = lmdbadvancedproject_get_entity_filter('project', $entityShared);
+		$orderEntities = lmdbadvancedproject_get_entity_filter('commande', 1);
+		$authorizedProjectIds = lmdbadvancedproject_get_budget_report_authorized_project_ids();
+
+		$sql = 'SELECT DISTINCT p.rowid, p.ref, p.title';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'projet p';
+		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'commande c ON c.fk_projet = p.rowid';
+		$sql .= ' WHERE p.entity IN ('.$projectEntities.')';
+		$sql .= ' AND c.entity IN ('.$orderEntities.') AND c.fk_statut > 0';
+		if (is_array($authorizedProjectIds)) {
+			$sql .= ' AND p.rowid IN ('.(empty($authorizedProjectIds) ? '0' : implode(',', array_map('intval', $authorizedProjectIds))).')';
+		}
+		$sql .= ' ORDER BY p.ref ASC';
+
+		$options = array();
+		$result = $db->query($sql);
+		if (!$result) {
+			dol_syslog(__FUNCTION__.': failed to load project filter options: '.$db->lasterror(), LOG_ERR);
+			return $options;
+		}
+		while (is_object($projectRow = $db->fetch_object($result))) {
+			$label = (string) $projectRow->ref;
+			if (!empty($projectRow->title)) {
+				$label .= ' - '.(string) $projectRow->title;
+			}
+			$options[(int) $projectRow->rowid] = $label;
+		}
+		$db->free($result);
+
+		return $options;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_customer_order_list_url')) {
+	/**
+	 * Build the native customer order list URL matching a project report total.
+	 *
+	 * @param  string              $projectRef Project reference
+	 * @param  array<string,mixed> $filters    Normalized report filters
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_customer_order_list_url($projectRef, $filters)
+	{
+		$params = array(
+			'leftmenu' => 'orders',
+			'search_project_ref' => (string) $projectRef,
+			'search_status' => -3,
+		);
+
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		if (lmdbadvancedproject_budget_report_content_period_is_active($filters)) {
+			$dateParameters = array(
+				'date_start' => 'search_dateorder_start_',
+				'date_end' => 'search_dateorder_end_',
+			);
+			foreach ($dateParameters as $filterKey => $parameterPrefix) {
+				if (!empty($filters[$filterKey]) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $filters[$filterKey], $matches)) {
+					$params[$parameterPrefix.'year'] = (int) $matches[1];
+					$params[$parameterPrefix.'month'] = (int) $matches[2];
+					$params[$parameterPrefix.'day'] = (int) $matches[3];
+				}
+			}
+		}
+
+		return DOL_URL_ROOT.'/commande/list.php?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_customer_order_summary_html')) {
+	/**
+	 * Render an order amount linked to the native order list with detail tooltip.
+	 *
+	 * @param  Form                $form         Dolibarr form helper
+	 * @param  string              $projectRef   Project reference
+	 * @param  float|int           $orders       Project orders amount
+	 * @param  list<array{id:int,ref:string,date:string,amount:float}> $orderDetails Order details
+	 * @param  array<string,mixed> $filters      Normalized report filters
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_customer_order_summary_html($form, $projectRef, $orders, $orderDetails, $filters)
+	{
+		global $db, $langs, $user;
+
+		$formattedSummary = lmdbadvancedproject_format_price($orders);
+		if (!$user->hasRight('commande', 'lire')) {
+			return $formattedSummary;
+		}
+
+		$listUrl = lmdbadvancedproject_get_customer_order_list_url($projectRef, $filters);
+		$summaryLink = '<a href="'.dol_escape_htmltag($listUrl).'">'.$formattedSummary.'</a>';
+		if (empty($orderDetails)) {
+			return $summaryLink;
+		}
+
+		$tooltip = '<table class="nobordernopadding">';
+		$tooltip .= '<tr class="liste_titre"><th>'.$langs->trans('BudgetReportMarket').'</th><th>'.$langs->trans('Date').'</th><th class="right">'.$langs->trans('AmountHTShort').'</th></tr>';
+		foreach ($orderDetails as $orderDetail) {
+			$orderStatic = new Commande($db);
+			$orderStatic->id = (int) $orderDetail['id'];
+			$orderStatic->ref = (string) $orderDetail['ref'];
+
+			$tooltip .= '<tr>';
+			$tooltip .= '<td>'.$orderStatic->getNomUrl(1, '', 0, 0, 1).'</td>';
+			$tooltip .= '<td class="nowrap">'.lmdbadvancedproject_format_date($orderDetail['date']).'</td>';
+			$tooltip .= '<td class="right nowrap">'.lmdbadvancedproject_format_price($orderDetail['amount']).'</td>';
+			$tooltip .= '</tr>';
+		}
+		$tooltip .= '</table>';
+
+		return $form->textwithtooltip($summaryLink, $tooltip, 1, 0, '', '', 3, '', 1);
 	}
 }
 
@@ -662,7 +841,7 @@ if (!function_exists('lmdbadvancedproject_build_project_date_sql_filter')) {
 	/**
 	 * Build the SQL overlap filter for project dates.
 	 *
-	 * @param  array<string,string> $filters Normalized filters
+	 * @param  array<string,mixed> $filters Normalized filters
 	 * @return string
 	 */
 	function lmdbadvancedproject_build_project_date_sql_filter($filters)
@@ -711,7 +890,7 @@ if (!function_exists('lmdbadvancedproject_budget_report_content_period_is_active
 	/**
 	 * Check whether dated report content must be restricted to the observation period.
 	 *
-	 * @param  array<string,string> $filters Normalized filters
+	 * @param  array<string,mixed> $filters Normalized filters
 	 * @return bool
 	 */
 	function lmdbadvancedproject_budget_report_content_period_is_active($filters)
@@ -729,7 +908,7 @@ if (!function_exists('lmdbadvancedproject_build_content_date_sql_condition')) {
 	 * The date expression is supplied only by module code and must never contain request data.
 	 *
 	 * @param  string               $dateExpression Trusted SQL date expression
-	 * @param  array<string,string> $filters        Normalized filters
+	 * @param  array<string,mixed>  $filters        Normalized filters
 	 * @return string
 	 */
 	function lmdbadvancedproject_build_content_date_sql_condition($dateExpression, $filters)
@@ -756,7 +935,7 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 	/**
 	 * Print the global budget report filter form.
 	 *
-	 * @param  array<string,string> $filters Normalized filters
+	 * @param  array<string,mixed> $filters Normalized filters
 	 * @return void
 	 */
 	function lmdbadvancedproject_print_budget_report_filters($filters)
@@ -777,6 +956,9 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 		$ignoreEndedTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportIgnoreEndedAfterHelp'), 2, 1, img_info(''), '', 3);
 		$contentPeriodTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportExcludeContentOutsidePeriodHelp'), 2, 1, img_info(''), '', 3);
 		$statusTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportFilterStatusHelp'), 2, 1, img_info(''), '', 3);
+		$projectsTooltip = $form->textwithtooltip('', $langs->trans('BudgetReportFilterProjectsHelp'), 2, 1, img_info(''), '', 3);
+		$projectOptions = lmdbadvancedproject_get_budget_report_project_options();
+		$selectedProjectIds = array_map('strval', $filters['project_ids']);
 
 		print '<form method="GET" action="'.lmdbadvancedproject_escape_html($action).'" class="budgetreport-filters">';
 		print '<div class="budgetreport-filter-title">'.$langs->trans('BudgetReportFilters').'</div>';
@@ -800,6 +982,9 @@ if (!function_exists('lmdbadvancedproject_print_budget_report_filters')) {
 		}
 		print '</select></label>';
 		print ajax_combobox('project_status');
+		print '<label class="budgetreport-filter-field"><span>'.$langs->trans('BudgetReportFilterProjects').' '.$projectsTooltip.'</span>';
+		print $form->multiselectarray('project_ids', $projectOptions, $selectedProjectIds, 0, 0, 'minwidth300', 0, 320, '', '', $langs->trans('BudgetReportAllProjects'), 1);
+		print '</label>';
 		print '<div class="budgetreport-filter-actions">';
 		print '<button type="submit" class="button">'.$langs->trans('BudgetReportApplyFilters').'</button>';
 		print '<a class="button" href="'.lmdbadvancedproject_escape_html($action).'">'.$langs->trans('BudgetReportResetFilters').'</a>';
@@ -1843,6 +2028,27 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 		$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
+		if ($budgetReportProjectId <= 0) {
+			$restrictedProjectIds = null;
+			$authorizedProjectIds = lmdbadvancedproject_get_budget_report_authorized_project_ids();
+			if (is_array($authorizedProjectIds)) {
+				$restrictedProjectIds = array_values(array_unique(array_map('intval', $authorizedProjectIds)));
+			}
+			if (!empty($filters['project_ids'])) {
+				$requestedProjectIds = array_values(array_unique(array_map('intval', $filters['project_ids'])));
+				$restrictedProjectIds = is_array($restrictedProjectIds)
+					? array_values(array_intersect($restrictedProjectIds, $requestedProjectIds))
+					: $requestedProjectIds;
+			}
+			if (is_array($restrictedProjectIds)) {
+				$restrictedProjectsSql = empty($restrictedProjectIds) ? '0' : implode(',', $restrictedProjectIds);
+				$projectSqlFilter .= ' AND p.rowid IN ('.$restrictedProjectsSql.')';
+				$orderProjectSqlFilter .= ' AND c.fk_projet IN ('.$restrictedProjectsSql.')';
+				$vendorInvoiceProjectSqlFilter .= ' AND ff.fk_projet IN ('.$restrictedProjectsSql.')';
+				$supplierOrderProjectSqlFilter .= ' AND cf.fk_projet IN ('.$restrictedProjectsSql.')';
+				$expenseProjectSqlFilter .= ' AND ed.fk_projet IN ('.$restrictedProjectsSql.')';
+			}
+		}
 		$contentPeriodIsActive = $budgetReportProjectId <= 0 && lmdbadvancedproject_budget_report_content_period_is_active($filters);
 		$contentFilters = $filters;
 		if ($budgetReportProjectId > 0) {
@@ -1905,6 +2111,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				"public" => (int) $obj->public,
 				"budget" => $projectBudget,
 				"orders" => $projectOrders,
+				"order_details" => array(),
 				"invoiced" => 0,
 				"invoice_details" => array(),
 				"spent" => 0,
@@ -1962,11 +2169,45 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$db->free($result);
 		}
 
+		/** @var array<int,list<array{id:int,ref:string,date:string,amount:float}>> $customerOrderDetails */
+		$customerOrderDetails = array();
+		$selectedReportProjectIds = array_map('intval', array_keys($projects));
+		if (!empty($selectedReportProjectIds)) {
+			$selectedReportProjectsSql = implode(',', $selectedReportProjectIds);
+			$sqlCustomerOrderDetails = "SELECT c.fk_projet, c.rowid AS order_id, c.ref AS order_ref, c.date_commande AS order_date, COALESCE(c.total_ht, 0) AS total_order
+				FROM ".MAIN_DB_PREFIX."commande c
+				WHERE c.fk_projet IN (".$selectedReportProjectsSql.") AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")
+				AND ".$orderDateCondition."
+				ORDER BY c.date_commande DESC, c.ref DESC";
+			$resultCustomerOrderDetails = $db->query($sqlCustomerOrderDetails);
+			if (!$resultCustomerOrderDetails) {
+				dol_syslog(__FUNCTION__.': failed to load customer order details: '.$db->lasterror(), LOG_ERR);
+			} else {
+				while (is_object($orderRow = $db->fetch_object($resultCustomerOrderDetails))) {
+					$projectId = (int) $orderRow->fk_projet;
+					if (!isset($customerOrderDetails[$projectId])) {
+						$customerOrderDetails[$projectId] = array();
+					}
+					$customerOrderDetails[$projectId][] = array(
+						'id' => (int) $orderRow->order_id,
+						'ref' => (string) $orderRow->order_ref,
+						'date' => (string) $orderRow->order_date,
+						'amount' => (float) $orderRow->total_order,
+					);
+				}
+				$db->free($resultCustomerOrderDetails);
+			}
+		}
+		foreach (array_keys($projects) as $pid) {
+			if (!empty($customerOrderDetails[$pid])) {
+				$projects[$pid]['order_details'] = $customerOrderDetails[$pid];
+			}
+		}
+
 		/** @var array<int,list<array{id:int,ref:string,type:int,date:string,amount:float}>> $customerInvoiceDetails */
 		$customerInvoiceDetails = array();
-		$selectedCustomerInvoiceProjectIds = array_map('intval', array_keys($projects));
-		if (!empty($selectedCustomerInvoiceProjectIds)) {
-			$selectedCustomerInvoiceProjectsSql = implode(',', $selectedCustomerInvoiceProjectIds);
+		if (!empty($selectedReportProjectIds)) {
+			$selectedCustomerInvoiceProjectsSql = implode(',', $selectedReportProjectIds);
 			$customerInvoiceSplitEnabled = lmdbadvancedproject_customer_invoice_split_report_enabled();
 			if ($customerInvoiceSplitEnabled) {
 				$directInvoiceContributionsSql = "SELECT f.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, SUM(COALESCE(fd.total_ht, 0)) AS total_invoice
@@ -3076,7 +3317,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 		<tr>
 			<td><?php echo $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php', 1); ?></td>
-			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_get_customer_order_summary_html($formBudgetReport, $data['project_ref'], $data['orders'], $data['order_details'], $filters); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_get_customer_invoice_summary_html($formBudgetReport, $data['project_ref'], $data['invoiced'], $data['orders'], $data['invoice_details'], $filters); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>

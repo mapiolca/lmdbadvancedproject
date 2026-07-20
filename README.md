@@ -12,6 +12,8 @@ The global report can restrict dated project content to an inclusive observation
 
 The global project table displays each project's invoiced amount and invoicing rate next to its orders. The amount links to Dolibarr's native customer invoice list, while its tooltip lists the contributing invoices, dates, and project-attributed amounts. ODS and XLSX exports provide separate numeric columns for the invoiced amount and rate.
 
+Customer order totals also link to Dolibarr's native order list and expose the contributing orders, dates, and amounts in a native tooltip. A project multiselect limits the global report and its spreadsheet exports to the selected accessible projects.
+
 The report includes a monthly time matrix by project on the global page and by task on an individual project. The total time cost and total decimal hours are displayed together in the Spent tile.
 
 The monthly budget-versus-spent chart also overlays recorded hours on a secondary axis. Each series can be shown or hidden from the chart legend, and an information tooltip explains how hours relate to total spending.

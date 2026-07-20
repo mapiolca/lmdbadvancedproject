@@ -82,6 +82,7 @@ $budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array
 	'ignore_ended_after' => GETPOST('ignore_ended_after', 'alpha'),
 	'exclude_content_outside_period' => GETPOST('exclude_content_outside_period', 'alpha'),
 	'project_status' => GETPOST('project_status', 'alpha'),
+	'project_ids' => GETPOST('project_ids', 'array:int'),
 ));
 
 

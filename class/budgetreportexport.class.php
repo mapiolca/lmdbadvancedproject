@@ -271,12 +271,26 @@ class LmdbAdvancedProjectBudgetReportExport
 			$row++;
 		} elseif (!empty($this->data['filters'])) {
 			$statusLabels = array('open' => 'BudgetReportStatusOpen', 'closed' => 'BudgetReportStatusClosed', 'both' => 'BudgetReportStatusBoth');
+			$projectFilterValue = $this->outputlangs->transnoentities('BudgetReportAllProjects');
+			if (!empty($this->data['filters']['project_ids'])) {
+				$projectFilterLabels = array();
+				$projectOptions = lmdbadvancedproject_get_budget_report_project_options();
+				foreach ($this->data['filters']['project_ids'] as $projectId) {
+					if (isset($projectOptions[(int) $projectId])) {
+						$projectFilterLabels[] = $projectOptions[(int) $projectId];
+					}
+				}
+				$projectFilterValue = empty($projectFilterLabels)
+					? $this->outputlangs->transnoentities('NoRecordFound')
+					: implode(', ', $projectFilterLabels);
+			}
 			$filterRows = array(
 				array('BudgetReportFilterDateStart', $this->data['filters']['date_start']),
 				array('BudgetReportFilterDateEnd', $this->data['filters']['date_end']),
 				array('BudgetReportFilterStatus', $this->outputlangs->transnoentities($statusLabels[$this->data['filters']['project_status']])),
 				array('BudgetReportIgnoreStartedBefore', $this->outputlangs->transnoentities($this->data['filters']['ignore_started_before'] === '1' ? 'Yes' : 'No')),
 				array('BudgetReportIgnoreEndedAfter', $this->outputlangs->transnoentities($this->data['filters']['ignore_ended_after'] === '1' ? 'Yes' : 'No')),
+				array('BudgetReportFilterProjects', $projectFilterValue),
 			);
 			foreach ($filterRows as $filterIndex => $filterRow) {
 				$filterRowNumber = 3 + (int) floor($filterIndex / 2);
