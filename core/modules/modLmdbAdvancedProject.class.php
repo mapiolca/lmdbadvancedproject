@@ -56,7 +56,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.2.1';
+		$this->version = '1.3.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
@@ -67,7 +67,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'menus' => 0,
 			'tpl' => 0,
 			'barcode' => 0,
-			'models' => 0,
+			'models' => 1,
 			'printing' => 0,
 			'theme' => 0,
 			'css' => array(
@@ -93,8 +93,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->requiredby = array();
 		$this->conflictwith = array();
 		$this->langfiles = array('lmdbadvancedproject@lmdbadvancedproject');
-		$this->phpmin = array(5, 6);
-		$this->need_dolibarr_version = array(11, -3);
+		$this->phpmin = array(8, 0);
+		$this->need_dolibarr_version = array(20, 0);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array(
@@ -147,17 +147,18 @@ class modLmdbAdvancedProject extends DolibarrModules
 
 		$this->rights = array();
 		$r = 0;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$r++;
+		$this->rights[$r][0] = $this->numero * 100 + $r;
 		$this->rights[$r][1] = 'ReadBudgetReport';
 		$this->rights[$r][4] = 'budgetreport';
 		$this->rights[$r][5] = 'read';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][0] = $this->numero * 100 + $r;
 		$this->rights[$r][1] = 'ReadInvoiceBreakdown';
 		$this->rights[$r][4] = 'split';
 		$this->rights[$r][5] = 'read';
 		$r++;
-		$this->rights[$r][0] = $this->numero . sprintf('%02d', $r + 1);
+		$this->rights[$r][0] = $this->numero * 100 + $r;
 		$this->rights[$r][1] = 'WriteInvoiceBreakdown';
 		$this->rights[$r][4] = 'split';
 		$this->rights[$r][5] = 'write';

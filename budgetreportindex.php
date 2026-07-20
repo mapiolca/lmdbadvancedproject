@@ -63,12 +63,11 @@ $langs->loadLangs(array("lmdbadvancedproject@lmdbadvancedproject"));
 
 $action = GETPOST('action', 'aZ09');
 
+if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+	accessforbidden();
+}
 
-// Security check
-// if (! $user->rights->lmdbadvancedproject->budgetreport->read) {
-// 	accessforbidden();
-// }
-$socid = GETPOST('socid', 'int');
+$socid = GETPOSTINT('socid');
 if (isset($user->socid) && $user->socid > 0) {
 	$action = '';
 	$socid = $user->socid;
@@ -77,11 +76,13 @@ if (isset($user->socid) && $user->socid > 0) {
 $max = 5;
 $now = dol_now();
 $budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
-	'date_start' => GETPOST('date_start', 'alpha'),
-	'date_end' => GETPOST('date_end', 'alpha'),
+	'date_start' => lmdbadvancedproject_get_budget_report_request_date('date_start'),
+	'date_end' => lmdbadvancedproject_get_budget_report_request_date('date_end'),
 	'ignore_started_before' => GETPOST('ignore_started_before', 'alpha'),
 	'ignore_ended_after' => GETPOST('ignore_ended_after', 'alpha'),
+	'exclude_content_outside_period' => GETPOST('exclude_content_outside_period', 'alpha'),
 	'project_status' => GETPOST('project_status', 'alpha'),
+	'project_ids' => GETPOST('project_ids', 'array:int'),
 ));
 
 
@@ -100,14 +101,15 @@ $form = new Form($db);
 $formfile = new FormFile($db);
 $title = $langs->trans("BudgetReportArea");
 $help_url = '';
+$budgetReportCss = array('/lmdbadvancedproject/css/budgetreport.css.php?revision='.(string) filemtime(__DIR__.'/css/budgetreport.css.php'));
 
-llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'bodyforlist mod-order page-list');
+llxHeader('', $title, $help_url, '', 0, 0, '', $budgetReportCss, '', 'bodyforlist mod-order page-list classforhorizontalscrolloftabs');
 
 print_barre_liste($title, 0, $_SERVER["PHP_SELF"], '', '', '', '', 0, 0, 'fa-chart-pie', 0, '', '', 0, 1, 1);
 
 ?>
-<div class="fichecenter">
-<div >
+<div class="fichecenter budgetreport-page">
+<div class="budgetreport-page-inner">
 
 
 <?php
@@ -118,6 +120,9 @@ lmdbadvancedproject_render_global_budget_report($budgetReportFilters);
 <div class="tabBar" style='clear:both;'>
 <div class="warning"><?php echo $langs->trans("BudgetReportOpenProjectsNote"); ?></div>
 <div class="warning"><?php echo $langs->trans("BudgetReportMonthlySplitNote"); ?></div>
+</div>
+
+</div>
 </div>
 
 <?php

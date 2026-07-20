@@ -205,9 +205,27 @@ div.mainmenu.budgetreport {
 .budgetreport-summary-fullwidth,
 .budgetreport-report,
 .budgetreport-month-section,
-.budgetreport-table-section {
+.budgetreport-table-section,
+.budgetreport-time-section {
 	clear: both;
 	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.budgetreport-page,
+.budgetreport-page-inner {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow-x: hidden;
+}
+
+.budgetreport-report {
+	overflow-x: hidden;
 }
 
 .budgetreport-filters {
@@ -257,7 +275,8 @@ div.mainmenu.budgetreport {
 	gap: 4px;
 }
 
-.budgetreport-filter-field span {
+.budgetreport-filter-field > span,
+.budgetreport-filter-field > label > span {
 	font-size: 90%;
 	color: #555;
 }
@@ -268,17 +287,11 @@ div.mainmenu.budgetreport {
 	box-sizing: border-box;
 }
 
-.budgetreport-filter-checkbox {
+.budgetreport-filter-binary {
 	display: flex;
-	align-items: flex-start;
-	gap: 6px;
-	font-size: 90%;
-	line-height: 1.2;
-}
-
-.budgetreport-filter-checkbox input[type="checkbox"] {
-	min-height: 0;
-	margin-top: 1px;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 100%;
 }
 
 .budgetreport-filter-actions {
@@ -286,6 +299,49 @@ div.mainmenu.budgetreport {
 	flex-wrap: wrap;
 	gap: 8px;
 	align-items: center;
+}
+
+.budgetreport-document-tooltip-table {
+	width: 100%;
+	min-width: 440px;
+	border-collapse: separate;
+	border-spacing: 0;
+	table-layout: fixed;
+}
+
+.budgetreport-document-tooltip-table th,
+.budgetreport-document-tooltip-table td {
+	padding: 6px 10px !important;
+	box-sizing: border-box;
+	vertical-align: middle;
+}
+
+.budgetreport-document-tooltip-table th {
+	font-weight: 600;
+}
+
+.budgetreport-document-tooltip-table tbody tr + tr td {
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.budgetreport-document-tooltip-ref {
+	min-width: 190px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.budgetreport-document-tooltip-date {
+	width: 105px;
+	min-width: 105px;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.budgetreport-document-tooltip-amount {
+	width: 135px;
+	min-width: 135px;
+	text-align: right;
+	white-space: nowrap;
 }
 
 .budgetreport-summary-fullwidth {
@@ -362,11 +418,15 @@ div.mainmenu.budgetreport {
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 32px;
 	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
 	align-items: start;
 }
 
 .budgetreport-chart-panel {
 	min-width: 0;
+	max-width: 100%;
 }
 
 .budgettitle {
@@ -389,6 +449,41 @@ div.mainmenu.budgetreport {
 	max-height: 350px;
 }
 
+.budgetreport-chart-scroll,
+.budgetreport-table-scroll,
+.budgetreport-time-scroll {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+}
+
+.budgetreport-chart-content {
+	min-width: 560px;
+}
+
+.budgetreport-month-section .budgetbarchart {
+	margin-bottom: 8px;
+}
+
+.budgetreport-month-scrollbar {
+	width: 100%;
+	max-width: 100%;
+	height: 18px;
+	margin-bottom: 30px;
+	overflow-x: auto;
+	overflow-y: hidden;
+	-webkit-overflow-scrolling: touch;
+}
+
+.budgetreport-month-scrollbar-track {
+	height: 1px;
+}
+
 .budgetchart canvas,
 .budgetbarchart canvas {
 	max-width: 100%;
@@ -397,6 +492,12 @@ div.mainmenu.budgetreport {
 
 .budgetreport-table-section .budgettbl {
 	width: 100%;
+}
+
+.budgetreport-table-scroll > .budgettbl {
+	width: max-content;
+	min-width: 100%;
+	max-width: none;
 }
 
 .budgettbl th{
@@ -505,6 +606,45 @@ div.mainmenu.budgetreport {
 	margin-top: 20px;
 }
 
+.budgetreport-time-section {
+	margin-top: 24px;
+}
+
+.budgetreport-time-scroll {
+	margin-bottom: 30px;
+}
+
+.budgetreport-time-table {
+	width: max-content;
+	min-width: 100%;
+	max-width: none;
+}
+
+.budgetreport-time-table th,
+.budgetreport-time-table td {
+	min-width: 82px;
+}
+
+.budgetreport-time-table .budgetreport-time-label {
+	position: sticky;
+	left: 0;
+	z-index: 1;
+	min-width: 260px;
+	max-width: 360px;
+	background: var(--colorbacklineimpair, #fff);
+}
+
+.budgetreport-time-table thead .budgetreport-time-label {
+	z-index: 2;
+	background: var(--colorbacktitle1, #f2f2f2);
+}
+
+.budgetreport-time-row-label {
+	display: block;
+	margin-top: 2px;
+	white-space: normal;
+}
+
 .budgetreport-forecast-subtitle {
 	margin-top: 16px;
 }
@@ -607,6 +747,32 @@ div.mainmenu.budgetreport {
 }
 
 @media only screen and (max-width: 480px) {
+	.budgetreport-document-tooltip-table {
+		width: calc(100vw - 48px);
+		min-width: 0;
+	}
+
+	.budgetreport-document-tooltip-table th,
+	.budgetreport-document-tooltip-table td {
+		padding: 5px 6px !important;
+	}
+
+	.budgetreport-document-tooltip-ref {
+		width: auto;
+		min-width: 0;
+		white-space: normal;
+	}
+
+	.budgetreport-document-tooltip-date {
+		width: 85px;
+		min-width: 85px;
+	}
+
+	.budgetreport-document-tooltip-amount {
+		width: 100px;
+		min-width: 100px;
+	}
+
 	.budgetreport-filter-field,
 	.budgetreport-filter-actions {
 		width: 100%;

@@ -59,10 +59,18 @@ require_once dirname(__DIR__).'/lib/budgetreport.lib.php';
 
 $langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 
-$id = GETPOST('id', 'int');
+$id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
+$action = GETPOST('action', 'aZ09');
+$budgetReportFilters = lmdbadvancedproject_normalize_budget_report_filters(array(
+	'date_start' => lmdbadvancedproject_get_budget_report_request_date('date_start'),
+	'date_end' => lmdbadvancedproject_get_budget_report_request_date('date_end'),
+	'exclude_content_outside_period' => GETPOST('exclude_content_outside_period', 'alpha'),
+));
 
-if (!$user->rights->projet->lire || empty($user->rights->lmdbadvancedproject->budgetreport->read)) {
+$hookmanager->initHooks(array('projectbudgetreport', 'projectcard', 'globalcard'));
+
+if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 	accessforbidden();
 }
 
@@ -80,8 +88,36 @@ if ($id > 0 || !empty($ref)) {
 
 restrictedArea($user, 'projet', $object->id, 'projet&project');
 
+$projectWriteAccess = $object->restrictedProjectArea($user, 'write') > 0;
+$permissionToGenerate = $user->hasRight('projet', 'creer') && $projectWriteAccess;
+
+$parameters = array('id' => (int) $object->id, 'budgetreport_filters' => $budgetReportFilters);
+$reshook = $hookmanager->executeHooks('doActions', $parameters, $object, $action);
+if ($reshook < 0) {
+	setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
+}
+
+if (empty($reshook) && $action === 'generate_budgetreport') {
+	if (!$permissionToGenerate) {
+		accessforbidden();
+	}
+	if (!isset($object->context) || !is_array($object->context)) {
+		$object->context = array();
+	}
+	$object->context['budgetreport_filters'] = $budgetReportFilters;
+	$result = $object->generateDocument('budgetreport', $langs);
+	if ($result <= 0) {
+		setEventMessages($object->error, $object->errors, 'errors');
+	} else {
+		$relativeFile = dol_sanitizeFileName($object->ref).'/'.lmdbadvancedproject_budget_report_filename($object->ref, $langs);
+		header('Location: '.DOL_URL_ROOT.'/document.php?modulepart=project&entity='.(int) $object->entity.'&file='.urlencode($relativeFile));
+		exit;
+	}
+}
+
 $title = $langs->trans('BudgetReportProjectTab').' - '.$object->ref.' '.$object->title;
-llxHeader('', $title);
+$budgetReportCss = array('/lmdbadvancedproject/css/budgetreport.css.php?revision='.(string) filemtime(dirname(__DIR__).'/css/budgetreport.css.php'));
+llxHeader('', $title, '', '', 0, 0, '', $budgetReportCss, '', 'classforhorizontalscrolloftabs');
 
 $head = project_prepare_head($object);
 print dol_get_fiche_head($head, 'budgetreport', $langs->trans('Project'), -1, ($object->public ? 'projectpub' : 'project'));
@@ -103,8 +139,10 @@ $morehtmlref .= '</div>';
 
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 
-print '<div class="fichecenter">';
-lmdbadvancedproject_render_project_budget_report((int) $object->id);
+lmdbadvancedproject_print_project_budget_report_filters((int) $object->id, $budgetReportFilters);
+
+print '<div class="fichecenter budgetreport-page">';
+lmdbadvancedproject_render_project_budget_report((int) $object->id, $permissionToGenerate, $budgetReportFilters);
 print '</div>';
 
 print dol_get_fiche_end();
