@@ -3,6 +3,7 @@
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/task.class.php';
 require_once DOL_DOCUMENT_ROOT.'/expensereport/class/expensereport.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
 
@@ -529,6 +530,93 @@ if (!function_exists('lmdbadvancedproject_normalize_budget_report_filters')) {
 		}
 
 		return $normalized;
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_customer_invoice_list_url')) {
+	/**
+	 * Build the native customer invoice list URL matching a project report total.
+	 *
+	 * @param  string              $projectRef Project reference
+	 * @param  array<string,mixed> $filters    Normalized report filters
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_customer_invoice_list_url($projectRef, $filters)
+	{
+		$params = array(
+			'leftmenu' => 'customers_bills',
+			'search_project_ref' => (string) $projectRef,
+		);
+
+		if (defined('DOL_VERSION') && version_compare(DOL_VERSION, '24.0.0-alpha', '>=')) {
+			$params['search_status'] = array(1, 2);
+		} else {
+			$params['search_status'] = '1,2';
+		}
+
+		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
+		if (lmdbadvancedproject_budget_report_content_period_is_active($filters)) {
+			$dateParameters = array(
+				'date_start' => 'search_date_start',
+				'date_end' => 'search_date_end',
+			);
+			foreach ($dateParameters as $filterKey => $parameterPrefix) {
+				if (!empty($filters[$filterKey]) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $filters[$filterKey], $matches)) {
+					$params[$parameterPrefix.'year'] = (int) $matches[1];
+					$params[$parameterPrefix.'month'] = (int) $matches[2];
+					$params[$parameterPrefix.'day'] = (int) $matches[3];
+				}
+			}
+		}
+
+		return DOL_URL_ROOT.'/compta/facture/list.php?'.http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+	}
+}
+
+if (!function_exists('lmdbadvancedproject_get_customer_invoice_summary_html')) {
+	/**
+	 * Render an invoiced amount linked to the native invoice list with detail tooltip.
+	 *
+	 * @param  Form                $form       Dolibarr form helper
+	 * @param  string              $projectRef Project reference
+	 * @param  float|int           $invoiced   Project-attributed invoiced amount
+	 * @param  float|int           $orders     Project orders amount
+	 * @param  list<array{id:int,ref:string,type:int,date:string,amount:float}> $invoiceDetails Invoice contributions
+	 * @param  array<string,mixed> $filters    Normalized report filters
+	 * @return string
+	 */
+	function lmdbadvancedproject_get_customer_invoice_summary_html($form, $projectRef, $invoiced, $orders, $invoiceDetails, $filters)
+	{
+		global $db, $langs, $user;
+
+		$formattedSummary = lmdbadvancedproject_format_price($invoiced).' ('.lmdbadvancedproject_format_percentage($invoiced, $orders).')';
+		if (!$user->hasRight('facture', 'read')) {
+			return $formattedSummary;
+		}
+
+		$listUrl = lmdbadvancedproject_get_customer_invoice_list_url($projectRef, $filters);
+		$summaryLink = '<a href="'.dol_escape_htmltag($listUrl).'">'.$formattedSummary.'</a>';
+		if (empty($invoiceDetails)) {
+			return $summaryLink;
+		}
+
+		$tooltip = '<table class="nobordernopadding">';
+		$tooltip .= '<tr class="liste_titre"><th>'.$langs->trans('BudgetReportInvoices').'</th><th>'.$langs->trans('Date').'</th><th class="right">'.$langs->trans('BudgetReportInvoiceAttributedAmount').'</th></tr>';
+		foreach ($invoiceDetails as $invoiceDetail) {
+			$invoiceStatic = new Facture($db);
+			$invoiceStatic->id = (int) $invoiceDetail['id'];
+			$invoiceStatic->ref = (string) $invoiceDetail['ref'];
+			$invoiceStatic->type = (int) $invoiceDetail['type'];
+
+			$tooltip .= '<tr>';
+			$tooltip .= '<td>'.$invoiceStatic->getNomUrl(1, '', 0, 0, '', 1).'</td>';
+			$tooltip .= '<td class="nowrap">'.lmdbadvancedproject_format_date($invoiceDetail['date']).'</td>';
+			$tooltip .= '<td class="right nowrap">'.lmdbadvancedproject_format_price($invoiceDetail['amount']).'</td>';
+			$tooltip .= '</tr>';
+		}
+		$tooltip .= '</table>';
+
+		return $form->textwithtooltip($summaryLink, $tooltip, 1, 0, '', '', 3, '', 1);
 	}
 }
 
@@ -1752,7 +1840,6 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projectStatusSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_status_sql_filter($filters['project_status']);
 		$projectDateSqlFilter = ($budgetReportProjectId > 0) ? '' : lmdbadvancedproject_build_project_date_sql_filter($filters);
 		$orderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND c.fk_projet = ".$budgetReportProjectId : "";
-		$customerInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND f.fk_projet = ".$budgetReportProjectId : "";
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 		$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
@@ -1819,6 +1906,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				"budget" => $projectBudget,
 				"orders" => $projectOrders,
 				"invoiced" => 0,
+				"invoice_details" => array(),
 				"spent" => 0,
 			);
 			$budget += $projectBudget;
@@ -1874,64 +1962,68 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$db->free($result);
 		}
 
-		$customerinvoices = array();
-		$customerInvoiceSplitEnabled = lmdbadvancedproject_customer_invoice_split_report_enabled();
-		if ($customerInvoiceSplitEnabled) {
-			$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(fd.total_ht, 0)) AS total_invoice
-				FROM ".MAIN_DB_PREFIX."facture f
-				INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON fd.fk_facture = f.rowid
-				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
-				AND ".$customerInvoiceDateCondition."
-				AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cipx WHERE cipx.fk_facture_det = fd.rowid)
-				GROUP BY f.fk_projet";
-		} else {
-			$sqlCustomerInvoices = "SELECT f.fk_projet, SUM(COALESCE(f.total_ht, 0)) AS total_invoice
-				FROM ".MAIN_DB_PREFIX."facture f
-				WHERE f.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")".$customerInvoiceProjectSqlFilter."
-				AND ".$customerInvoiceDateCondition."
-				GROUP BY f.fk_projet";
-		}
-		$resultCustomerInvoices = $db->query($sqlCustomerInvoices);
-		$nbtotalCustomerInvoices = $resultCustomerInvoices ? $db->num_rows($resultCustomerInvoices) : 0;
-		$i=0;
-		while ($i<$nbtotalCustomerInvoices) {
-			$obj = $db->fetch_object($resultCustomerInvoices);
-			$customerinvoices[$obj->fk_projet] = (float) $obj->total_invoice;
-			$i++;
-		}
-		if ($resultCustomerInvoices) {
-			$db->free($resultCustomerInvoices);
-		}
+		/** @var array<int,list<array{id:int,ref:string,type:int,date:string,amount:float}>> $customerInvoiceDetails */
+		$customerInvoiceDetails = array();
+		$selectedCustomerInvoiceProjectIds = array_map('intval', array_keys($projects));
+		if (!empty($selectedCustomerInvoiceProjectIds)) {
+			$selectedCustomerInvoiceProjectsSql = implode(',', $selectedCustomerInvoiceProjectIds);
+			$customerInvoiceSplitEnabled = lmdbadvancedproject_customer_invoice_split_report_enabled();
+			if ($customerInvoiceSplitEnabled) {
+				$directInvoiceContributionsSql = "SELECT f.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, SUM(COALESCE(fd.total_ht, 0)) AS total_invoice
+					FROM ".MAIN_DB_PREFIX."facture f
+					INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON fd.fk_facture = f.rowid
+					WHERE f.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")
+					AND ".$customerInvoiceDateCondition."
+					AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cipx WHERE cipx.fk_facture_det = fd.rowid)
+					GROUP BY f.fk_projet, f.rowid, f.ref, f.type, f.datef";
+				$splitInvoiceContributionsSql = "SELECT cip.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, SUM(COALESCE(cip.total_ht, 0)) AS total_invoice
+					FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cip
+					INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = cip.fk_facture
+					WHERE cip.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.") AND cip.entity IN (".$customerInvoiceEntities.")
+					AND ".$customerInvoiceDateCondition."
+					GROUP BY cip.fk_projet, f.rowid, f.ref, f.type, f.datef";
+				$sqlCustomerInvoiceDetails = "SELECT invoice_contribution.fk_projet, invoice_contribution.invoice_id, invoice_contribution.invoice_ref, invoice_contribution.invoice_type, invoice_contribution.invoice_date, SUM(invoice_contribution.total_invoice) AS total_invoice
+					FROM (".$directInvoiceContributionsSql." UNION ALL ".$splitInvoiceContributionsSql.") invoice_contribution
+					GROUP BY invoice_contribution.fk_projet, invoice_contribution.invoice_id, invoice_contribution.invoice_ref, invoice_contribution.invoice_type, invoice_contribution.invoice_date
+					ORDER BY invoice_contribution.invoice_date DESC, invoice_contribution.invoice_ref DESC";
+			} else {
+				$sqlCustomerInvoiceDetails = "SELECT f.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, COALESCE(f.total_ht, 0) AS total_invoice
+					FROM ".MAIN_DB_PREFIX."facture f
+					WHERE f.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")
+					AND ".$customerInvoiceDateCondition."
+					ORDER BY f.datef DESC, f.ref DESC";
+			}
 
-		if ($customerInvoiceSplitEnabled) {
-			$customerInvoicePartProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cip.fk_projet = ".$budgetReportProjectId : "";
-			$sqlCustomerInvoiceParts = "SELECT cip.fk_projet, SUM(COALESCE(cip.total_ht, 0)) AS total_invoice
-				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cip
-				INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = cip.fk_facture
-				WHERE cip.fk_projet > 0 AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.") AND cip.entity IN (".$customerInvoiceEntities.")".$customerInvoicePartProjectSqlFilter."
-				AND ".$customerInvoiceDateCondition."
-				GROUP BY cip.fk_projet";
-			$resultCustomerInvoiceParts = $db->query($sqlCustomerInvoiceParts);
-			$nbtotalCustomerInvoiceParts = $resultCustomerInvoiceParts ? $db->num_rows($resultCustomerInvoiceParts) : 0;
-			$i=0;
-			while ($i<$nbtotalCustomerInvoiceParts) {
-				$obj = $db->fetch_object($resultCustomerInvoiceParts);
-				if (!isset($customerinvoices[$obj->fk_projet])) {
-					$customerinvoices[$obj->fk_projet] = 0;
+			$resultCustomerInvoiceDetails = $db->query($sqlCustomerInvoiceDetails);
+			if (!$resultCustomerInvoiceDetails) {
+				dol_syslog(__FUNCTION__.': failed to load customer invoice details: '.$db->lasterror(), LOG_ERR);
+			} else {
+				while (is_object($invoiceRow = $db->fetch_object($resultCustomerInvoiceDetails))) {
+					$projectId = (int) $invoiceRow->fk_projet;
+					if (!isset($customerInvoiceDetails[$projectId])) {
+						$customerInvoiceDetails[$projectId] = array();
+					}
+					$customerInvoiceDetails[$projectId][] = array(
+						'id' => (int) $invoiceRow->invoice_id,
+						'ref' => (string) $invoiceRow->invoice_ref,
+						'type' => (int) $invoiceRow->invoice_type,
+						'date' => (string) $invoiceRow->invoice_date,
+						'amount' => (float) $invoiceRow->total_invoice,
+					);
 				}
-				$customerinvoices[$obj->fk_projet] += (float) $obj->total_invoice;
-				$i++;
-			}
-			if ($resultCustomerInvoiceParts) {
-				$db->free($resultCustomerInvoiceParts);
+				$db->free($resultCustomerInvoiceDetails);
 			}
 		}
 
-		foreach ($projects as $pid=>$data) {
-			if (isset($customerinvoices[$pid])) {
-				$projects[$pid]["invoiced"] = (float) $customerinvoices[$pid];
-				$totalcustomerinvoices += (float) $customerinvoices[$pid];
+		foreach ($projects as $pid => $data) {
+			if (empty($customerInvoiceDetails[$pid])) {
+				continue;
 			}
+			$projects[$pid]['invoice_details'] = $customerInvoiceDetails[$pid];
+			foreach ($customerInvoiceDetails[$pid] as $invoiceDetail) {
+				$projects[$pid]['invoiced'] += (float) $invoiceDetail['amount'];
+			}
+			$totalcustomerinvoices += (float) $projects[$pid]['invoiced'];
 		}
 
 		$timespent = array();
@@ -2960,6 +3052,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		<tr>
 			<th><?php echo $langs->trans("BudgetReportProject"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportMarket"); ?></th>
+			<th><?php echo $langs->trans("BudgetReportInvoices"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportBudget"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportSpent"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th>
@@ -2984,6 +3077,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		<tr>
 			<td><?php echo $projectstatic->getNomUrl(1, '/lmdbadvancedproject/tabs/project_budgetreport.php', 1); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['orders']); ?></td>
+			<td align="right"><?php echo lmdbadvancedproject_get_customer_invoice_summary_html($formBudgetReport, $data['project_ref'], $data['invoiced'], $data['orders'], $data['invoice_details'], $filters); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
 			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td>
@@ -3000,6 +3094,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		<tr>
 			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalorders); ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders).')'; ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
 			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>

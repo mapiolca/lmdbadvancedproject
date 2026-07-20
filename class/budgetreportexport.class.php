@@ -257,8 +257,9 @@ class LmdbAdvancedProjectBudgetReportExport
 		$numberFormat = $this->getTotalNumberFormat();
 		$currencyFormat = $numberFormat.' "'.(empty($conf->currency) ? '' : $conf->currency).'"';
 		$sheet->setCellValue('A1', $this->outputlangs->transnoentities('BudgetReportArea'));
-		$sheet->mergeCells('A1:F1');
-		$this->styleTitle($sheet, 'A1:F1');
+		$titleRange = empty($this->data['budgetReportProjectId']) ? 'A1:H1' : 'A1:F1';
+		$sheet->mergeCells($titleRange);
+		$this->styleTitle($sheet, $titleRange);
 
 		$row = 3;
 		if (is_object($this->project)) {
@@ -326,27 +327,29 @@ class LmdbAdvancedProjectBudgetReportExport
 	/** @param mixed $sheet @param int $row @param string $currencyFormat @return void */
 	private function writeGlobalSummary($sheet, $row, $currencyFormat)
 	{
-		$headers = array('BudgetReportProject', 'BudgetReportMarket', 'BudgetReportBudget', 'BudgetReportSpent', 'BudgetReportGrossMargin', 'BudgetReportBalance');
+		$headers = array('BudgetReportProject', 'BudgetReportMarket', 'BudgetReportInvoices', 'BudgetReportInvoicedRate', 'BudgetReportBudget', 'BudgetReportSpent', 'BudgetReportGrossMargin', 'BudgetReportBalance');
 		$this->writeHeaderRow($sheet, $row, $headers);
 		$row++;
 		foreach ($this->data['projects'] as $project) {
 			$this->setText($sheet, 'A'.$row, $project['project_ref'].' - '.$project['title']);
-			$values = array((float) $project['orders'], (float) $project['budget'], (float) $project['spent'], (float) $project['orders'] - (float) $project['spent'], (float) $project['budget'] - (float) $project['spent']);
+			$invoicedRate = (float) $project['orders'] > 0 ? (float) $project['invoiced'] / (float) $project['orders'] : 0.0;
+			$values = array((float) $project['orders'], (float) $project['invoiced'], $invoicedRate, (float) $project['budget'], (float) $project['spent'], (float) $project['orders'] - (float) $project['spent'], (float) $project['budget'] - (float) $project['spent']);
 			foreach ($values as $index => $value) {
 				$cell = Coordinate::stringFromColumnIndex($index + 2).$row;
 				$sheet->setCellValue($cell, $value);
-				$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($currencyFormat);
+				$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($index === 2 ? '0%' : $currencyFormat);
 			}
 			$row++;
 		}
 		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportTotal'));
-		$totals = array($this->data['totalorders'], $this->data['budget'], $this->data['totalspent'], $this->data['totalorders'] - $this->data['totalspent'], $this->data['balance']);
+		$totalInvoicedRate = (float) $this->data['totalorders'] > 0 ? (float) $this->data['totalcustomerinvoices'] / (float) $this->data['totalorders'] : 0.0;
+		$totals = array($this->data['totalorders'], $this->data['totalcustomerinvoices'], $totalInvoicedRate, $this->data['budget'], $this->data['totalspent'], $this->data['totalorders'] - $this->data['totalspent'], $this->data['balance']);
 		foreach ($totals as $index => $value) {
 			$cell = Coordinate::stringFromColumnIndex($index + 2).$row;
 			$sheet->setCellValue($cell, (float) $value);
-			$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($currencyFormat);
+			$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($index === 2 ? '0%' : $currencyFormat);
 		}
-		$sheet->getStyle('A'.$row.':F'.$row)->getFont()->setBold(true);
+		$sheet->getStyle('A'.$row.':H'.$row)->getFont()->setBold(true);
 	}
 
 	/** @param mixed $sheet @param int $row @param string $currencyFormat @return void */

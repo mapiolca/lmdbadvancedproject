@@ -10,6 +10,8 @@ The Budget Report page tracks project budgets, time spent on tasks, vendor invoi
 
 The global report can restrict dated project content to an inclusive observation period while keeping the projects selected by the existing project date and status filters. In this mode, customer orders and budgets, customer and supplier invoices, supplier orders, expense reports, and time entries outside the period are excluded from screen totals, monthly charts, and spreadsheet exports.
 
+The global project table displays each project's invoiced amount and invoicing rate next to its orders. The amount links to Dolibarr's native customer invoice list, while its tooltip lists the contributing invoices, dates, and project-attributed amounts. ODS and XLSX exports provide separate numeric columns for the invoiced amount and rate.
+
 The report includes a monthly time matrix by project on the global page and by task on an individual project. The total time cost and total decimal hours are displayed together in the Spent tile.
 
 The monthly budget-versus-spent chart also overlays recorded hours on a secondary axis. Each series can be shown or hidden from the chart legend, and an information tooltip explains how hours relate to total spending.

@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Add per-project invoiced totals and invoicing rates to the global budget table, with native invoice links, contribution tooltips, and numeric ODS/XLSX columns
 - Add an optional observation-period restriction for all dated budget-report content while retaining selected projects, with matching XLSX/ODS exports
 - Add translated Dolibarr information tooltips to every global budget-report filter and use native date and binary selectors
 - Add a shared monthly time axis and time matrices by project and by task, including zero-value rows and row/column totals
