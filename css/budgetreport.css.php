@@ -301,6 +301,49 @@ div.mainmenu.budgetreport {
 	align-items: center;
 }
 
+.budgetreport-document-tooltip-table {
+	width: 100%;
+	min-width: 440px;
+	border-collapse: separate;
+	border-spacing: 0;
+	table-layout: fixed;
+}
+
+.budgetreport-document-tooltip-table th,
+.budgetreport-document-tooltip-table td {
+	padding: 6px 10px !important;
+	box-sizing: border-box;
+	vertical-align: middle;
+}
+
+.budgetreport-document-tooltip-table th {
+	font-weight: 600;
+}
+
+.budgetreport-document-tooltip-table tbody tr + tr td {
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.budgetreport-document-tooltip-ref {
+	min-width: 190px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.budgetreport-document-tooltip-date {
+	width: 105px;
+	min-width: 105px;
+	text-align: center;
+	white-space: nowrap;
+}
+
+.budgetreport-document-tooltip-amount {
+	width: 135px;
+	min-width: 135px;
+	text-align: right;
+	white-space: nowrap;
+}
+
 .budgetreport-summary-fullwidth {
 	display: block;
 	max-width: none;
@@ -704,6 +747,32 @@ div.mainmenu.budgetreport {
 }
 
 @media only screen and (max-width: 480px) {
+	.budgetreport-document-tooltip-table {
+		width: calc(100vw - 48px);
+		min-width: 0;
+	}
+
+	.budgetreport-document-tooltip-table th,
+	.budgetreport-document-tooltip-table td {
+		padding: 5px 6px !important;
+	}
+
+	.budgetreport-document-tooltip-ref {
+		width: auto;
+		min-width: 0;
+		white-space: normal;
+	}
+
+	.budgetreport-document-tooltip-date {
+		width: 85px;
+		min-width: 85px;
+	}
+
+	.budgetreport-document-tooltip-amount {
+		width: 100px;
+		min-width: 100px;
+	}
+
 	.budgetreport-filter-field,
 	.budgetreport-filter-actions {
 		width: 100%;

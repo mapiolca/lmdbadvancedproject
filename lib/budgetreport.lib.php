@@ -693,20 +693,21 @@ if (!function_exists('lmdbadvancedproject_get_customer_order_summary_html')) {
 			return $summaryLink;
 		}
 
-		$tooltip = '<table class="nobordernopadding">';
-		$tooltip .= '<tr class="liste_titre"><th>'.$langs->trans('BudgetReportMarket').'</th><th>'.$langs->trans('Date').'</th><th class="right">'.$langs->trans('AmountHTShort').'</th></tr>';
+		$tooltip = '<table class="nobordernopadding budgetreport-document-tooltip-table">';
+		$tooltip .= '<thead><tr class="liste_titre"><th class="budgetreport-document-tooltip-ref">'.$langs->trans('BudgetReportMarket').'</th><th class="budgetreport-document-tooltip-date">'.$langs->trans('Date').'</th><th class="budgetreport-document-tooltip-amount">'.$langs->trans('AmountHTShort').'</th></tr></thead>';
+		$tooltip .= '<tbody>';
 		foreach ($orderDetails as $orderDetail) {
 			$orderStatic = new Commande($db);
 			$orderStatic->id = (int) $orderDetail['id'];
 			$orderStatic->ref = (string) $orderDetail['ref'];
 
 			$tooltip .= '<tr>';
-			$tooltip .= '<td>'.$orderStatic->getNomUrl(1, '', 0, 0, 1).'</td>';
-			$tooltip .= '<td class="nowrap">'.lmdbadvancedproject_format_date($orderDetail['date']).'</td>';
-			$tooltip .= '<td class="right nowrap">'.lmdbadvancedproject_format_price($orderDetail['amount']).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-ref">'.$orderStatic->getNomUrl(1, '', 0, 0, 1).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-date">'.lmdbadvancedproject_format_date($orderDetail['date']).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-amount">'.lmdbadvancedproject_format_price($orderDetail['amount']).'</td>';
 			$tooltip .= '</tr>';
 		}
-		$tooltip .= '</table>';
+		$tooltip .= '</tbody></table>';
 
 		return $form->textwithtooltip($summaryLink, $tooltip, 1, 0, '', '', 3, '', 1);
 	}
@@ -779,8 +780,9 @@ if (!function_exists('lmdbadvancedproject_get_customer_invoice_summary_html')) {
 			return $summaryLink;
 		}
 
-		$tooltip = '<table class="nobordernopadding">';
-		$tooltip .= '<tr class="liste_titre"><th>'.$langs->trans('BudgetReportInvoices').'</th><th>'.$langs->trans('Date').'</th><th class="right">'.$langs->trans('BudgetReportInvoiceAttributedAmount').'</th></tr>';
+		$tooltip = '<table class="nobordernopadding budgetreport-document-tooltip-table">';
+		$tooltip .= '<thead><tr class="liste_titre"><th class="budgetreport-document-tooltip-ref">'.$langs->trans('BudgetReportInvoices').'</th><th class="budgetreport-document-tooltip-date">'.$langs->trans('Date').'</th><th class="budgetreport-document-tooltip-amount">'.$langs->trans('BudgetReportInvoiceAttributedAmount').'</th></tr></thead>';
+		$tooltip .= '<tbody>';
 		foreach ($invoiceDetails as $invoiceDetail) {
 			$invoiceStatic = new Facture($db);
 			$invoiceStatic->id = (int) $invoiceDetail['id'];
@@ -788,12 +790,12 @@ if (!function_exists('lmdbadvancedproject_get_customer_invoice_summary_html')) {
 			$invoiceStatic->type = (int) $invoiceDetail['type'];
 
 			$tooltip .= '<tr>';
-			$tooltip .= '<td>'.$invoiceStatic->getNomUrl(1, '', 0, 0, '', 1).'</td>';
-			$tooltip .= '<td class="nowrap">'.lmdbadvancedproject_format_date($invoiceDetail['date']).'</td>';
-			$tooltip .= '<td class="right nowrap">'.lmdbadvancedproject_format_price($invoiceDetail['amount']).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-ref">'.$invoiceStatic->getNomUrl(1, '', 0, 0, '', 1).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-date">'.lmdbadvancedproject_format_date($invoiceDetail['date']).'</td>';
+			$tooltip .= '<td class="budgetreport-document-tooltip-amount">'.lmdbadvancedproject_format_price($invoiceDetail['amount']).'</td>';
 			$tooltip .= '</tr>';
 		}
-		$tooltip .= '</table>';
+		$tooltip .= '</tbody></table>';
 
 		return $form->textwithtooltip($summaryLink, $tooltip, 1, 0, '', '', 3, '', 1);
 	}
