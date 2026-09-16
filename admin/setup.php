@@ -24,7 +24,7 @@
 
 // Load Dolibarr environment
 $res = 0;
-if (!$res && !empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
+if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
 	$res = @include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -41,39 +41,30 @@ if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1)).'/main.inc.php')) {
 if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php')) {
 	$res = @include dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php';
 }
-if (!$res && file_exists('../../main.inc.php')) {
-	$res = @include '../../main.inc.php';
-}
-if (!$res && file_exists('../../../main.inc.php')) {
-	$res = @include '../../../main.inc.php';
+foreach (array('../main.inc.php', '../../main.inc.php', '../../../main.inc.php', '../../../../main.inc.php') as $mainFile) {
+	$resolvedMainFile = realpath(__DIR__.'/'.$mainFile);
+	if (!$res && $resolvedMainFile !== false) {
+		$res = @include $resolvedMainFile;
+	}
 }
 if (!$res) {
 	die('Include of main fails');
 }
 
+/** @var DoliDB $db */
+/** @var User $user */
+/** @var Conf $conf */
+/** @var Translate $langs */
+/** @var HookManager $hookmanager */
+global $db, $user, $conf, $langs, $hookmanager;
+
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
-require_once '../lib/lmdbadvancedproject.lib.php';
+require_once __DIR__.'/../lib/lmdbadvancedproject.lib.php';
+require_once __DIR__.'/../class/lmdbadvancedprojectcompatibility.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 
 $langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
-
-if (!function_exists('lmdbadvancedproject_is_multicompany_enabled')) {
-	/**
-	 * Check if Dolibarr Multicompany module is enabled.
-	 *
-	 * @return bool
-	 */
-	function lmdbadvancedproject_is_multicompany_enabled()
-	{
-		global $conf;
-
-		if (function_exists('isModEnabled')) {
-			return isModEnabled('multicompany');
-		}
-
-		return !empty($conf->multicompany->enabled);
-	}
-}
 
 if (!$user->admin) {
 	accessforbidden();
@@ -85,10 +76,11 @@ $help_url = '';
 $page_name = 'AdvancedProjectSetup';
 
 $switchConstants = array(
+	'LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST' => 1,
 	'LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT' => 1,
 	'LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT' => 1,
 );
-if (lmdbadvancedproject_is_multicompany_enabled()) {
+if (isModEnabled('multicompany')) {
 	$switchConstants['LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES'] = 1;
 }
 
@@ -107,26 +99,17 @@ foreach ($switchConstants as $constantName => $enabled) {
 	}
 }
 
-if ($switchConstant !== '') {
+if ($switchConstant !== '' || $action === 'save_shipment_method') {
 	$token = GETPOST('token', 'alpha');
-	$expectedToken = '';
-	if (function_exists('currentToken')) {
-		$expectedToken = currentToken();
-	} elseif (!empty($_SESSION['newtoken'])) {
-		$expectedToken = $_SESSION['newtoken'];
-	}
-
-	if (!empty($expectedToken) && $token !== $expectedToken) {
+	$expectedToken = currentToken();
+	if ($expectedToken === '' || !hash_equals($expectedToken, $token)) {
 		accessforbidden('Bad value for token');
 	}
+}
+if ($switchConstant !== '') {
+	$entity = (int) $conf->entity;
 
-	$entityIsSet = function_exists('GETPOSTISSET') ? GETPOSTISSET('entity') : (isset($_GET['entity']) || isset($_POST['entity']));
-	$entity = $entityIsSet ? GETPOST('entity', 'int') : $conf->entity;
-	if ($entity < 0) {
-		$entity = $conf->entity;
-	}
-
-	$result = dolibarr_set_const($db, $switchConstant, (int) $switchValue, 'chaine', 0, '', $entity);
+	$result = dolibarr_set_const($db, $switchConstant, (string) $switchValue, 'chaine', 0, '', $entity);
 	if ($result > 0) {
 		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
 		header('Location: '.$_SERVER['PHP_SELF']);
@@ -134,6 +117,19 @@ if ($switchConstant !== '') {
 	}
 
 	dol_print_error($db);
+}
+
+if ($action === 'save_shipment_method') {
+	$method = GETPOST('shipment_method', 'aZ09');
+	if (!in_array($method, array('supplier_tariff', 'pmp'), true)) {
+		accessforbidden();
+	}
+	if (dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD', $method, 'chaine', 0, '', (int) $conf->entity) > 0) {
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+		header('Location: '.$_SERVER['PHP_SELF']);
+		exit;
+	}
+	setEventMessages($langs->trans('Error'), null, 'errors');
 }
 
 llxHeader('', $langs->trans($page_name), $help_url);
@@ -170,7 +166,7 @@ print '<td class="right">';
 print ajax_constantonoff('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', array(), $conf->entity, 0, 0, 0, 2, 0, 1);
 print '</td>';
 print '</tr>';
-if (lmdbadvancedproject_is_multicompany_enabled()) {
+if (isModEnabled('multicompany')) {
 	print '<tr class="oddeven">';
 	print '<td>';
 	print '<label for="LMDBADVANCEDPROJECT_MULTICOMPANY_ALL_ENTITIES">'.$langs->trans('AdvancedProjectMulticompanyScope').'</label>';
@@ -183,7 +179,28 @@ if (lmdbadvancedproject_is_multicompany_enabled()) {
 }
 print '</table>';
 
-if (!lmdbadvancedproject_is_multicompany_enabled()) {
+$form = new Form($db);
+print '<br><table class="noborder centpercent">';
+print '<tr class="liste_titre"><th>'.$langs->trans('BudgetCostFeature').'</th><th class="right">'.$langs->trans('Value').'</th></tr>';
+print '<tr class="oddeven"><td>'.$form->textwithtooltip($langs->trans('BudgetCostFeature'), $langs->trans('BudgetCostFormulaHelp')).'<br><span class="opacitymedium">'.$langs->trans('BudgetCostFeatureDescription').'</span></td><td class="right">';
+if (LmdbAdvancedProjectCompatibility::shipmentCostAvailable()) {
+	print ajax_constantonoff('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST', array(), (int) $conf->entity, 0, 0, 0, 2, 0, 1);
+} else {
+	print $langs->trans('Unavailable');
+}
+print '</td></tr><tr class="oddeven"><td>'.$langs->trans('BudgetCostMethod').'</td><td class="right">';
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="save_shipment_method">';
+print $form->selectarray('shipment_method', array('supplier_tariff' => $langs->trans('BudgetCostSupplierTariff'), 'pmp' => $langs->trans('BudgetCostPmp')), getDolGlobalString('LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD', 'supplier_tariff'), 0);
+print ajax_combobox('shipment_method');
+print ' <input class="button" type="submit" value="'.$langs->trans('Save').'">';
+print '</form></td></tr></table>';
+print '<div class="info">'.$langs->trans('BudgetCostFormulaHelp').'<br>'.$langs->trans('BudgetCostChronologyHelp').'<br>'.$langs->trans('BudgetCostPriceHelp').'<br>'.$langs->trans('BudgetCostHistoryHelp').'</div>';
+if (!LmdbAdvancedProjectCompatibility::shipmentCostAvailable()) {
+	print '<div class="warning">'.$langs->trans('BudgetCostUnavailable').'</div>';
+}
+
+if (!isModEnabled('multicompany')) {
 	print '<div class="info">'.$langs->trans('AdvancedProjectMulticompanyInactive').'</div>';
 }
 

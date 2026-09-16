@@ -1,0 +1,27 @@
+parameters:
+    level: 5
+    phpVersion: 80000
+    treatPhpDocTypesAsCertain: false
+    dynamicConstantNames:
+        - DOL_DOCUMENT_ROOT
+        - DOL_VERSION
+    stubFiles:
+        - test/phpstan-native.stub
+    bootstrapFiles:
+        - test/phpstan-bootstrap.php
+    paths:
+        - class/lmdbadvancedprojectcostledger.class.php
+        - class/lmdbadvancedprojectproductcost.class.php
+        - class/lmdbadvancedprojectcompatibility.class.php
+        - class/actions_lmdbadvancedproject.class.php
+        - core/triggers/interface_99_modLmdbAdvancedProject_CostSnapshots.class.php
+        - lib/productcost.lib.php
+        - lib/budgetreport.lib.php
+        - tabs/project_productcost.php
+        - admin/setup.php
+        - class/budgetreportexport.class.php
+        - core/modules/project/doc/pdf_budgetreport.modules.php
+        - core/modules/modLmdbAdvancedProject.class.php
+        - budgetreportexport.php
+    scanFiles:
+        - lib/lmdbadvancedproject.lib.php

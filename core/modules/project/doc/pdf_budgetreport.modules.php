@@ -57,10 +57,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		$this->marge_haute = getDolGlobalInt('MAIN_PDF_MARGIN_TOP', 10);
 		$this->marge_basse = getDolGlobalInt('MAIN_PDF_MARGIN_BOTTOM', 10);
 		$this->emetteur = $mysoc;
-		$this->footerHeight = $this->marge_basse + 14 + max(5, getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5));
-		if (getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS')) {
-			$this->footerHeight += 8;
-		}
+		$this->footerHeight = $this->marge_basse;
 	}
 
 	/**
@@ -78,6 +75,14 @@ class pdf_budgetreport extends ModelePDFProjects
 	{
 		global $action, $conf, $hookmanager, $langs, $user;
 
+		if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire')
+			|| !$user->hasRight('projet', 'creer') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')
+			|| (int) $object->id <= 0 || (int) $object->entity <= 0
+			|| !in_array((int) $object->entity, array_map('intval', explode(',', getEntity('project'))), true)
+			|| $object->restrictedProjectArea($user, 'read') <= 0) {
+			$this->error = $langs->transnoentities('BudgetCostAccessDenied');
+			return -1;
+		}
 		if (!is_object($outputlangs)) {
 			$outputlangs = $langs;
 		}
@@ -90,8 +95,17 @@ class pdf_budgetreport extends ModelePDFProjects
 			return -1;
 		}
 
+		$root = getMultidirOutput($object, 'project', 1);
+		if (!is_string($root) || $root === '' || strpos($root, 'error-') === 0) {
+			$this->error = $langs->transnoentities('ErrorConstantNotDefined', 'PROJECT_OUTPUTDIR');
+			return -1;
+		}
 		$objectref = dol_sanitizeFileName($object->ref);
-		$dir = $conf->project->multidir_output[$object->entity].'/'.$objectref;
+		if ($objectref === '' || $objectref === '.' || $objectref === '..') {
+			$this->error = $langs->transnoentities('BudgetCostAccessDenied');
+			return -1;
+		}
+		$dir = $root.'/'.$objectref;
 		$file = $dir.'/'.lmdbadvancedproject_budget_report_filename($object->ref, $outputlangs);
 		if (dol_mkdir($dir) < 0) {
 			$this->error = $langs->transnoentities('ErrorCanNotCreateDir', $dir);
@@ -112,11 +126,33 @@ class pdf_budgetreport extends ModelePDFProjects
 		}
 
 		$filters = array();
-		if (isset($object->context) && is_array($object->context) && isset($object->context['budgetreport_filters']) && is_array($object->context['budgetreport_filters'])) {
+		if (isset($object->context['budgetreport_filters']) && is_array($object->context['budgetreport_filters'])) {
 			$filters = $object->context['budgetreport_filters'];
 		}
 		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
-		$data = lmdbadvancedproject_load_budget_report_data((int) $object->id, $filters);
+		try {
+			$data = lmdbadvancedproject_load_budget_report_data((int) $object->id, $filters);
+		} catch (RuntimeException $exception) {
+			$this->error = $outputlangs->transnoentities($exception->getMessage());
+			return -1;
+		}
+		// Let the native footer measure its substitutions, HTML, company details and hooks.
+		// A separate PDF avoids nesting TCPDF transactions used by the native HTML helper.
+		$this->footerHeight = $this->marge_basse;
+		foreach (array(0, 1) as $hideFooterText) {
+			$probe = pdf_getInstance($this->format);
+			$probe->setPrintHeader(false);
+			$probe->setPrintFooter(false);
+			$probe->SetMargins($this->marge_gauche, $this->marge_haute, $this->marge_droite);
+			$probe->SetFont(pdf_getPDFFont($outputlangs));
+			$probe->AddPage('L', $this->format);
+			$this->footerHeight = max($this->footerHeight, (float) $this->_pagefoot($probe, $object, $outputlangs, $hideFooterText) + 5);
+			unset($probe);
+		}
+		if ($this->footerHeight > $this->page_hauteur - 110) {
+			$this->error = $outputlangs->transnoentities('BudgetReportFooterTooHigh');
+			return -1;
+		}
 		$pdf = pdf_getInstance($this->format);
 		if (class_exists('TCPDF')) {
 			$pdf->setPrintHeader(false);
@@ -134,12 +170,15 @@ class pdf_budgetreport extends ModelePDFProjects
 		}
 
 		$this->addPage($pdf, $object, $outputlangs, false);
-		$this->drawSummary($pdf, $data, $outputlangs);
+		$this->drawSummary($pdf, $object, $data, $outputlangs);
 		$this->addPage($pdf, $object, $outputlangs, true);
 		$this->drawCategorySummary($pdf, $object, $data, $outputlangs);
 		$this->drawTimeTotal($pdf, $object, $data['budgetReportForecast'], $outputlangs);
 		$this->drawExpenseDetails($pdf, $object, $data['budgetReportForecast'], $outputlangs);
 		$this->drawTimeMatrix($pdf, $object, $data, $outputlangs);
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$this->drawProductCosts($pdf, $object, $data['productCosts'], $outputlangs);
+		}
 
 		$this->_pagefoot($pdf, $object, $outputlangs, 0);
 		if (method_exists($pdf, 'AliasNbPages')) {
@@ -162,7 +201,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param Translate $outputlangs @param bool $finishPrevious @return void */
-	private function addPage($pdf, $object, $outputlangs, $finishPrevious)
+	private function addPage(&$pdf, $object, $outputlangs, $finishPrevious)
 	{
 		if ($finishPrevious && $pdf->getNumPages() > 0) {
 			$this->_pagefoot($pdf, $object, $outputlangs, 1);
@@ -176,8 +215,8 @@ class pdf_budgetreport extends ModelePDFProjects
 		$pdf->SetY(34);
 	}
 
-	/** @param TCPDF $pdf @param array<string,mixed> $data @param Translate $outputlangs @return void */
-	private function drawSummary($pdf, $data, $outputlangs)
+	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $data @param Translate $outputlangs @return void */
+	private function drawSummary(&$pdf, $object, $data, $outputlangs)
 	{
 		$left = $this->marge_gauche;
 		$usable = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
@@ -205,7 +244,7 @@ class pdf_budgetreport extends ModelePDFProjects
 
 		$pdf->SetXY($left, 59);
 		$pdf->MultiCell($usable, 4, $outputlangs->convToOutputCharset(
-			$outputlangs->transnoentities('BudgetReportObservationPeriod').': '.lmdbadvancedproject_get_budget_report_period_label($data['filters'], $outputlangs)
+			$outputlangs->transnoentities('BudgetReportObservationPeriod').': '.lmdbadvancedproject_get_budget_report_period_label($data['filters'], $outputlangs).(!empty($data['productCosts']['issues']) ? ' · '.$outputlangs->transnoentities('BudgetCostIncomplete') : '')
 		), 0, 'L');
 
 		$budgetLabels = $data['labels'];
@@ -218,22 +257,47 @@ class pdf_budgetreport extends ModelePDFProjects
 
 		$chartGap = 4.0;
 		$pieWidth = ($usable - $chartGap) / 2;
-		$this->drawPie($pdf, $left, 64, $pieWidth, 54, $budgetLabels, $data['budgets'], $outputlangs->transnoentities($data['budgetChartTitleKey']), $outputlangs);
-		$this->drawPie($pdf, $left + $pieWidth + $chartGap, 64, $pieWidth, 54, $data['spentLabels'], $data['spentValues'], $outputlangs->transnoentities('BudgetReportBudgetVsSpent'), $outputlangs);
+		$pieHeight = min(54.0, $this->page_hauteur - $this->footerHeight - 70);
+		$this->drawPie($pdf, $left, 64, $pieWidth, $pieHeight, $budgetLabels, $data['budgets'], $outputlangs->transnoentities($data['budgetChartTitleKey']), $outputlangs);
+		$this->drawPie($pdf, $left + $pieWidth + $chartGap, 64, $pieWidth, $pieHeight, $data['spentLabels'], $data['spentValues'], $outputlangs->transnoentities('BudgetReportBudgetVsSpent'), $outputlangs);
 
 		$monthlyChartY = 121.0;
 		$monthlyChartHeight = $this->page_hauteur - $this->footerHeight - $monthlyChartY - 10.0;
-		if ($monthlyChartHeight > 24.0) {
-			$this->drawMonthlyChart($pdf, $left, $monthlyChartY, $usable, $monthlyChartHeight, $data['monthAxis'], $outputlangs);
+		if ($monthlyChartHeight <= 24.0) {
+			$this->addPage($pdf, $object, $outputlangs, true);
+			$monthlyChartY = 34.0;
+			$monthlyChartHeight = $this->page_hauteur - $this->footerHeight - $monthlyChartY - 10.0;
 		}
+		$this->drawMonthlyChart($pdf, $left, $monthlyChartY, $usable, $monthlyChartHeight, $data['monthAxis'], $outputlangs);
 	}
 
 	/** @param TCPDF $pdf @param float $x @param float $y @param float $w @param float $h @param array<int,string> $labels @param array<int,float> $values @param string $title @param Translate $outputlangs @return void */
-	private function drawPie($pdf, $x, $y, $w, $h, $labels, $values, $title, $outputlangs)
+	private function drawPie(&$pdf, $x, $y, $w, $h, $labels, $values, $title, $outputlangs)
 	{
 		$pdf->SetFont('', 'B', 8);
 		$pdf->SetXY($x, $y);
 		$pdf->MultiCell($w, 4, $outputlangs->convToOutputCharset($title), 0, 'C');
+		if ($values && min($values) < 0) {
+			// Signed cost movements cannot be represented by a pie chart.
+			$maximum = max(1.0, max(array_map('abs', $values)));
+			$zeroX = $x + $w * 0.68;
+			$halfWidth = $w * 0.13;
+			$pdf->SetDrawColor(120, 120, 120);
+			$pdf->Line($zeroX, $y + 7, $zeroX, $y + $h - 2);
+			$step = min(6.0, ($h - 9) / count($values));
+			foreach ($values as $index => $value) {
+				$lineY = $y + 8 + $index * $step;
+				$bar = $value / $maximum * $halfWidth;
+				$pdf->SetFillColor(79, 129, 189);
+				$pdf->Rect(min($zeroX, $zeroX + $bar), $lineY, abs($bar), 2.5, 'F');
+				$pdf->SetFont('', '', 5.5);
+				$pdf->SetXY($x, $lineY - 0.5);
+				$pdf->MultiCell($w * 0.52, 3, $outputlangs->convToOutputCharset($labels[$index]), 0, 'L');
+				$pdf->SetXY($x + $w * 0.83, $lineY - 0.5);
+				$pdf->MultiCell($w * 0.17, 3, $outputlangs->convToOutputCharset(lmdbadvancedproject_format_price($value, $outputlangs)), 0, 'R');
+			}
+			return;
+		}
 		$total = array_sum($values);
 		if ($total <= 0) {
 			$pdf->SetFont('', '', 7);
@@ -253,7 +317,7 @@ class pdf_budgetreport extends ModelePDFProjects
 			$end = $start + ((float) $value / $total * 360);
 			$color = $colors[$index % count($colors)];
 			$pdf->SetFillColor($color[0], $color[1], $color[2]);
-			$pdf->PieSector($cx, $cy, $radius, $start, $end, 'FD', false, 0, 2);
+			$pdf->PieSector($cx, $cy, $radius, $start, $end, 'FD');
 			$start = $end;
 		}
 		$pdf->SetFont('', '', 5.5);
@@ -274,7 +338,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param float $x @param float $y @param float $w @param float $h @param array<string,mixed> $monthAxis @param Translate $outputlangs @return void */
-	private function drawMonthlyChart($pdf, $x, $y, $w, $h, $monthAxis, $outputlangs)
+	private function drawMonthlyChart(&$pdf, $x, $y, $w, $h, $monthAxis, $outputlangs)
 	{
 		$pdf->SetFont('', 'B', 8);
 		$pdf->SetXY($x, $y);
@@ -289,28 +353,32 @@ class pdf_budgetreport extends ModelePDFProjects
 		$chartY = $y + 10;
 		$chartW = $w - 10;
 		$chartH = $h - 18;
+		$amountMinimum = 0.0;
 		$amountMaximum = 0.0;
 		$hoursMaximum = 0.0;
 		foreach ($monthAxis as $month) {
+			$amountMinimum = min($amountMinimum, (float) $month['budget'], (float) $month['spent']);
 			$amountMaximum = max($amountMaximum, (float) $month['budget'], (float) $month['spent']);
 			$hoursMaximum = max($hoursMaximum, (float) $month['time_hours']);
 		}
 		$amountMaximum = max(1.0, $amountMaximum);
 		$hoursMaximum = max(1.0, ceil($hoursMaximum * 1.1));
+		$amountRange = $amountMaximum - $amountMinimum;
+		$zeroY = $chartY + $chartH - (0 - $amountMinimum) / $amountRange * $chartH;
 		$count = count($monthAxis);
 		$step = $chartW / $count;
 		$pdf->SetDrawColor(160, 160, 160);
-		$pdf->Line($chartX, $chartY + $chartH, $chartX + $chartW, $chartY + $chartH);
+		$pdf->Line($chartX, $zeroY, $chartX + $chartW, $zeroY);
 		$previous = null;
 		$previousTime = null;
 		$index = 0;
 		foreach ($monthAxis as $month) {
-			$barHeight = ((float) $month['budget'] / $amountMaximum) * $chartH;
+			$barHeight = ((float) $month['budget'] / $amountRange) * $chartH;
 			$barX = $chartX + ($index * $step) + ($step * 0.15);
 			$pdf->SetFillColor(151, 187, 225);
-			$pdf->Rect($barX, $chartY + $chartH - $barHeight, max(0.8, $step * 0.45), $barHeight, 'F');
+			$pdf->Rect($barX, min($zeroY, $zeroY - $barHeight), max(0.8, $step * 0.45), abs($barHeight), 'F');
 			$pointX = $chartX + ($index * $step) + ($step * 0.55);
-			$pointY = $chartY + $chartH - (((float) $month['spent'] / $amountMaximum) * $chartH);
+			$pointY = $chartY + $chartH - ((((float) $month['spent'] - $amountMinimum) / $amountRange) * $chartH);
 			if (is_array($previous)) {
 				$pdf->SetLineStyle(array('width' => 0.3, 'dash' => 0, 'color' => array(192, 80, 77)));
 				$pdf->Line($previous[0], $previous[1], $pointX, $pointY);
@@ -338,8 +406,37 @@ class pdf_budgetreport extends ModelePDFProjects
 		$pdf->SetLineStyle(array('width' => 0.2, 'dash' => 0, 'color' => array(0, 0, 0)));
 	}
 
+	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $report @param Translate $outputlangs @return void */
+	private function drawProductCosts(&$pdf, $object, $report, $outputlangs)
+	{
+		$this->addPage($pdf, $object, $outputlangs, true);
+		$pdf->SetFont('', 'B', 10);
+		$pdf->MultiCell(0, 5, $outputlangs->convToOutputCharset($outputlangs->transnoentities('BudgetCostProductList')), 0, 'L');
+		$pdf->SetFont('', '', 7);
+		$text = $outputlangs->transnoentities('BudgetCostChronologyHelp').' '.$outputlangs->transnoentities('BudgetCostQuantityHelp');
+		foreach ($report['issues'] as $issue) { $text .= ' '.$outputlangs->transnoentities($issue); }
+		$pdf->MultiCell(0, 4, $outputlangs->convToOutputCharset($text), 0, 'L');
+		$widths = array(42, 72, 27, 27, 35, 35, 35);
+		$headers = array('Ref', 'Label', 'BudgetCostUncoveredQty', 'BudgetCostRemainingQty', 'BudgetCostInvoiceCost', 'BudgetCostShipmentsNet', 'BudgetCostRetained');
+		$this->drawTableHeader($pdf, $headers, $widths, $outputlangs);
+		foreach ($report['products'] as $product) {
+			if ($pdf->GetY() > $this->page_hauteur - $this->footerHeight - 18) {
+				$this->addPage($pdf, $object, $outputlangs, true);
+				$this->drawTableHeader($pdf, $headers, $widths, $outputlangs);
+			}
+			$label = dol_trunc($product['label'], 60).($product['issues'] ? ' *' : '');
+			$values = array($product['ref'], $label, count($product['units']) > 1 ? '—' : price($product['uncovered_qty']),
+				count($product['units']) > 1 ? '—' : price($product['remaining_qty']),
+				price($product['invoice_cost']), price($product['shipment_cost']), price($product['total']));
+			$this->drawTableRow($pdf, $values, $widths, $outputlangs);
+		}
+		if (!$report['products']) {
+			$pdf->MultiCell(0, 4, $outputlangs->transnoentities('NoRecordFound'), 0, 'L');
+		}
+	}
+
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $data @param Translate $outputlangs @return void */
-	private function drawCategorySummary($pdf, $object, $data, $outputlangs)
+	private function drawCategorySummary(&$pdf, $object, $data, $outputlangs)
 	{
 		$pdf->SetFont('', 'B', 10);
 		$pdf->MultiCell(0, 5, $outputlangs->convToOutputCharset($outputlangs->transnoentities('BudgetReportCategorySummary')), 0, 'L');
@@ -363,7 +460,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $forecast @param Translate $outputlangs @return void */
-	private function drawTimeTotal($pdf, $object, $forecast, $outputlangs)
+	private function drawTimeTotal(&$pdf, $object, $forecast, $outputlangs)
 	{
 		$headers = array('Task', 'Label', 'BudgetReportContributorCount', 'BudgetReportTimeSpentHours', 'BudgetReportSpent');
 		$widths = array(42, 120, 35, 30, 50);
@@ -412,7 +509,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $forecast @param Translate $outputlangs @return void */
-	private function drawExpenseDetails($pdf, $object, $forecast, $outputlangs)
+	private function drawExpenseDetails(&$pdf, $object, $forecast, $outputlangs)
 	{
 		$headers = array('Date', 'Ref', 'User', 'BudgetReportExpenseComment', 'AmountHTShort');
 		$widths = array(28, 35, 50, 119, 45);
@@ -463,7 +560,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $data @param Translate $outputlangs @return void */
-	private function drawTimeMatrix($pdf, $object, $data, $outputlangs)
+	private function drawTimeMatrix(&$pdf, $object, $data, $outputlangs)
 	{
 		$months = array_keys($data['monthAxis']);
 		$blocks = empty($months) ? array(array()) : array_chunk($months, 10);
@@ -507,7 +604,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param array<int,string> $headers @param array<int,float> $widths @param Translate $outputlangs @param bool $translate @return void */
-	private function drawTableHeader($pdf, $headers, $widths, $outputlangs, $translate = true)
+	private function drawTableHeader(&$pdf, $headers, $widths, $outputlangs, $translate = true)
 	{
 		$x = $this->marge_gauche;
 		$y = $pdf->GetY();
@@ -525,7 +622,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param array<int,string> $values @param array<int,float> $widths @param Translate $outputlangs @param bool $bold @param array<int,string> $alignments Cell alignments @return void */
-	private function drawTableRow($pdf, $values, $widths, $outputlangs, $bold = false, $alignments = array())
+	private function drawTableRow(&$pdf, $values, $widths, $outputlangs, $bold = false, $alignments = array())
 	{
 		$x = $this->marge_gauche;
 		$y = $pdf->GetY();
@@ -539,14 +636,14 @@ class pdf_budgetreport extends ModelePDFProjects
 		foreach ($values as $index => $value) {
 			$pdf->SetXY($x, $y);
 			$alignment = isset($alignments[$index]) ? $alignments[$index] : ($index === 0 ? 'L' : 'R');
-			$pdf->MultiCell($widths[$index], $height, $outputlangs->convToOutputCharset((string) $value), 1, $alignment, false, 0, '', '', true, 0, false, true, $height, 'M');
+			$pdf->MultiCell($widths[$index], $height, $outputlangs->convToOutputCharset((string) $value), 1, $alignment, false, 0, null, null, true, 0, false, true, $height, 'M');
 			$x += $widths[$index];
 		}
 		$pdf->SetY($y + $height);
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param Translate $outputlangs @return void */
-	protected function _pagehead($pdf, $object, $outputlangs)
+	protected function _pagehead(&$pdf, $object, $outputlangs)
 	{
 		global $conf, $mysoc;
 
@@ -577,7 +674,7 @@ class pdf_budgetreport extends ModelePDFProjects
 	}
 
 	/** @param TCPDF $pdf @param Project $object @param Translate $outputlangs @param int $hidefreetext @return int */
-	protected function _pagefoot($pdf, $object, $outputlangs, $hidefreetext = 0)
+	protected function _pagefoot(&$pdf, $object, $outputlangs, $hidefreetext = 0)
 	{
 		$showdetails = getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS', 0);
 		$pdf->setPageMark();

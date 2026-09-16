@@ -33,6 +33,8 @@ include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
  */
 class modLmdbAdvancedProject extends DolibarrModules
 {
+	/** @var string Publisher contact address. */
+	public $editor_email;
 	/**
 	 * Constructor. Define names, constants, directories, boxes, permissions.
 	 *
@@ -56,20 +58,13 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.3.0';
+		$this->version = '1.4.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
 		$this->module_parts = array(
-			'triggers' => 0,
-			'login' => 0,
-			'substitutions' => 0,
-			'menus' => 0,
-			'tpl' => 0,
-			'barcode' => 0,
+			'triggers' => 1,
 			'models' => 1,
-			'printing' => 0,
-			'theme' => 0,
 			'css' => array(
 				'/lmdbadvancedproject/css/budgetreport.css.php',
 			),
@@ -80,9 +75,9 @@ class modLmdbAdvancedProject extends DolibarrModules
 				'projectoverview',
 				'projectOverview',
 				'projectcard',
+				'globalcard', // Only completeTabsHead uses this to guard project tabs.
 				'projectCard',
 			), 'entity' => '0'),
-			'moduleforexternal' => 0,
 		);
 
 		$this->dirs = array('/lmdbadvancedproject/temp');
@@ -98,6 +93,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array(
+			array('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST', 'chaine', 0, 'Enable analytical shipment costs', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD', 'chaine', 'supplier_tariff', 'Historical supplier_tariff or pmp', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on supplier invoice lines', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on customer invoice lines', 0, 'current', 0),
 		);
@@ -111,8 +108,9 @@ class modLmdbAdvancedProject extends DolibarrModules
 
 		$this->tabs = array();
 		$this->tabs[] = array(
-			'data' => 'project:+budgetreport:BudgetReportProjectTab:lmdbadvancedproject@lmdbadvancedproject:$user->rights->lmdbadvancedproject->budgetreport->read:/lmdbadvancedproject/tabs/project_budgetreport.php?id=__ID__',
+			'data' => 'project:+budgetreport:BudgetReportProjectTab:lmdbadvancedproject@lmdbadvancedproject:$user->hasRight("lmdbadvancedproject", "budgetreport", "read"):/lmdbadvancedproject/tabs/project_budgetreport.php?id=__ID__',
 		);
+		$this->tabs[] = array('data' => 'project:+lmdbap_productcost:BudgetCostProductList:lmdbadvancedproject@lmdbadvancedproject:getDolGlobalInt("LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST") && isModEnabled("expedition") && $user->hasRight("projet", "lire") && $user->hasRight("lmdbadvancedproject", "budgetreport", "read"):/lmdbadvancedproject/tabs/project_productcost.php?id=__ID__');
 
 		$this->dictionaries = array();
 		if (!isModEnabled('dynamicsprices')) {
@@ -175,8 +173,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 			'url' => '/lmdbadvancedproject/budgetreportindex.php',
 			'langs' => 'lmdbadvancedproject@lmdbadvancedproject',
 			'position' => '9',
-			'enabled' => '$conf->lmdbadvancedproject->enabled',
-			'perms' => '$user->rights->lmdbadvancedproject->budgetreport->read',
+			'enabled' => 'isModEnabled("lmdbadvancedproject")',
+			'perms' => '$user->hasRight("lmdbadvancedproject", "budgetreport", "read")',
 			'target' => '',
 			'user' => 0,
 		);
@@ -287,7 +285,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 				'LMDB_CommercialCategoryExtrafield',
 				'sellist',
 				$field['pos'],
-				255,
+				'255',
 				$element,
 				0,
 				0,
@@ -295,10 +293,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 				$param,
 				1,
 				'',
-				-1,
+				'-1',
 				'',
 				'',
-				0,
+				'0',
 				'lmdbadvancedproject@lmdbadvancedproject',
 				$field['enabled'],
 				0,

@@ -164,3 +164,55 @@ LMDBAdvancedProjectQuantityRequired = Saisissez une quantité non nulle pour cha
 LMDBAdvancedProjectAtLeastOnePartRequired = Ajoutez au moins une ligne de répartition par projet.
 LMDBAdvancedProjectAmountTotalMismatch = Le total HT doit être %s (actuel : %s).
 LMDBAdvancedProjectQuantityTotalMismatch = La quantité totale doit être %s (actuelle : %s).
+
+# Analytical shipment costs
+BudgetCostFeature=Intégrer les expéditions aux coûts
+BudgetCostFeatureDescription=Valorise les produits expédiés non couverts par des achats facturés. Calcul analytique uniquement, sans écriture comptable ni mouvement de stock supplémentaire.
+BudgetCostFormulaHelp=Coût retenu = achats facturés + expéditions non couvertes + engagements fournisseurs restants. Exemple : 12 unités commandées, 10 expédiées et 4 facturées donnent 4 unités au coût facturé, 6 au coût d’expédition et 2 au coût de commande. Rapprochement par projet, produit et unité, avec respect des répartitions de factures.
+BudgetCostChronologyHelp=Les montants sont les mouvements de la période ; l’historique antérieur sert au rapprochement. Une expédition de 100 en mars facturée 120 en avril donne 100 en mars et +20 en avril. Les régularisations peuvent être négatives.
+BudgetCostQuantityHelp=Les quantités sont cumulées jusqu’à la fin de période. Les factures couvrent les expéditions les plus anciennes, sans utiliser deux fois la même quantité. Les documents actuellement valides font foi : une correction antidatée peut modifier un ancien rapport.
+BudgetCostPriceHelp=Dernier tarif : prix fournisseur net HT unitaire le plus récemment enregistré avant ou à la date d’expédition, tous fournisseurs autorisés confondus. Sans date d’expédition, la date de validation est utilisée. Une date future est plafonnée à la validation. Le PMP est lu dans l’entité de l’expédition, à sa validation (module Stock requis).
+BudgetCostHistoryHelp=Les deux prix disponibles sont mémorisés à la validation ; changer de méthode recalcule les rapports depuis ces instantanés. Les anciennes valeurs non démontrables restent non valorisées : aucun prix actuel ne les remplace. Les instantanés et réglages sont conservés après désactivation. Les modifications directes en base ou imports sans événement natif ne constituent pas un historique fiable.
+BudgetCostMethod=Méthode de valorisation
+BudgetCostPmp=PMP à la validation
+BudgetCostSupplierTariff=Dernier tarif fournisseur net HT
+BudgetCostUnavailable=Fonctionnalité indisponible : vérifier les modules Projet, Expéditions et Produits/Services, Dolibarr 20+, PHP 8.0+ et réactiver Advanced Project pour installer les tables historiques.
+BudgetCostProductList=Liste des produits
+BudgetCostEnvironment=Environnement
+BudgetCostComplete=Valorisation complète
+BudgetCostIncomplete=Valorisation incomplète
+BudgetCostMissingPrice=Coût non valorisé
+BudgetCostMissingDate=Un document contributeur n’a pas de date métier exploitable. Le calcul est interrompu.
+BudgetCostReadFailed=Impossible de lire les données de valorisation. Aucun total fiable ne peut être affiché.
+BudgetCostCaptureFailed=Impossible de mémoriser les coûts historiques. L’opération est annulée pour conserver la cohérence des données.
+BudgetCostAccessDenied=Droits insuffisants pour consulter les coûts des produits.
+BudgetCostCreditQuantityUnknown=Quantités d’avoir ou négatives ambiguës : seul l’effet financier est pris en compte, sans déduire de retour physique.
+BudgetCostHistoricalDiscountUnknown=La remise historique du tarif fournisseur est inconnue.
+BudgetCostProjectConflict=Une expédition et sa commande désignent des projets différents : son coût n’est attribué à aucun projet.
+BudgetCostIncompatibleUnits=Unités incompatibles : les rapprochements restent séparés par unité. Les quantités agrégées ne sont pas additionnées.
+BudgetCostValidationDateFallback=Date d’expédition absente : date de validation utilisée.
+BudgetCostCustomerQty=Quantité commandée client
+BudgetCostOrderedQty=Quantité commandée fournisseur
+BudgetCostShippedQty=Quantité expédiée
+BudgetCostInvoicedQty=Quantité facturée à l’achat
+BudgetCostUncoveredQty=Expédié non couvert
+BudgetCostRemainingQty=Engagements restants (quantité)
+BudgetCostInvoiceCost=Coûts facturés (période)
+BudgetCostShipmentsNet=Expéditions et régularisations (période)
+BudgetCostCommitmentsNet=Engagements nets (période)
+BudgetCostRetained=Coût retenu (période)
+BudgetCostContributions=Contributions de coûts
+BudgetCostPriceSource=Source du prix
+BudgetCostReason_invoice=Achat facturé
+BudgetCostReason_shipment=Valorisation provisoire
+BudgetCostReason_regularization=Reprise de valorisation à la facturation
+BudgetCostReason_commitment=Engagement fournisseur
+BudgetCostReason_commitment_release=Reprise d’engagement représenté
+BudgetCostProvisionalBalance=Valorisation provisoire restante
+
+BudgetCostCurrencyUnknown=La devise de base de certains documents est différente ou inconnue. Les montants concernés restent non valorisés ; aucun taux de change actuel n’est appliqué.
+BudgetCostSourceUnavailable=La commande source de certaines expéditions est absente ou inaccessible. Le produit reste visible, sans affectation de coût ni couverture automatique.
+BudgetCostCauseDocument=Document à l’origine du mouvement
+BudgetCostSupplierPending=Commande fournisseur validée ou approuvée mais pas encore passée : quantité visible, sans engagement financier.
+
+BudgetReportFooterTooHigh=Le pied de page est trop haut pour ce rapport. Réduisez le texte libre du projet ou le contenu du hook de pied de page.

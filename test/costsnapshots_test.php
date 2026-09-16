@@ -1,0 +1,72 @@
+<?php
+/* Exercise the real Product::fetch and the snapshot service against SQL fixtures. */
+require __DIR__.'/costsources_test.php';
+error_reporting(E_ALL & ~E_DEPRECATED);
+$nativeSchema = file_get_contents(DOL_DOCUMENT_ROOT.'/install/mysql/tables/llx_product.sql');
+preg_match_all('/^\s*([a-z][a-z0-9_]*)\s+(?:integer|int|varchar|text|mediumtext|longtext|double|real|float|tinyint|smallint|datetime|timestamp|date)/mi', $nativeSchema, $matches);
+$existing = array_map(static function ($row) { return $row->name; }, $db->query('PRAGMA table_info('.MAIN_DB_PREFIX.'product)')->rows);
+foreach (array_diff($matches[1], $existing) as $column) {
+	$db->query('ALTER TABLE '.MAIN_DB_PREFIX.'product ADD COLUMN '.$column." TEXT DEFAULT ''");
+}
+$db->query('CREATE TABLE '.MAIN_DB_PREFIX.'product_extrafields (fk_object INTEGER, tms TEXT)');
+$db->connection->sqliteCreateFunction('GREATEST', static function (...$values) { return max($values); });
+$extrafields = (object) array('attributes'=>array('product'=>array('loaded'=>true,'label'=>array())));
+$db->query('UPDATE '.MAIN_DB_PREFIX."product SET pmp=7.12345 WHERE rowid=1");
+$now = date('Y-m-d H:i:s');
+$db->query('UPDATE '.MAIN_DB_PREFIX."expedition SET date_valid='".$now."',date_expedition='".$now."' WHERE rowid=1");
+$service->captureShipment(1, $user);
+$snapshots = $db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost')->rows;
+check(count($snapshots), 1, 'First validation snapshot');
+check($snapshots[0]->snapshot_pmp, 7.12345, 'Native Product::fetch PMP frozen');
+check($snapshots[0]->snapshot_tariff, 10, 'Net packaged tariff frozen');
+$service->captureShipment(1, $user);
+check($db->num_rows($db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost')), 1, 'Validation replay no duplicate');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'product SET pmp=99 WHERE rowid=1');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'product_fournisseur_price SET unitprice=999 WHERE rowid=1');
+$service->captureTariff(1, $user);
+$report = $service->load(array(1));
+check($report['products']['1:1']['provisional_cost'], 60, 'Later tariff cannot rewrite snapshot');
+$conf->global->LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD = 'pmp';
+check($service->load(array(1))['products']['1:1']['provisional_cost'], (float) price2num(6*7.12345,'MT'), 'Method change uses historical PMP');
+$service->retireShipment(1);
+$service->captureShipment(1, $user);
+$snapshots = $db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost ORDER BY revision')->rows;
+check(count($snapshots), 2, 'New validation version even within same second');
+check($snapshots[0]->active, 0, 'Previous version retained inactive');
+check($snapshots[1]->snapshot_pmp, 99, 'Revalidation takes current native PMP');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'product SET pmp=0 WHERE rowid=1');
+$service->retireShipment(1); $service->captureShipment(1, $user);
+check($service->load(array(1))['products']['1:1']['provisional_cost'], 0, 'Explicit zero PMP is valued');
+$conf->global->LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD = 'supplier_tariff';
+$db->query('UPDATE '.MAIN_DB_PREFIX."const SET value='USD' WHERE entity=2");
+$db->query('UPDATE '.MAIN_DB_PREFIX.'facture_fourn SET entity=2');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts SET entity=2');
+check(in_array('BudgetCostCurrencyUnknown',$service->load(array(2))['issues'],true), true, 'Different base currency cannot be silently added');
+check(total($service->load(array(2))), 0, 'No fabricated currency conversion');
+// A supplier tariff in another base currency is preserved as evidence, not relabelled EUR.
+$db->query('UPDATE '.MAIN_DB_PREFIX."product_fournisseur_price SET entity=2,fk_soc=2,datec='".$now."'");
+$service->retireShipment(1); $service->captureShipment(1,$user);
+$latest=$db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost WHERE active=1')->rows[0];
+check($latest->tariff_currency,'USD','Supplier snapshot keeps its own currency');
+check($latest->currency,'EUR','PMP snapshot keeps shipment currency');
+check($service->load(array(1))['products']['1:1']['provisional_cost'],null,'Foreign tariff cannot be relabelled as shipment currency');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commandedet SET fk_unit=2 WHERE rowid=1');
+check(in_array('BudgetCostIncompatibleUnits',$service->load(array(1))['issues'],true),true,'Unit price not applied to an incompatible shipment unit');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commandedet SET fk_unit=1 WHERE rowid=1');
+$conf->global->LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST=0;
+require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+require_once __DIR__.'/../core/triggers/interface_99_modLmdbAdvancedProject_CostSnapshots.class.php';
+$trigger = new InterfaceCostSnapshots($db);
+$shipment = new Expedition($db); $shipment->id=1;
+check($trigger->runTrigger('SHIPMENT_UNVALIDATE',$shipment,$user,$langs,$conf),0,'Native draft event accepted while option off');
+check($db->num_rows($db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost WHERE active=1')),0,'Option off still retires cancelled validation evidence');
+// Use the actual version-dependent native event name through the listener.
+$conf->global->LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST=1;
+require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.product.class.php';
+$priceObject = new ProductFournisseur($db); $priceObject->id=1; $priceObject->product_fourn_price_id=1;
+$db->query('UPDATE '.MAIN_DB_PREFIX.'product_fournisseur_price SET entity=1,fk_soc=1,unitprice=25 WHERE rowid=1');
+$prefix=version_compare(DOL_VERSION,'23.0.0','>=') ? 'PRODUCT_BUYPRICE_' : 'SUPPLIER_PRODUCT_BUYPRICE_';
+check($trigger->runTrigger($prefix.'MODIFY',$priceObject,$user,$langs,$conf),0,'Versioned native price event accepted');
+$net=$db->query('SELECT snapshot_unit_ht FROM '.MAIN_DB_PREFIX.'lmdbap_tariff_history ORDER BY rowid DESC LIMIT 1')->rows[0]->snapshot_unit_ht;
+check($net,20,'Native listener records the discounted unit price');
+echo $checks." assertions passed including native PMP and historical snapshot lifecycle.\n";

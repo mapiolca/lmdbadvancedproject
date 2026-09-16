@@ -7,6 +7,8 @@ require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+require_once __DIR__.'/../class/lmdbadvancedprojectproductcost.class.php';
+require_once __DIR__.'/productcost.lib.php';
 
 if (!function_exists('lmdbadvancedproject_round_amount')) {
 	/**
@@ -567,7 +569,7 @@ if (!function_exists('lmdbadvancedproject_get_budget_report_authorized_project_i
 		}
 		$loaded = true;
 
-		if (!empty($user->admin) || (empty($user->socid) && $user->hasRight('projet', 'all', 'lire'))) {
+		if (empty($user->socid) && $user->hasRight('projet', 'all', 'lire')) {
 			return null;
 		}
 
@@ -605,9 +607,10 @@ if (!function_exists('lmdbadvancedproject_get_budget_report_project_options')) {
 
 		$sql = 'SELECT DISTINCT p.rowid, p.ref, p.title';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'projet p';
-		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'commande c ON c.fk_projet = p.rowid';
+		if (!LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'commande c ON c.fk_projet = p.rowid AND c.entity IN ('.$orderEntities.') AND c.fk_statut > 0';
+		}
 		$sql .= ' WHERE p.entity IN ('.$projectEntities.')';
-		$sql .= ' AND c.entity IN ('.$orderEntities.') AND c.fk_statut > 0';
 		if (is_array($authorizedProjectIds)) {
 			$sql .= ' AND p.rowid IN ('.(empty($authorizedProjectIds) ? '0' : implode(',', array_map('intval', $authorizedProjectIds))).')';
 		}
@@ -1454,11 +1457,12 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 	 * @param  array<string,mixed>  $filters              Normalized report filters
 	 * @return array<string,mixed>
 	 */
-	function lmdbadvancedproject_load_project_forecast($projectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters = array())
+	function lmdbadvancedproject_load_project_forecast($projectId, $projectEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters = array(), $productCosts = null)
 	{
 		global $db;
 
 		$forecast = lmdbadvancedproject_init_forecast();
+		$useProductCosts = LmdbAdvancedProjectCompatibility::isShipmentCostEnabled();
 		$projectId = (int) $projectId;
 		$filters = lmdbadvancedproject_normalize_budget_report_filters($filters);
 		$orderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('c.date_commande', $filters);
@@ -1491,7 +1495,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
 			".$categorySql['join']."
 			WHERE ff.fk_projet = ".$projectId." AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND ffd.product_type IN (0,1)
-			AND ".$supplierInvoiceDateCondition.$supplierInvoiceSplitExclusion;
+			".LmdbAdvancedProjectProductCost::legacyLineFilter('ffd')." AND ".$supplierInvoiceDateCondition.$supplierInvoiceSplitExclusion;
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -1512,7 +1516,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 				AND ff.entity IN (".$supplierInvoiceEntities.")
 				AND sip.entity IN (".$supplierInvoiceEntities.")
 				AND ffd.product_type IN (0,1)
-				AND ".$supplierInvoiceDateCondition;
+				".LmdbAdvancedProjectProductCost::legacyLineFilter('ffd')." AND ".$supplierInvoiceDateCondition;
 			$resql = $db->query($sql);
 			if ($resql) {
 				while ($obj = $db->fetch_object($resql)) {
@@ -1538,6 +1542,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			AND COALESCE(cf.billed, 0) = 0
 			AND cf.entity IN (".$supplierOrderEntities.")
 			AND cfd.product_type IN (0,1)
+			".LmdbAdvancedProjectProductCost::legacyLineFilter('cfd')."
 			AND ".$supplierOrderDateCondition."
 			".$supplierOrderSplitExclusion."
 			HAVING amount_ht > 0";
@@ -1635,6 +1640,13 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			$db->free($resql);
 		}
 
+		if ($useProductCosts) {
+			if ($productCosts === null) {
+				$productCosts = (new LmdbAdvancedProjectProductCost($db))->load(array($projectId), $filters);
+			}
+			lmdbadvancedproject_add_product_cost_forecast($forecast, $productCosts);
+		}
+
 		foreach ($forecast['categories'] as $key => $category) {
 			$forecast['categories'][$key]['forecast_gap'] = $category['order_budget'] - $category['supplier_expenses'];
 		}
@@ -1674,6 +1686,9 @@ if (!function_exists('lmdbadvancedproject_get_forecast_document_nom_url')) {
 	function lmdbadvancedproject_get_forecast_document_nom_url($line)
 	{
 		global $db;
+		if (isset($line['cost_source'])) {
+			return lmdbadvancedproject_cost_document_link($line['cost_source']);
+		}
 
 		$documentId = empty($line['document_id']) ? 0 : (int) $line['document_id'];
 		$ref = empty($line['ref']) ? '' : (string) $line['ref'];
@@ -1710,11 +1725,7 @@ if (!function_exists('lmdbadvancedproject_get_forecast_document_nom_url')) {
 		$document->id = $documentId;
 		$document->rowid = $documentId;
 		$document->ref = $ref;
-		if (method_exists($document, 'getNomUrl')) {
-			return $document->getNomUrl(1);
-		}
-
-		return lmdbadvancedproject_escape_html($ref);
+		return $document->getNomUrl(1);
 	}
 }
 
@@ -1728,6 +1739,9 @@ if (!function_exists('lmdbadvancedproject_get_forecast_document_status_badge')) 
 	function lmdbadvancedproject_get_forecast_document_status_badge($line)
 	{
 		global $db, $langs;
+		if (isset($line['cost_reason'])) {
+			return dolGetBadge($langs->trans('BudgetCostReason_'.$line['cost_reason']), '', 'status4');
+		}
 
 		$documentId = empty($line['document_id']) ? 0 : (int) $line['document_id'];
 		$ref = empty($line['ref']) ? '' : (string) $line['ref'];
@@ -1761,9 +1775,7 @@ if (!function_exists('lmdbadvancedproject_get_forecast_document_status_badge')) 
 				$document->paye = $paid;
 				$document->paid = $paid;
 				$document->billed = $billed;
-				if (method_exists($document, 'getLibStatut')) {
-					return $document->getLibStatut(5);
-				}
+				return $document->getLibStatut(5);
 			}
 		}
 
@@ -1839,7 +1851,7 @@ if (!function_exists('lmdbadvancedproject_print_forecast_lines')) {
 			print '<td class="budgetreport-forecast-date-col">'.lmdbadvancedproject_format_modal_date($line['date']).'</td>';
 			print '<td class="budgetreport-forecast-label-col"><span class="budgetreport-forecast-label-truncate" title="'.lmdbadvancedproject_escape_html($lineLabelFull).'">'.lmdbadvancedproject_escape_html($lineLabel).'</span></td>';
 			print '<td class="budgetreport-forecast-qty-col" align="right">'.price($line['qty']).'</td>';
-			print '<td class="budgetreport-forecast-amount-col" align="right">'.lmdbadvancedproject_format_price($line['amount']).'</td>';
+			print '<td class="budgetreport-forecast-amount-col" align="right">'.(!empty($line['cost_missing']) ? $langs->trans('BudgetCostMissingPrice') : lmdbadvancedproject_format_price($line['amount'])).'</td>';
 			if ($showBudget) {
 				print '<td class="budgetreport-forecast-budget-col" align="right">'.lmdbadvancedproject_format_price($line['budget']).'</td>';
 			}
@@ -2089,7 +2101,10 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 	 */
 	function lmdbadvancedproject_load_budget_report_data($budgetReportProjectId = 0, $filters = array())
 	{
-		global $db, $conf;
+		global $db, $conf, $langs;
+		if (getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST') === 1 && !LmdbAdvancedProjectCompatibility::shipmentCostAvailable()) {
+			throw new RuntimeException('BudgetCostUnavailable');
+		}
 
 		$projects = array();
 		$mobudget = array();
@@ -2163,8 +2178,9 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$budgetReportMulticompanyInfoKey = $entityShared ? 'BudgetReportMulticompanyAllEntitiesInfo' : 'BudgetReportMulticompanyCurrentEntityInfo';
 		}
 
-		$sql = "SELECT p.*, cmd.total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget FROM ".MAIN_DB_PREFIX."projet p
-			INNER JOIN (
+		$projectOrderJoin = LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() ? "LEFT JOIN" : "INNER JOIN";
+		$sql = "SELECT p.*, COALESCE(cmd.total_orders,0) AS total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget FROM ".MAIN_DB_PREFIX."projet p
+			".$projectOrderJoin." (
 				SELECT c.fk_projet, SUM(CASE WHEN ".$orderDateCondition." THEN COALESCE(c.total_ht, 0) ELSE 0 END) as total_orders
 				FROM ".MAIN_DB_PREFIX."commande c
 				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
@@ -2480,7 +2496,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$supplierInvoiceSplitExclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'ffd', $supplierInvoiceEntities);
 		$sql1 = "SELECT ff.datef, ff.fk_projet, SUM(ffd.total_ht) as total_inv FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
-			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter.$supplierInvoiceSplitExclusion."
+			WHERE ff.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.")".$vendorInvoiceProjectSqlFilter.$supplierInvoiceSplitExclusion.LmdbAdvancedProjectProductCost::legacyLineFilter('ffd')."
 			AND ".$supplierInvoiceDateCondition."
 			GROUP BY ff.fk_projet, ff.datef";
 		$result1 = $db->query($sql1);
@@ -2503,7 +2519,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$sqlSupplierInvoiceParts = "SELECT ff.datef, sip.fk_projet, SUM(sip.total_ht) AS total_inv
 				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sip
 				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn ff ON ff.rowid = sip.fk_facture_fourn
-				WHERE sip.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND sip.entity IN (".$supplierInvoiceEntities.")".$supplierInvoicePartProjectSqlFilter."
+				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.rowid = sip.fk_facture_fourn_det AND ffd.fk_facture_fourn = ff.rowid
+				WHERE sip.fk_projet > 0 AND ff.fk_statut IN (1,2) AND ff.entity IN (".$supplierInvoiceEntities.") AND sip.entity IN (".$supplierInvoiceEntities.")".$supplierInvoicePartProjectSqlFilter.LmdbAdvancedProjectProductCost::legacyLineFilter('ffd')."
 				AND ".$supplierInvoiceDateCondition."
 				GROUP BY sip.fk_projet, ff.datef";
 			$resultSupplierInvoiceParts = $db->query($sqlSupplierInvoiceParts);
@@ -2551,7 +2568,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			WHERE cf.fk_projet > 0
 			AND cf.fk_statut IN (3,4,5)
 			AND COALESCE(cf.billed, 0) = 0
-			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter.$supplierOrderSplitExclusion."
+			AND cf.entity IN (".$supplierOrderEntities.")".$supplierOrderProjectSqlFilter.$supplierOrderSplitExclusion.LmdbAdvancedProjectProductCost::legacyLineFilter('cfd')."
 			AND ".$supplierOrderDateCondition."
 			GROUP BY cf.fk_projet, order_date, supplier_order_bucket";
 		$result3 = $db->query($sql3);
@@ -2632,6 +2649,33 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			}
 		}
 
+		$productCosts = array('products' => array(), 'events' => array(), 'issues' => array(), 'complete' => true);
+		$totalshipmentcost = 0.0;
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$productCostService = new LmdbAdvancedProjectProductCost($db);
+			$productCosts = $productCostService->load(array_map('intval', array_keys($projects)), $filters);
+			foreach ($productCosts['events'] as $costEvent) {
+				$pid = $costEvent['line']['project'];
+				$amount = $costEvent['amount'] ?? 0.0;
+				$projects[$pid]['spent'] += $amount;
+				$month = substr($costEvent['date'], 0, 7);
+				$cleanmos[$month] = $month;
+				$mospent[$month] = ($mospent[$month] ?? 0.0) + $amount;
+				if ($costEvent['kind'] === 'invoice') {
+					$totalvendinv += $amount;
+				} elseif ($costEvent['kind'] === 'shipment') {
+					$totalshipmentcost += $amount;
+				} else {
+					$totalsupplierordersremaining += $amount;
+					if ($costEvent['kind'] === 'ordered') {
+						$totalsupplierordersorderedremaining += $amount;
+					} else {
+						$totalsupplierordersdeliveredremaining += $amount;
+					}
+				}
+			}
+		}
+
 		ksort($cleanmos);
 		$monthAxis = array();
 		$molabels = array();
@@ -2672,7 +2716,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		}
 		$timeBreakdown['total_hours'] = $totalTimeHours;
 
-		$totalspent = $totaltime+$totalvendinv+$totalsupplierordersremaining+$totalexpenses;
+		$totalspent = $totaltime+$totalvendinv+$totalsupplierordersremaining+$totalexpenses+$totalshipmentcost;
 		$balance = $budget-$totalspent;
 		$blncolor = $balance < 0 ? "red" : "green";
 
@@ -2705,6 +2749,10 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			lmdbadvancedproject_round_amount($totalexpenses),
 		);
 
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$spentLabels[] = $langs->transnoentities('BudgetCostShipmentsNet');
+			$spentValues[] = (float) price2num($totalshipmentcost, 'MT');
+		}
 		if ($balance > 0) {
 			$spentLabels[] = lmdbadvancedproject_trans_chart("BudgetReportBalance");
 			$spentValues[] = lmdbadvancedproject_round_amount($balance);
@@ -2717,7 +2765,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		$budgetReportForecast = array();
 		if ($budgetReportProjectId > 0 && !empty($projects)) {
-			$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectDataEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters);
+			$budgetReportForecast = lmdbadvancedproject_load_project_forecast($budgetReportProjectId, $projectDataEntities, $orderEntities, $supplierInvoiceEntities, $supplierOrderEntities, $expenseReportEntities, $filters, $productCosts);
 		}
 
 		$budgetChartTitleKey = "BudgetReportBudgetByProjects";
@@ -2766,6 +2814,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			'totalcustomerinvoices' => $totalcustomerinvoices,
 			'budget' => $budget,
 			'totalspent' => $totalspent,
+			'totalshipmentcost' => $totalshipmentcost,
+			'productCosts' => $productCosts,
 			'balance' => $balance,
 			'blncolor' => $blncolor,
 			'labels' => $labels,
@@ -2870,8 +2920,57 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 
 		$budgetReportProjectId = (int) $budgetReportProjectId;
 
-		$budgetReportData = lmdbadvancedproject_load_budget_report_data($budgetReportProjectId, $filters);
-		extract($budgetReportData, EXTR_OVERWRITE);
+		try {
+			$budgetReportData = lmdbadvancedproject_load_budget_report_data($budgetReportProjectId, $filters);
+		} catch (RuntimeException $exception) {
+			setEventMessages($langs->trans($exception->getMessage()), null, 'errors');
+			return;
+		}
+		// Explicit unpacking keeps the shared report contract visible to static analysis.
+		$budgetReportProjectId = $budgetReportData['budgetReportProjectId'];
+		$filters = $budgetReportData['filters'];
+		$budgetReportMulticompanyInfoKey = $budgetReportData['budgetReportMulticompanyInfoKey'];
+		$projects = $budgetReportData['projects'];
+		$mobudget = $budgetReportData['mobudget'];
+		$mospent = $budgetReportData['mospent'];
+		$motimehours = $budgetReportData['motimehours'];
+		$cleanmos = $budgetReportData['cleanmos'];
+		$monthAxis = $budgetReportData['monthAxis'];
+		$molabels = $budgetReportData['molabels'];
+		$mobudgets = $budgetReportData['mobudgets'];
+		$mospents = $budgetReportData['mospents'];
+		$motimehourvalues = $budgetReportData['motimehourvalues'];
+		$motimehourAxisMaximum = $budgetReportData['motimehourAxisMaximum'];
+		$mobudgetFormattedValues = $budgetReportData['mobudgetFormattedValues'];
+		$mospentFormattedValues = $budgetReportData['mospentFormattedValues'];
+		$motimehourFormattedValues = $budgetReportData['motimehourFormattedValues'];
+		$timeBreakdown = $budgetReportData['timeBreakdown'];
+		$totalTimeHours = $budgetReportData['totalTimeHours'];
+		$totaltime = $budgetReportData['totaltime'];
+		$totalvendinv = $budgetReportData['totalvendinv'];
+		$totalsupplierordersorderedremaining = $budgetReportData['totalsupplierordersorderedremaining'];
+		$totalsupplierordersdeliveredremaining = $budgetReportData['totalsupplierordersdeliveredremaining'];
+		$totalsupplierordersremaining = $budgetReportData['totalsupplierordersremaining'];
+		$totalexpenses = $budgetReportData['totalexpenses'];
+		$totalorders = $budgetReportData['totalorders'];
+		$totalcustomerinvoices = $budgetReportData['totalcustomerinvoices'];
+		$budget = $budgetReportData['budget'];
+		$totalspent = $budgetReportData['totalspent'];
+		$totalshipmentcost = $budgetReportData['totalshipmentcost'];
+		$productCosts = $budgetReportData['productCosts'];
+		$balance = $budgetReportData['balance'];
+		$blncolor = $budgetReportData['blncolor'];
+		$labels = $budgetReportData['labels'];
+		$budgets = $budgetReportData['budgets'];
+		$spents = $budgetReportData['spents'];
+		$budgetFormattedValues = $budgetReportData['budgetFormattedValues'];
+		$spentFormattedValues = $budgetReportData['spentFormattedValues'];
+		$spentLabels = $budgetReportData['spentLabels'];
+		$spentValues = $budgetReportData['spentValues'];
+		$spentPieFormattedValues = $budgetReportData['spentPieFormattedValues'];
+		$budgetReportForecast = $budgetReportData['budgetReportForecast'];
+		$budgetChartTitleKey = $budgetReportData['budgetChartTitleKey'];
+
 		$monthlyChartMinWidth = max(720, (count($monthAxis) * 90) + 180);
 		$exportParameters = $filters;
 		if ($budgetReportProjectId > 0) {
@@ -2890,6 +2989,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 ?>
 
 <div class="info"><?php echo $langs->trans($budgetReportMulticompanyInfoKey); ?></div>
+<?php lmdbadvancedproject_print_cost_notice($productCosts); ?>
 
 <?php if ($budgetReportProjectId > 0 && empty($projects)) { ?>
 <div class="warning"><?php echo $langs->trans("BudgetReportProjectNoData"); ?></div>
@@ -2943,6 +3043,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
+				<?php if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) { ?><div><span><?php echo $formBudgetReport->textwithtooltip($langs->trans('BudgetCostShipmentsNet'), $langs->trans('BudgetCostChronologyHelp')); ?></span><strong><?php echo price(price2num($totalshipmentcost, 'MT'), 0, $langs, 1, -1, -1, $conf->currency).' ('.lmdbadvancedproject_format_spent_percentage($totalshipmentcost, $totalspent).')'; ?></strong></div><?php } ?>
 				<div><span><?php echo $langs->trans("BudgetReportStaffExpenses"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')'; ?></strong></div>
 			</div>
 		</td>
@@ -3079,7 +3180,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	<script id="idgraphspent">
 	var spentFormattedValues = <?php echo json_encode(array_values($spentPieFormattedValues)); ?>;
 	var spent_config = {
-			type: 'pie',
+			type: <?php echo json_encode(min($spentValues) < 0 ? 'bar' : 'pie'); ?>,
 			data: {
 				datasets: [{
 					label: <?php echo json_encode(lmdbadvancedproject_trans_chart("BudgetReportBudgetVsSpent")); ?>,

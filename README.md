@@ -1,6 +1,6 @@
 # ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-Current version: **1.3.0**
+Current version: **1.4.0**
 
 ## Features
 
@@ -25,6 +25,20 @@ Reports can be exported as XLSX or ODS. Both formats include the total-time deta
 Spreadsheet exports require the PhpSpreadsheet library bundled with Dolibarr 20 and the PHP `ZipArchive` extension. The module compatibility tab reports the availability of these components.
 
 Date range and project status filters on the global report are preserved in spreadsheet exports. Supplier spending is split between ordered supplier orders, delivered supplier orders, and supplier invoices, with percentages displayed in the Spent tile. Detail modals include totals, localized dates, and Dolibarr document links.
+
+## Optional shipment costs
+
+An entity-specific switch adds provisional costs for shipped products not yet covered by supplier invoices. Choose the latest historical net supplier tariff or the native PMP frozen at shipment validation. Invoices later replace the provisional valuation; dated adjustments preserve period totals. Both historical values are retained, including after disabling the option. Unknown historical prices are reported as incomplete instead of using current prices.
+
+A native **Product list** project tab compares customer/supplier orders, shipments, invoiced purchases, uncovered quantities and remaining commitments. Project/global reports, categories, graphs and PDF/XLSX/ODS outputs share the same reconciliation; spreadsheets also include products and dated contributions. Native invoice allocations, entity scopes and project/report permissions are respected.
+
+After updating, reactivate the module to install the historical tables and native trigger listener, then opt in from its settings. The option defaults to off; settings and snapshots survive reactivation. The native PMP method requires Stock. See the [detailed rules, examples and historical limitations](doc/SHIPMENT_COSTS.md) and [test/instance validation guide](test/README.md), with [executed checks and remaining limits](doc/VALIDATION_SHIPMENT_COSTS.md).
+
+## Project overview integration
+
+Invoice allocations are added to the project's native overview without replacing entries contributed by other modules, including Diffusion. Allocation settings and permissions still determine which allocation entries appear. Deploy the corresponding additive-hook correction in Diffusion as well when both modules are used; no hook priority override or database migration is required.
+
+The joint regression runner is `test/project_overview_hooks.php` in the Diffusion module. It checks both hook orders, preserved third-module entries, allocation permissions and Diffusion visibility for authors and other readers using the native Dolibarr HookManager. Its fixtures simulate users and use SQLite in memory; they do not validate a deployed ERP or Multicompany instance.
 
 ## Translations
 

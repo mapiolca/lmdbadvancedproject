@@ -47,6 +47,37 @@ class ActionsLmdbadvancedproject
 	}
 
 	/**
+	 * Keep project-tab visibility aligned with the shared server predicate.
+	 * globalcard covers native project Notes/Documents pages as well as the card.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function completeTabsHead($parameters, &$object, &$action, $hookmanager)
+	{
+		$this->results = array();
+		if (($parameters['type'] ?? '') !== 'project' || ($parameters['mode'] ?? '') !== 'remove') {
+			return 0;
+		}
+		global $user;
+		require_once __DIR__.'/lmdbadvancedprojectcompatibility.class.php';
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() && $user->hasRight('projet', 'lire')
+			&& $user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if (isset($parameters['head']) && is_array($parameters['head'])) {
+			foreach ($parameters['head'] as $key => $tab) {
+				if (is_array($tab) && ($tab[2] ?? '') === 'lmdbap_productcost') {
+					unset($parameters['head'][$key]);
+				}
+			}
+		}
+		return 0;
+	}
+
+	/**
 	 * Inject the inline split button on invoice line tables.
 	 *
 	 * @param  array<string,mixed> $parameters Hook parameters
@@ -57,10 +88,11 @@ class ActionsLmdbadvancedproject
 	 */
 	public function addHtmlHeader($parameters, $object, $action, $hookmanager)
 	{
-		global $langs;
+		global $langs, $user;
 
 		$context = $this->getInvoiceContext($parameters);
-		if ($context === '' || !$this->isFeatureEnabled($context) || !$this->hasWriteAccess($context)) {
+		if ($context === '' || !$this->isFeatureEnabled($context) || !$user->hasRight('lmdbadvancedproject', 'split', 'write') || !$user->hasRight('projet', 'lire')
+			|| !($context === 'invoicecard' ? $user->hasRight('facture', 'lire') : $user->hasRight('fournisseur', 'facture', 'lire'))) {
 			return 0;
 		}
 
@@ -240,7 +272,7 @@ class ActionsLmdbadvancedproject
 	 */
 	public function completeListOfReferent($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs;
+		global $langs, $user;
 
 		if (empty($object) || empty($object->element) || $object->element !== 'project') {
 			return 0;
@@ -249,7 +281,8 @@ class ActionsLmdbadvancedproject
 		$langs->load('lmdbadvancedproject@lmdbadvancedproject');
 		$results = array();
 
-		if ($this->isFeatureEnabled('invoicesuppliercard') && $this->hasReadAccess('invoicesuppliercard')) {
+		if ($this->isFeatureEnabled('invoicesuppliercard') && ($user->hasRight('lmdbadvancedproject', 'split', 'read') || $user->hasRight('lmdbadvancedproject', 'split', 'write'))
+			&& $user->hasRight('projet', 'lire') && $user->hasRight('fournisseur', 'facture', 'lire')) {
 			$results['lmdbadvancedproject_supplier_invoice_parts'] = array(
 				'name' => $langs->trans('LMDBAdvancedProjectSupplierInvoiceParts'),
 				'title' => $langs->trans('LMDBAdvancedProjectSupplierInvoicePartsList'),
@@ -263,7 +296,8 @@ class ActionsLmdbadvancedproject
 			);
 		}
 
-		if ($this->isFeatureEnabled('invoicecard') && $this->hasReadAccess('invoicecard')) {
+		if ($this->isFeatureEnabled('invoicecard') && ($user->hasRight('lmdbadvancedproject', 'split', 'read') || $user->hasRight('lmdbadvancedproject', 'split', 'write'))
+			&& $user->hasRight('projet', 'lire') && $user->hasRight('facture', 'lire')) {
 			$results['lmdbadvancedproject_customer_invoice_parts'] = array(
 				'name' => $langs->trans('LMDBAdvancedProjectCustomerInvoiceParts'),
 				'title' => $langs->trans('LMDBAdvancedProjectCustomerInvoicePartsList'),
@@ -283,7 +317,8 @@ class ActionsLmdbadvancedproject
 
 		$this->results = $results;
 
-		return 1;
+		// Add our referents without replacing contributions from other modules.
+		return 0;
 	}
 
 	/**
@@ -297,7 +332,7 @@ class ActionsLmdbadvancedproject
 	 */
 	public function doActions($parameters, &$object, &$action, $hookmanager)
 	{
-		global $langs;
+		global $langs, $user;
 
 		$context = $this->getInvoiceContext($parameters);
 		if ($context === '' || !in_array($action, array('lmdbadvancedproject_edit_split', 'lmdbadvancedproject_update_split'), true)) {
@@ -306,13 +341,14 @@ class ActionsLmdbadvancedproject
 
 		$langs->load('lmdbadvancedproject@lmdbadvancedproject');
 
-		if (!$this->isFeatureEnabled($context) || !$this->hasWriteAccess($context)) {
+		if (!$this->isFeatureEnabled($context) || !$user->hasRight('lmdbadvancedproject', 'split', 'write') || !$user->hasRight('projet', 'lire')
+			|| !($context === 'invoicecard' ? $user->hasRight('facture', 'lire') : $user->hasRight('fournisseur', 'facture', 'lire'))) {
 			accessforbidden();
 		}
 
 		$messages = array();
 		$errors = array();
-		$lineId = GETPOST('lineid', 'int');
+		$lineId = GETPOSTINT('lineid');
 		$source = $this->fetchSourceLine($context, $lineId);
 		if (empty($source)) {
 			$errors[] = $langs->trans('LMDBAdvancedProjectSourceLineNotFound');
@@ -369,54 +405,14 @@ class ActionsLmdbadvancedproject
 	 */
 	private function isFeatureEnabled($context)
 	{
-		global $conf;
-
 		if ($context === 'invoicesuppliercard') {
-			return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT);
+			return getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT') > 0;
 		}
 		if ($context === 'invoicecard') {
-			return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT);
+			return getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT') > 0;
 		}
 
 		return false;
-	}
-
-	/**
-	 * Check read access for allocated parts.
-	 *
-	 * @param  string $context Hook context
-	 * @return bool
-	 */
-	private function hasReadAccess($context)
-	{
-		global $user;
-
-		if (empty($user->rights->lmdbadvancedproject->split->read) && empty($user->rights->lmdbadvancedproject->split->write)) {
-			return false;
-		}
-
-		if (empty($user->rights->projet->lire)) {
-			return false;
-		}
-
-		if ($context === 'invoicecard') {
-			return !empty($user->rights->facture->lire);
-		}
-
-		return !empty($user->rights->fournisseur->facture->lire) || !empty($user->rights->fournisseur->lire);
-	}
-
-	/**
-	 * Check write access for allocated parts.
-	 *
-	 * @param  string $context Hook context
-	 * @return bool
-	 */
-	private function hasWriteAccess($context)
-	{
-		global $user;
-
-		return !empty($user->rights->lmdbadvancedproject->split->write) && $this->hasReadAccess($context);
 	}
 
 	/**
@@ -434,7 +430,7 @@ class ActionsLmdbadvancedproject
 			$expectedToken = $_SESSION['newtoken'];
 		}
 
-		return empty($expectedToken) || $token === $expectedToken;
+		return $expectedToken !== '' && is_string($token) && hash_equals($expectedToken, $token);
 	}
 
 	/**
@@ -496,6 +492,7 @@ class ActionsLmdbadvancedproject
 	 */
 	private function saveSplit($context, $source, &$messages, &$errors)
 	{
+		/** @var Translate $langs */
 		global $langs, $user;
 
 		$config = $this->getContextConfig($context);
@@ -561,7 +558,7 @@ class ActionsLmdbadvancedproject
 			}
 
 			if ($mode === 'amount') {
-				$amount = price2num($rawAmount);
+				$amount = (float) price2num($rawAmount);
 				if (abs($amount) < 0.00000001) {
 					$errors[] = $langs->trans('LMDBAdvancedProjectAmountRequired');
 					continue;
@@ -570,7 +567,7 @@ class ActionsLmdbadvancedproject
 				$qty = $sourceQty * $ratio;
 				$totalTtc = $sourceTtc * $ratio;
 			} else {
-				$qty = price2num($rawQty);
+				$qty = (float) price2num($rawQty);
 				if (abs($qty) < 0.00000001) {
 					$errors[] = $langs->trans('LMDBAdvancedProjectQuantityRequired');
 					continue;
@@ -1108,10 +1105,10 @@ class ActionsLmdbadvancedproject
 		if (!is_object($form)) {
 			$form = new Form($this->db);
 		}
-		if (is_object($form) && method_exists($form, 'textwithpicto') && $this->isGlobalFlagEnabled('MAIN_ENABLE_AJAX_TOOLTIP')) {
+		if (method_exists($form, 'textwithpicto') && $this->isGlobalFlagEnabled('MAIN_ENABLE_AJAX_TOOLTIP')) {
 			return $label.' '.$form->textwithpicto('', $description);
 		}
-		if (is_object($form) && method_exists($form, 'textwithtooltip')) {
+		if (method_exists($form, 'textwithtooltip')) {
 			return $form->textwithtooltip($label, $description, 3, 0, '', 0, 2);
 		}
 
@@ -1136,7 +1133,7 @@ class ActionsLmdbadvancedproject
 			$projectObject->id = (int) $project['id'];
 			$projectObject->ref = (string) $project['ref'];
 			$projectObject->title = (string) $project['title'];
-			$link = method_exists($projectObject, 'getNomUrl') ? $projectObject->getNomUrl(1) : $this->escape($projectObject->ref);
+			$link = $projectObject->getNomUrl(1);
 			$title = trim((string) $project['title']);
 
 			return $link.($title !== '' ? ' - '.$this->escape($title) : '');

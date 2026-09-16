@@ -225,6 +225,9 @@ class LmdbAdvancedProjectBudgetReportExport
 		$this->fillReportSheet($reportSheet, $withCharts);
 		$this->fillTimeSheet($timeSheet);
 		$this->fillChartDataSheet($dataSheet);
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$this->fillProductSheets($spreadsheet);
+		}
 
 		if ($withCharts) {
 			$this->addCharts($reportSheet, $dataSheet);
@@ -241,6 +244,97 @@ class LmdbAdvancedProjectBudgetReportExport
 		$spreadsheet->setActiveSheetIndex(0);
 
 		return $spreadsheet;
+	}
+
+	/** @param Spreadsheet $spreadsheet @return void */
+	private function fillProductSheets($spreadsheet)
+	{
+		global $db, $conf;
+		$report = $this->data['productCosts'];
+		$environments = array();
+		$entityIds = array();
+		foreach ($report['products'] as $productRow) { $entityIds = array_merge($entityIds, array_values($productRow['entities'])); }
+		$entityIds = array_unique(array_map('intval', $entityIds));
+		if (count($entityIds) > 1 && isModEnabled('multicompany')) {
+			$result = $db->query('SELECT rowid, label FROM '.MAIN_DB_PREFIX.'entity WHERE rowid IN ('.implode(',', $entityIds).')');
+			if (!$result) { throw new RuntimeException($this->outputlangs->transnoentities('BudgetCostReadFailed')); }
+			while (is_object($entityRow = $db->fetch_object($result))) { $environments[(int) $entityRow->rowid] = (string) $entityRow->label; }
+			$db->free($result);
+		}
+		$sheet = $spreadsheet->createSheet();
+		$sheet->setTitle($this->sheetTitle($this->outputlangs->transnoentities('BudgetCostProductList')));
+		$columns = array('project' => 'Project') + lmdbadvancedproject_product_cost_columns();
+		if ($environments) { $columns['entities'] = 'BudgetCostEnvironment'; }
+		$lastColumn = Coordinate::stringFromColumnIndex(count($columns));
+		$this->setText($sheet, 'A1', $this->outputlangs->transnoentities($report['complete'] ? 'BudgetCostComplete' : 'BudgetCostIncomplete'));
+		$sheet->mergeCells('A1:'.$lastColumn.'1');
+		$this->setText($sheet, 'A4', implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, $report['issues'])));
+		$sheet->mergeCells('A4:'.$lastColumn.'4');
+		$this->setText($sheet, 'A2', $this->outputlangs->transnoentities('BudgetCostQuantityHelp'));
+		$sheet->mergeCells('A2:'.$lastColumn.'2');
+		$this->setText($sheet, 'A3', $this->outputlangs->transnoentities('BudgetCostChronologyHelp'));
+		$sheet->mergeCells('A3:'.$lastColumn.'3');
+		$sheet->getStyle('A1:'.$lastColumn.'4')->getAlignment()->setWrapText(true);
+		$this->writeHeaderRow($sheet, 5, array_values($columns));
+		$rowNumber = 6;
+		foreach ($report['products'] as $row) {
+			$column = 1;
+			foreach ($columns as $key => $label) {
+				$cell = Coordinate::stringFromColumnIndex($column++).$rowNumber;
+				$value = $row[$key] ?? $this->outputlangs->transnoentities('BudgetCostMissingPrice');
+				if ($key === 'project') {
+					$value = $this->data['projects'][$row['project']]['project_ref'] ?? '';
+				} elseif ($key === 'entities') {
+					$value = implode(', ', array_intersect_key($environments, $row['entities']));
+				} elseif ($key === 'type') {
+					$value = $this->outputlangs->transnoentities($value === 1 ? 'Service' : 'Product');
+				} elseif ($key === 'issues') {
+					$value = implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, $value));
+				} elseif ($key === 'unit') {
+					$value = implode(' / ', $row['units']);
+				} elseif (substr($key, -4) === '_qty' && count($row['units']) > 1) {
+					$value = '—';
+				}
+				if (is_float($value)) {
+					$sheet->setCellValue($cell, $value);
+					$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($this->getTotalNumberFormat());
+				} else {
+					$this->setText($sheet, $cell, $value);
+				}
+			}
+			$rowNumber++;
+		}
+		$sheet->setAutoFilter('A5:'.$lastColumn.max(5, $rowNumber - 1));
+		$sheet->freezePane('F6');
+		for ($column = 1; $column <= count($columns); $column++) {
+			$sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setWidth(23);
+		}
+		$detail = $spreadsheet->createSheet();
+		$detail->setTitle($this->sheetTitle($this->outputlangs->transnoentities('BudgetCostContributions')));
+		$this->writeHeaderRow($detail, 1, array('Project', 'Product', 'Ref', 'Date', 'Type', 'Qty', 'AmountHTShort', 'BudgetCostPriceSource', 'Price', 'Date', 'Status', 'BudgetCostCauseDocument', 'Currency', 'BudgetCostEnvironment'));
+		$rowNumber = 2;
+		foreach ($report['events'] as $event) {
+			$line = $event['line'];
+			$values = array($this->data['projects'][$line['project']]['project_ref'] ?? '', $line['product_ref'], $line['ref'], $event['date'],
+				$this->outputlangs->transnoentities('BudgetCostReason_'.$event['reason']), $event['qty'],
+				$event['amount'] ?? $this->outputlangs->transnoentities('BudgetCostMissingPrice'),
+				$line['price_source'] === '' ? '' : $this->outputlangs->transnoentities($line['price_source']),
+				$line['price'] ?? '', $line['price_date'], implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, array_merge($line['issues'], $line['date_fallback'] ? array('BudgetCostValidationDateFallback') : array(), !empty($line['price_status']) && $line['price_status'] !== 'known' ? array($line['price_status']) : array()))),
+				$event['cause']['ref'], $line['currency'] ?? $conf->currency, $environments[$line['entity']] ?? '');
+			foreach ($values as $index => $value) {
+				$cell = Coordinate::stringFromColumnIndex($index + 1).$rowNumber;
+				if (is_float($value)) {
+					$detail->setCellValue($cell, $value);
+					$detail->getStyle($cell)->getNumberFormat()->setFormatCode($index === 8 ? $this->getUnitNumberFormat() : $this->getTotalNumberFormat());
+				} else {
+					$this->setText($detail, $cell, $value);
+				}
+			}
+			$rowNumber++;
+		}
+		$detail->setAutoFilter('A1:N'.max(1, $rowNumber - 1));
+		$detail->freezePane('A2');
+		foreach (range('A', 'N') as $column) { $detail->getColumnDimension($column)->setWidth(24); }
 	}
 
 	/**
@@ -340,6 +434,10 @@ class LmdbAdvancedProjectBudgetReportExport
 			$column++;
 		}
 
+		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			$this->setText($sheet, 'A9', $this->outputlangs->transnoentities($this->data['productCosts']['complete'] ? 'BudgetCostComplete' : 'BudgetCostIncomplete'));
+			$sheet->mergeCells('A9:F9');
+		}
 		$row = $withCharts ? 46 : 11;
 		if (!empty($this->data['budgetReportProjectId'])) {
 			$this->writeProjectSummary($sheet, $row, $currencyFormat);
@@ -504,6 +602,13 @@ class LmdbAdvancedProjectBudgetReportExport
 		}
 	}
 
+	/** Spreadsheet unit-price precision follows native MU configuration. @return string */
+	private function getUnitNumberFormat()
+	{
+		$decimals = max(0, getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT', 5));
+		return '#,##0'.($decimals > 0 ? '.'.str_repeat('#', $decimals) : '');
+	}
+
 	/** @return string */
 	private function getTotalNumberFormat()
 	{
@@ -587,7 +692,7 @@ class LmdbAdvancedProjectBudgetReportExport
 			$reportSheet->addChart($this->createPieChart($sheetName, 'A', 'B', $budgetCount, $this->outputlangs->transnoentities($this->data['budgetChartTitleKey']), 'A10', 'F26'));
 		}
 		if ($spentCount > 0) {
-			$reportSheet->addChart($this->createPieChart($sheetName, 'D', 'E', $spentCount, $this->outputlangs->transnoentities('BudgetReportBudgetVsSpent'), 'G10', 'L26'));
+			$reportSheet->addChart($this->createPieChart($sheetName, 'D', 'E', $spentCount, $this->outputlangs->transnoentities('BudgetReportBudgetVsSpent'), 'G10', 'L26', min($this->data['spentValues']) < 0));
 		}
 		if ($monthCount > 0) {
 			$budgetSeries = new DataSeries(
@@ -637,10 +742,10 @@ class LmdbAdvancedProjectBudgetReportExport
 	}
 
 	/** @return Chart */
-	private function createPieChart($sheetName, $labelColumn, $valueColumn, $count, $title, $topLeft, $bottomRight)
+	private function createPieChart($sheetName, $labelColumn, $valueColumn, $count, $title, $topLeft, $bottomRight, $signed = false)
 	{
 		$series = new DataSeries(
-			DataSeries::TYPE_PIECHART,
+			$signed ? DataSeries::TYPE_BARCHART : DataSeries::TYPE_PIECHART,
 			DataSeries::GROUPING_STANDARD,
 			array(0),
 			array(new DataSeriesValues(DataSeriesValues::DATASERIES_TYPE_STRING, "'".$sheetName."'!\$".$valueColumn."\$2", null, 1)),

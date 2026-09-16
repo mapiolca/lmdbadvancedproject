@@ -1,0 +1,25 @@
+-- Historical analytical valuation; never a replacement for native stock/accounting.
+CREATE TABLE IF NOT EXISTS llx_lmdbap_shipment_cost (
+ rowid integer AUTO_INCREMENT PRIMARY KEY,
+ entity integer DEFAULT 1 NOT NULL,
+ fk_expedition integer NOT NULL,
+ fk_expeditiondet integer NOT NULL,
+ fk_product integer NOT NULL,
+ fk_unit integer NOT NULL DEFAULT 0,
+ revision integer NOT NULL,
+ active integer NOT NULL DEFAULT 1,
+ snapshot_qty double(24,8) NOT NULL,
+ date_validation datetime NOT NULL,
+ date_shipping datetime NOT NULL,
+ date_capture datetime NOT NULL,
+ snapshot_pmp double(24,8) DEFAULT NULL,
+ snapshot_tariff double(24,8) DEFAULT NULL,
+ tariff_date datetime DEFAULT NULL,
+ fk_supplier_price integer DEFAULT NULL,
+ fk_tariff_history integer DEFAULT NULL,
+ currency varchar(3) NOT NULL,
+ tariff_currency varchar(3) NOT NULL,
+ pmp_status varchar(64) NOT NULL,
+ tariff_status varchar(64) NOT NULL,
+ fk_user_author integer NOT NULL
+) ENGINE=innodb;

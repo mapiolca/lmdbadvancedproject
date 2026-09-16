@@ -164,3 +164,55 @@ LMDBAdvancedProjectQuantityRequired = Enter a non-zero quantity for each breakdo
 LMDBAdvancedProjectAtLeastOnePartRequired = Add at least one project breakdown row.
 LMDBAdvancedProjectAmountTotalMismatch = Total amount must be %s (current: %s).
 LMDBAdvancedProjectQuantityTotalMismatch = Total quantity must be %s (current: %s).
+
+# Analytical shipment costs
+BudgetCostFeature=Include shipments in costs
+BudgetCostFeatureDescription=Values shipped products not covered by supplier invoices. Analytical calculation only, without additional accounting entries or stock movements.
+BudgetCostFormulaHelp=Retained cost = invoiced purchases + uncovered shipments + remaining supplier commitments. Example: 12 ordered, 10 shipped and 4 invoiced units give 4 at invoice cost, 6 at shipment cost and 2 at order cost. Matching uses project, product and unit, respecting invoice allocations.
+BudgetCostChronologyHelp=Amounts are movements within the period; earlier history is used for matching. A shipment valued at 100 in March, invoiced at 120 in April, contributes 100 in March and +20 in April. Adjustments may be negative.
+BudgetCostQuantityHelp=Quantities accumulate through the period end. Invoices cover the oldest shipments without using any quantity twice. Currently valid documents are authoritative: backdated corrections may change an earlier report.
+BudgetCostPriceHelp=Latest tariff: the most recently recorded unit supplier price excluding tax, after discounts, on or before the shipment date, across authorized suppliers. Missing shipment dates use the validation date. Future dates are capped at validation. WAC is read in the shipment entity at validation (Stock module required).
+BudgetCostHistoryHelp=Both available prices are captured at validation; changing the method recalculates reports from these snapshots. Unprovable historical values remain unvalued: current prices never replace them. Snapshots and settings survive deactivation. Direct database changes or imports without native events are not a reliable history.
+BudgetCostMethod=Valuation method
+BudgetCostPmp=Weighted average cost at validation
+BudgetCostSupplierTariff=Latest net supplier tariff excluding tax
+BudgetCostUnavailable=Feature unavailable: check Projects, Shipments and Products/Services modules, Dolibarr 20+, PHP 8.0+, and reactivate Advanced Project to install the history tables.
+BudgetCostProductList=Product list
+BudgetCostEnvironment=Environment
+BudgetCostComplete=Complete valuation
+BudgetCostIncomplete=Incomplete valuation
+BudgetCostMissingPrice=Unvalued cost
+BudgetCostMissingDate=A contributing document has no usable business date. Calculation stopped.
+BudgetCostReadFailed=Unable to read valuation data. Reliable totals cannot be displayed.
+BudgetCostCaptureFailed=Unable to save historical costs. The operation is rolled back to preserve data consistency.
+BudgetCostAccessDenied=Insufficient rights to view product costs.
+BudgetCostCreditQuantityUnknown=Ambiguous credit or negative quantities: only the financial effect is included, without inferring a physical return.
+BudgetCostHistoricalDiscountUnknown=The historical supplier discount is unknown.
+BudgetCostProjectConflict=A shipment and its order refer to different projects: its cost is not assigned to either project.
+BudgetCostIncompatibleUnits=Incompatible units: matching remains separate for each unit. Aggregated quantities are not added together.
+BudgetCostValidationDateFallback=Missing shipment date: validation date used.
+BudgetCostCustomerQty=Customer ordered quantity
+BudgetCostOrderedQty=Supplier ordered quantity
+BudgetCostShippedQty=Shipped quantity
+BudgetCostInvoicedQty=Purchase invoiced quantity
+BudgetCostUncoveredQty=Uncovered shipped quantity
+BudgetCostRemainingQty=Remaining committed quantity
+BudgetCostInvoiceCost=Invoiced costs (period)
+BudgetCostShipmentsNet=Shipments and adjustments (period)
+BudgetCostCommitmentsNet=Net commitments (period)
+BudgetCostRetained=Retained cost (period)
+BudgetCostContributions=Cost contributions
+BudgetCostPriceSource=Price source
+BudgetCostReason_invoice=Invoiced purchase
+BudgetCostReason_shipment=Provisional valuation
+BudgetCostReason_regularization=Reversal of valuation upon invoicing
+BudgetCostReason_commitment=Supplier commitment
+BudgetCostReason_commitment_release=Release of covered commitment
+BudgetCostProvisionalBalance=Remaining provisional valuation
+
+BudgetCostCurrencyUnknown=Some documents have a different or unknown base currency. Their costs remain unvalued; no current exchange rate is applied.
+BudgetCostSourceUnavailable=The source order of some shipments is missing or inaccessible. Products remain visible without assigning costs or automatic quantity coverage.
+BudgetCostCauseDocument=Document causing the movement
+BudgetCostSupplierPending=Supplier order validated or approved but not yet sent: quantity is visible without a financial commitment.
+
+BudgetReportFooterTooHigh=The footer is too tall for this report. Shorten the project free text or the footer hook content.

@@ -2,7 +2,7 @@
 
 // Load Dolibarr environment.
 $res = 0;
-if (!$res && !empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
+if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
 	$res = @include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -16,15 +16,22 @@ while ($i > 0 && $j > 0 && isset($tmp[$i], $tmp2[$j]) && $tmp[$i] === $tmp2[$j])
 if (!$res && $i > 0 && file_exists(substr($tmp, 0, $i + 1).'/main.inc.php')) {
 	$res = @include substr($tmp, 0, $i + 1).'/main.inc.php';
 }
-if (!$res && file_exists('../main.inc.php')) {
-	$res = @include '../main.inc.php';
-}
-if (!$res && file_exists('../../main.inc.php')) {
-	$res = @include '../../main.inc.php';
+foreach (array('../main.inc.php', '../../main.inc.php', '../../../main.inc.php', '../../../../main.inc.php') as $mainFile) {
+	$resolvedMainFile = realpath(__DIR__.'/'.$mainFile);
+	if (!$res && $resolvedMainFile !== false) {
+		$res = @include $resolvedMainFile;
+	}
 }
 if (!$res) {
 	die('Include of main fails');
 }
+
+/** @var DoliDB $db */
+/** @var User $user */
+/** @var Conf $conf */
+/** @var Translate $langs */
+/** @var HookManager $hookmanager */
+global $db, $user, $conf, $langs, $hookmanager;
 
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once __DIR__.'/lib/budgetreport.lib.php';
@@ -75,7 +82,13 @@ $filters = lmdbadvancedproject_normalize_budget_report_filters(array(
 	'project_status' => GETPOST('project_status', 'alpha'),
 	'project_ids' => GETPOST('project_ids', 'array:int'),
 ));
-$data = lmdbadvancedproject_load_budget_report_data($projectId, $filters);
+try {
+	$data = lmdbadvancedproject_load_budget_report_data($projectId, $filters);
+} catch (RuntimeException $exception) {
+	setEventMessages($langs->trans($exception->getMessage()), null, 'errors');
+	header('Location: '.dol_buildpath('/lmdbadvancedproject/budgetreportindex.php', 1));
+	exit;
+}
 
 require_once __DIR__.'/class/budgetreportexport.class.php';
 
