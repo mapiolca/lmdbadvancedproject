@@ -34,6 +34,12 @@ A native **Product list** project tab compares customer/supplier orders, shipmen
 
 After updating, reactivate the module to install the historical tables and native trigger listener, then opt in from its settings. The option defaults to off; settings and snapshots survive reactivation. The native PMP method requires Stock. See the [detailed rules, examples and historical limitations](doc/SHIPMENT_COSTS.md) and [test/instance validation guide](test/README.md), with [executed checks and remaining limits](doc/VALIDATION_SHIPMENT_COSTS.md).
 
+## Project overview integration
+
+Invoice allocations are added to the project's native overview without replacing entries contributed by other modules, including Diffusion. Allocation settings and permissions still determine which allocation entries appear. Deploy the corresponding additive-hook correction in Diffusion as well when both modules are used; no hook priority override or database migration is required.
+
+The joint regression runner is `test/project_overview_hooks.php` in the Diffusion module. It checks both hook orders, preserved third-module entries, allocation permissions and Diffusion visibility for authors and other readers using the native Dolibarr HookManager. Its fixtures simulate users and use SQLite in memory; they do not validate a deployed ERP or Multicompany instance.
+
 ## Translations
 
 Translations are available in English, French, Italian, Spanish, and German. They can be completed manually by editing files in the `langs` directory.

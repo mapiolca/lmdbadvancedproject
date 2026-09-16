@@ -317,7 +317,8 @@ class ActionsLmdbadvancedproject
 
 		$this->results = $results;
 
-		return 1;
+		// Add our referents without replacing contributions from other modules.
+		return 0;
 	}
 
 	/**
