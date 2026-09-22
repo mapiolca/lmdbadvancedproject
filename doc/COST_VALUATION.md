@@ -2,6 +2,8 @@
 
 Après mise à jour, **désactiver puis réactiver Advanced Project** pour créer `lmdbap_cost_instruction` et `lmdbap_cost_fallback`. Les constantes existantes et les données sont conservées. L’option des coûts d’expédition doit être active. Avant réactivation, le rapport historique reste utilisable et l’actualisation est indisponible avec un message explicite.
 
+Installer tous les fichiers du même commit avant la réactivation. Le descripteur déclare directement ses versions minimales pour rester chargeable même si une ancienne classe de compatibilité subsiste pendant la mise à jour. Si PHP conserve encore des fichiers anciens après leur remplacement, faire renouveler le cache OPcache de l’application par l’hébergeur ; une réactivation Dolibarr ne remplace pas les fichiers ni ce cache.
+
 ## Résolution commune
 
 Le service de coûts est utilisé par les listes, rapports projet et global, catégories, graphiques et exports. Il conserve d’abord les prix connus de la méthode historique 1.4.0 et les instantanés complémentaires déjà figés, y compris zéro. Pour les coûts manquants, il applique la consigne projet/produit, puis le coût historique PriceList admissible, puis DynamicPrices compatible avec la date. Les coûts non démontrables restent inconnus.
