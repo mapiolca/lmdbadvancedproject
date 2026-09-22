@@ -16,6 +16,8 @@ class FixtureDB {
 	public function __construct() { $this->connection = new PDO('sqlite::memory:'); $this->connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); }
 	public function query($sql) {
 		$sql = preg_replace("/SHOW TABLES LIKE '([^']+)'/", "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '$1'", $sql);
+		$sql = preg_replace("/SHOW COLUMNS FROM (\\w+) LIKE '([^']+)'/", "SELECT * FROM pragma_table_info('$1') WHERE name = '$2'", $sql);
+		$sql = preg_replace('/BINARY ([a-z]+\\.[a-z_]+)/i', '$1 COLLATE BINARY', $sql);
 		$sql = str_replace(' FOR UPDATE', '', $sql);
 		$sql = str_replace('HAVING amount_ht > 0', 'AND amount_ht > 0', $sql);
 		$sql = str_replace('ON DUPLICATE KEY UPDATE fingerprint = fingerprint', 'ON CONFLICT(fingerprint) DO NOTHING', $sql);
@@ -26,6 +28,7 @@ class FixtureDB {
 	public function num_rows($result) { return count($result->rows); }
 	public function free($result) { }
 	public function fetch_row($result) { $row=$this->fetch_object($result); return $row ? array_values((array)$row) : false; }
+	public function fetch_array($result) { $row=$this->fetch_object($result); return $row ? (array)$row : false; }
 	public function encrypt($text, $mode=0) { return "'".$this->escape($text)."'"; }
 	public function decrypt($column) { return $column; }
 	public function prefix() { return MAIN_DB_PREFIX; }
@@ -34,12 +37,16 @@ class FixtureDB {
 	public function idate($timestamp) { return date('Y-m-d H:i:s', $timestamp); }
 	public function jdate($date) { return $date ? strtotime($date) : null; }
 	public function lasterror() { return $this->lastError; }
+	public function plimit($limit, $offset = 0) { return $limit > 0 ? ' LIMIT '.(int) $limit.' OFFSET '.(int) $offset : ''; }
+	public function begin() { return $this->connection->beginTransaction(); }
+	public function commit() { return $this->connection->commit(); }
+	public function rollback() { return $this->connection->rollBack(); }
 }
 $db = new FixtureDB();
 $langs = new class {
 	public $translations = array(); public $charset_output = 'UTF-8'; public $defaultlang = 'en_US';
 	public function trans($key, ...$args) { return $this->transnoentities($key, ...$args); }
-	public function transnoentitiesnoconv($key) { return array('SeparatorDecimal' => '.', 'SeparatorThousand' => ',')[$key] ?? $this->transnoentities($key); }
+	public function transnoentitiesnoconv($key) { return $this->translations[$key] ?? array('SeparatorDecimal' => '.', 'SeparatorThousand' => ',')[$key] ?? $this->transnoentities($key); }
 	public function transnoentities($key, ...$args) { return $this->translations[$key] ?? array('BudgetReportExportSheetReport'=>'Report','BudgetReportExportSheetTime'=>'Time','BudgetReportExportSheetCharts'=>'Charts','BudgetCostProductList'=>'Products','BudgetCostContributions'=>'Contributions')[$key] ?? $key; }
 	public function convToOutputCharset($text) { return $text; }
 	public function getCurrencySymbol($currency) { return $currency; }

@@ -1,12 +1,12 @@
 <?php
 // A native TCPDF render, using test source documents rather than a running ERP.
-require __DIR__.'/costexports_test.php';
+require __DIR__.'/costcategories_test.php';
 if (!defined('DOL_DATA_ROOT')) { define('DOL_DATA_ROOT', __DIR__.'/.cache'); }
 $conf->file=(object)array('dol_document_root'=>array(DOL_DOCUMENT_ROOT),'instance_unique_id'=>'fixture');
 require_once __DIR__.'/../core/modules/project/doc/pdf_budgetreport.modules.php';
 $user = new class($db) extends User { public $allowed=true; public function hasRight($module,$permlevel1,$permlevel2='') { return $this->allowed; } };
 $user->id=1; $user->firstname='Test'; $user->lastname='User';
-foreach (array(DOL_DOCUMENT_ROOT.'/langs/fr_FR/main.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/projects.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/companies.lang',__DIR__.'/../langs/fr_FR/lmdbadvancedproject.lang') as $file) {
+foreach (array(DOL_DOCUMENT_ROOT.'/langs/fr_FR/main.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/projects.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/products.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/companies.lang',__DIR__.'/../langs/fr_FR/lmdbadvancedproject.lang') as $file) {
 	foreach (file($file,FILE_IGNORE_NEW_LINES) as $entry) { if (strpos($entry,'=') !== false && substr($entry,0,1)!=='#') { [$key,$value]=explode('=',$entry,2); $langs->translations[trim($key)]=trim($value); } }
 }
 define('DOL_MAIN_URL_ROOT', 'https://example.invalid');
@@ -27,6 +27,7 @@ $project->thirdparty=$mysoc; $project->context['budgetreport_filters']=$period;
 $model=new pdf_budgetreport($db);
 check($model->write_file($project,$langs),1,'Native PDF generation');
 check(is_file($model->result['fullpath']),true,'PDF file exists in owner directory');
+check($model->result['fullpath'], $conf->project->multidir_output[1].'/P1/'.lmdbadvancedproject_budget_report_filename('P1', $langs), 'PDF path matches native project document download');
 copy($model->result['fullpath'],__DIR__.'/.cache/cost-report.pdf');
 // Make a negative correction explicit in the graphic as well as in totals.
 $db->query('UPDATE '.MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts SET total_ht=32 WHERE rowid=1');
@@ -56,9 +57,24 @@ copy($model->result['fullpath'],__DIR__.'/.cache/cost-report-footer-hook.pdf');
 $conf->global->PROJECT_FREE_TEXT=implode('<br>',array_fill(0,70,'Pied exceptionnellement long.'));
 check($model->write_file($project,$langs),-1,'Oversized footer refused before rendering content');
 $conf->global->PROJECT_FREE_TEXT='';
+$conf->global->LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD='pmp';
+insertFixture('lmdbap_cost_instruction',array('entity'=>1,'fk_project'=>1,'fk_product'=>1,'fk_unit'=>1,'snapshot_unit_ht'=>15,'currency'=>'EUR','source_code'=>'free','date_creation'=>'2026-05-01 00:00:00','fk_user_author'=>1,'request_key'=>'pdf'));
+$project->context['budgetreport_filters']=$filters;
+check($model->write_file($project,$langs),1,'Instruction and provenance PDF serialization');
+copy($model->result['fullpath'],__DIR__.'/.cache/cost-valuation.pdf');
 $user->allowed=false;
 check($model->write_file($project,$langs),-1,'PDF generation refuses missing rights');
 $user->allowed=true;
+$conf->project->multidir_output[2] = __DIR__.'/.cache/pdf-documents-entity2';
+$mc->scope = '1,2';
+$sharedProject = clone $project;
+$sharedProject->id = 2; $sharedProject->entity = 2; $sharedProject->ref = 'P2';
+check($model->write_file($sharedProject,$langs),1,'PDF generation for a shared project');
+check($model->result['fullpath'], $conf->project->multidir_output[2].'/P2/'.lmdbadvancedproject_budget_report_filename('P2', $langs), 'Shared project PDF uses its owner directory, not the consultation entity');
+check(is_file($model->result['fullpath']),true,'Shared project PDF exists at the native download path');
+unset($conf->project->multidir_output[2]);
+check($model->write_file($sharedProject,$langs),-1,'Shared project refuses missing owner directory despite a valid consultation directory');
+$mc->scope = '1';
 unset($conf->project->multidir_output[1]);
 check($model->write_file($project,$langs),-1,'PDF generation refuses missing owner directory');
 echo $checks." assertions passed including native PDF serialization and access guards.\n";

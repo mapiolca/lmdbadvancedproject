@@ -5,6 +5,10 @@
 // DolibarrModules::insert_module_parts accepts the structured hooks payload.
 class Form
 {
+	// Native v20 formconfirm reads only name/type unconditionally; remaining
+	// keys are per-field options (checkbox value explicitly accepts a boolean).
+	/** @param array<int,array{name:string,type:string,value?:string|bool,values?:array<string,string>,default?:string,label?:string,size?:string,morecss?:string,moreattr?:string,select_show_empty?:int}>|string|null $formquestion */
+	public function formconfirm($page, $title, $question, $action, $formquestion = '', $selectedchoice = '', $useajax = 0, $height = 0, $width = 500, $disableformtag = 0, $labelbuttonyes = 'Yes', $labelbuttonno = 'No') {}
 	/** @param array<int|string,string|int|array{label:string,data-html?:string,disable?:int,css?:string}> $array */
 	public static function selectarray($htmlname, $array, $id = '', $show_empty = 0, $key_in_label = 0, $value_as_key = 0, $moreparam = '', $translate = 0, $maxlen = 0, $disabled = 0, $sort = '', $morecss = 'minwidth75', $addjscombo = 1, $moreparamonempty = '', $disablebademail = 0, $nohtmlescape = 0) {}
 	/** @param array<int|string,string|array{id:string,label:string,color?:string,picto?:string,labelhtml?:string}> $array */

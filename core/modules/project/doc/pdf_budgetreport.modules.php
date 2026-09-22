@@ -86,7 +86,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		if (!is_object($outputlangs)) {
 			$outputlangs = $langs;
 		}
-		$outputlangs->loadLangs(array('main', 'dict', 'companies', 'projects', 'lmdbadvancedproject@lmdbadvancedproject'));
+		$outputlangs->loadLangs(array('main', 'dict', 'companies', 'projects', 'products', 'other', 'lmdbadvancedproject@lmdbadvancedproject'));
 		if (!isset($object->thirdparty) || !is_object($object->thirdparty)) {
 			$object->fetch_thirdparty();
 		}
@@ -105,7 +105,8 @@ class pdf_budgetreport extends ModelePDFProjects
 			$this->error = $langs->transnoentities('BudgetCostAccessDenied');
 			return -1;
 		}
-		$dir = $root.'/'.$objectref;
+		// forobject=1 already includes the native project reference directory.
+		$dir = rtrim($root, '/');
 		$file = $dir.'/'.lmdbadvancedproject_budget_report_filename($object->ref, $outputlangs);
 		if (dol_mkdir($dir) < 0) {
 			$this->error = $langs->transnoentities('ErrorCanNotCreateDir', $dir);
@@ -432,6 +433,23 @@ class pdf_budgetreport extends ModelePDFProjects
 		}
 		if (!$report['products']) {
 			$pdf->MultiCell(0, 4, $outputlangs->transnoentities('NoRecordFound'), 0, 'L');
+		}
+		// Keep each retained source visible in the PDF, including explicit
+		// instructions. All amounts still come from the shared ledger.
+		$headers = array('Ref', 'Product', 'BudgetCostPriceSource', 'Price', 'Unit', 'Date', 'Currency');
+		$widths = array(35, 38, 80, 30, 25, 43, 22);
+		$printedHeader = false;
+		foreach ($report['products'] as $product) {
+			foreach ($product['lines'] as $line) {
+				if ($line['kind'] !== 'shipment' || $line['price'] === null) { continue; }
+				if (!$printedHeader || $pdf->GetY() > $this->page_hauteur - $this->footerHeight - 22) {
+					$this->addPage($pdf, $object, $outputlangs, true);
+					$this->drawTableHeader($pdf, $headers, $widths, $outputlangs);
+					$printedHeader = true;
+				}
+				$this->drawTableRow($pdf, array($line['ref'], $line['product_ref'], lmdbadvancedproject_cost_price_source_label($line, $outputlangs),
+					price($line['price']), $outputlangs->transnoentities($line['unit_label']), dol_print_date($this->db->jdate($line['price_date']), 'dayhour', 'tzuser', $outputlangs), $line['currency'] ?? ''), $widths, $outputlangs);
+			}
 		}
 	}
 

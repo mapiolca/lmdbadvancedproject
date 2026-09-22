@@ -35,6 +35,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 {
 	/** @var string Publisher contact address. */
 	public $editor_email;
+	/** @var string SPDX license identifier, shared by the administration pages. */
+	public $license = 'GPL-3.0-or-later';
+	/** @var string Source repository. */
+	public $source_url = 'https://github.com/mapiolca/lmdbadvancedproject';
 	/**
 	 * Constructor. Define names, constants, directories, boxes, permissions.
 	 *
@@ -58,7 +62,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.4.0';
+		$this->version = '1.4.1';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
@@ -88,8 +92,9 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->requiredby = array();
 		$this->conflictwith = array();
 		$this->langfiles = array('lmdbadvancedproject@lmdbadvancedproject');
-		$this->phpmin = array(8, 0);
-		$this->need_dolibarr_version = array(20, 0);
+		// Module discovery must work before application classes are updated or loaded.
+		$this->phpmin = array(8, 0, 0);
+		$this->need_dolibarr_version = array(20, 0, 0);
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array(
@@ -115,8 +120,14 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->dictionaries = array();
 		if (!isModEnabled('dynamicsprices')) {
 			$commercialCategoryHasEntity = $this->tableExists(MAIN_DB_PREFIX."c_commercial_category") && $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+			$commercialCategoryEntities = $this->db->sanitize(getEntity('product'));
+			if (isModEnabled('multicompany')) {
+				// Keep dictionary administration aligned with the report and native customization.
+				$commercialCategoryEntities = getDolGlobalInt('MULTICOMPANY_C_COMMERCIAL_CATEGORY_CUSTOM_ENABLED')
+					? $this->db->sanitize(getEntity('c_commercial_category')) : '1,'.$commercialCategoryEntities;
+			}
 			$commercialCategorySelectSql = $commercialCategoryHasEntity
-				? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+				? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity IN ('.$commercialCategoryEntities.')'
 				: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
 			$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
 			$commercialCategoryHelp = array(

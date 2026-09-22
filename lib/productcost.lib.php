@@ -99,6 +99,7 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 {
 	global $langs, $db;
 	$parts = array($langs->trans('BudgetCostFormulaHelp'), $langs->trans('BudgetCostQuantityHelp'));
+	if (!$row['has_cost'] && !$row['issues']) { $parts[] = $langs->trans('BudgetCostNotApplicableHelp'); }
 	foreach ($row['lines'] as $line) {
 		$parts[] = lmdbadvancedproject_cost_document_link($line).' — '.dol_print_date($db->jdate($line['date']), 'day').' — '.$langs->trans('Qty').': '.price($line['qty']);
 		if ($line['kind'] === 'supplier_pending') { $parts[] = $langs->trans('BudgetCostSupplierPending'); }
@@ -109,7 +110,7 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 			$parts[] = $langs->trans('Currency').': '.dol_escape_htmltag($line['currency'] ?? '');
 			if (!empty($line['price_status']) && $line['price_status'] !== 'known') { $parts[] = $langs->trans($line['price_status']); }
 			$parts[] = $line['price'] === null ? $langs->trans('BudgetCostMissingPrice')
-				: $langs->trans($line['price_source']).': '.price($line['price']).' ('.dol_print_date($db->jdate($line['price_date']), 'dayhour').')';
+				: dol_escape_htmltag(lmdbadvancedproject_cost_price_source_label($line, $langs)).': '.price($line['price']).' ('.dol_print_date($db->jdate($line['price_date']), 'dayhour').')';
 		}
 	}
 	foreach ($row['events'] as $event) {
@@ -120,4 +121,62 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 		$parts[] = $langs->trans($issue);
 	}
 	return implode('<br>', $parts);
+}
+
+/** Display states in their default review order. Values stay independent of translations.
+ * @return array<string,array{label:string,badge:string,rank:int}>
+ */
+function lmdbadvancedproject_product_cost_states(): array
+{
+	return array(
+		'incomplete' => array('label' => 'BudgetCostIncomplete', 'badge' => 'status1', 'rank' => 0),
+		'unit_mismatch' => array('label' => 'BudgetCostUnitMismatch', 'badge' => 'status1', 'rank' => 1),
+		'complete' => array('label' => 'BudgetCostComplete', 'badge' => 'status4', 'rank' => 2),
+		'not_applicable' => array('label' => 'BudgetCostNotApplicable', 'badge' => 'status0', 'rank' => 3),
+	);
+}
+
+/** Filter derived states after reconciliation, before list counts and pagination.
+ * Unit anomalies take priority over missing prices on the same product.
+ * @param array<int|string,array<string,mixed>> $products Authorized reconciled products
+ * @param list<string> $selectedStates Empty means every state
+ * @param string $sortfield Native list column, including the derived issues column
+ * @param string $sortorder ASC or DESC
+ * @return list<array<string,mixed>>
+ */
+function lmdbadvancedproject_prepare_product_cost_rows(array $products, array $selectedStates = array(), string $sortfield = 'issues', string $sortorder = 'ASC'): array
+{
+	$states = lmdbadvancedproject_product_cost_states();
+	$columns = lmdbadvancedproject_product_cost_columns();
+	if (!isset($columns[$sortfield])) { $sortfield = 'issues'; }
+	$sortorder = $sortorder === 'DESC' ? 'DESC' : 'ASC';
+	$rows = array();
+	foreach ($products as $row) {
+		$state = in_array('BudgetCostIncompatibleUnits', $row['issues'], true) ? 'unit_mismatch'
+			: ($row['issues'] ? 'incomplete' : ($row['has_cost'] ? 'complete' : 'not_applicable'));
+		if ($selectedStates && !in_array($state, $selectedStates, true)) { continue; }
+		$row['valuation_state'] = $state;
+		$row['valuation_rank'] = $states[$state]['rank'];
+		$rows[] = $row;
+	}
+	// Native sorting is stable on the supported PHP 8+ baseline.
+	$rows = dol_sort_array($rows, 'product', $sortorder);
+	if ($sortfield === 'issues') {
+		$rows = dol_sort_array($rows, 'ref', 'ASC', 1);
+		$rows = dol_sort_array($rows, 'valuation_rank', $sortorder);
+	} else {
+		$rows = dol_sort_array($rows, $sortfield, $sortorder, in_array($sortfield, array('ref', 'label', 'unit'), true) ? 1 : 0);
+	}
+	return array_values($rows);
+}
+
+/** Source provenance shared by screen and document renderers.
+ * @param array<string,mixed> $line
+ * @param Translate $outputlangs
+ */
+function lmdbadvancedproject_cost_price_source_label(array $line, $outputlangs): string
+{
+	$label = $line['price_source'] === '' ? '' : $outputlangs->transnoentities($line['price_source']);
+	if (!empty($line['price_origin'])) { $label .= ' — '.$outputlangs->transnoentities($line['price_origin']); }
+	return $label;
 }

@@ -45,7 +45,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/project.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 require_once __DIR__.'/../lib/budgetreport.lib.php';
 
-$langs->loadLangs(array('main', 'projects', 'products', 'orders', 'bills', 'sendings', 'lmdbadvancedproject@lmdbadvancedproject'));
+$langs->loadLangs(array('main', 'projects', 'products', 'other', 'orders', 'bills', 'sendings', 'lmdbadvancedproject@lmdbadvancedproject'));
 if (!LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() || !$user->hasRight('projet', 'lire')
 	|| !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 	accessforbidden();
@@ -66,9 +66,12 @@ $action = GETPOST('action', 'aZ09');
 $contextpage = 'lmdbadvancedproject_productcost';
 $search = array('ref' => GETPOST('search_ref', 'alphanohtml'), 'label' => GETPOST('search_label', 'alphanohtml'),
 	'type' => GETPOST('search_type', 'alpha'), 'entities' => array_values(array_map('intval', GETPOST('search_entities', 'array:int'))));
+$costStates = lmdbadvancedproject_product_cost_states();
+$searchStates = array_values(array_intersect(GETPOST('search_states', 'array:aZ09'), array_keys($costStates)));
 $resetFilters = GETPOST('button_removefilter', 'alpha') || GETPOST('button_removefilter_x', 'alpha');
 if ($resetFilters) {
 	$search = array('ref' => '', 'label' => '', 'type' => '', 'entities' => array());
+	$searchStates = array();
 }
 $filters = lmdbadvancedproject_normalize_budget_report_filters(array(
 	'date_start' => $resetFilters ? '' : lmdbadvancedproject_get_budget_report_request_date('date_start'),
@@ -109,8 +112,8 @@ require DOL_DOCUMENT_ROOT.'/core/actions_changeselectedfields.inc.php';
 $form = new Form($db);
 $selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $contextpage);
 $sortfield = GETPOST('sortfield', 'aZ09');
-if (!isset($columns[$sortfield]) || in_array($sortfield, array('issues', 'entities'), true)) {
-	$sortfield = 'ref';
+if (!isset($columns[$sortfield]) || $sortfield === 'entities') {
+	$sortfield = 'issues';
 }
 $sortorder = GETPOST('sortorder', 'aZ09') === 'DESC' ? 'DESC' : 'ASC';
 $limit = GETPOSTINT('limit') ?: (int) $conf->liste_limit;
@@ -126,20 +129,62 @@ try {
 	$db->close();
 	exit;
 }
-$rows = array_values($report['products']);
-// Derived monetary columns require reconciliation before ordering/pagination.
-// Text, type and environment filters above are applied to sources in SQL.
-usort($rows, static function (array $left, array $right) use ($sortfield, $sortorder): int {
-	$comparison = is_string($left[$sortfield]) ? strnatcasecmp($left[$sortfield], $right[$sortfield]) : $left[$sortfield] <=> $right[$sortfield];
-	return ($comparison ?: $left['product'] <=> $right['product']) * ($sortorder === 'DESC' ? -1 : 1);
-});
+// State depends on all authorized contributions, so filter it after reconciliation.
+// Source text, type and environment filters remain in SQL; pagination comes last.
+$rows = lmdbadvancedproject_prepare_product_cost_rows($report['products'], $searchStates, $sortfield, $sortorder);
 $total = count($rows);
 if ($page * $limit >= $total) {
 	$page = 0;
 }
 $visibleRows = array_slice($rows, $page * $limit, $limit);
 $param = '&id='.$id.'&'.http_build_query(array('search_ref' => $search['ref'], 'search_label' => $search['label'],
-	'search_type' => $search['type'], 'search_entities' => $search['entities'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']));
+	'search_type' => $search['type'], 'search_entities' => $search['entities'], 'search_states' => $searchStates, 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']));
+$returnUrl = $_SERVER['PHP_SELF'].'?'.ltrim($param, '&').'&sortfield='.urlencode($sortfield).'&sortorder='.$sortorder.'&page='.$page.'&limit='.$limit;
+$valuation = new LmdbAdvancedProjectCostValuation($db);
+$canWriteCosts = LmdbAdvancedProjectCompatibility::costValuationAvailable()
+	&& ($user->hasRight('projet', 'creer') || $user->hasRight('projet', 'all', 'creer')) && $object->restrictedProjectArea($user, 'write') > 0;
+$modalQuote = null;
+$quoteKey = '';
+$selectedCostSource = GETPOST('cost_source', 'alphanohtml') ?: 'free';
+$selectedCostSource = is_string($selectedCostSource) ? $selectedCostSource : '';
+$freeCost = GETPOST('cost_amount', 'alphanohtml');
+$freeCost = is_string($freeCost) ? $freeCost : '';
+$applyAll = GETPOSTINT('cost_all') === 1;
+$valueProduct = GETPOSTINT('value_product');
+if (!isset($_SESSION['lmdbap_cost_quotes']) || !is_array($_SESSION['lmdbap_cost_quotes'])) { $_SESSION['lmdbap_cost_quotes'] = array(); }
+foreach ($_SESSION['lmdbap_cost_quotes'] as $key => $savedQuote) {
+	if (!is_array($savedQuote) || (int) ($savedQuote['expires'] ?? 0) < dol_now()) { unset($_SESSION['lmdbap_cost_quotes'][$key]); }
+}
+while (count($_SESSION['lmdbap_cost_quotes']) > 20) { array_shift($_SESSION['lmdbap_cost_quotes']); }
+if ($action === 'confirm_cost' && GETPOST('confirm', 'alpha') === 'yes') {
+	if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$canWriteCosts) { accessforbidden(); }
+	// main.inc.php validates the native CSRF token before any operation here.
+	$quoteKey = GETPOST('cost_quote', 'aZ09');
+	$quoteKey = is_string($quoteKey) ? $quoteKey : '';
+	$savedQuote = $_SESSION['lmdbap_cost_quotes'][$quoteKey] ?? null;
+	try {
+		if (!is_array($savedQuote) || (int) $savedQuote['entity'] !== (int) $conf->entity || (int) $savedQuote['user'] !== (int) $user->id
+			|| (int) $savedQuote['payload']['project'] !== $id) { throw new RuntimeException('BudgetCostConflict'); }
+		$count = $valuation->save($savedQuote['payload'], $selectedCostSource, $freeCost, $applyAll, $quoteKey);
+		setEventMessages($langs->trans('BudgetCostApplied', (string) $count), null, 'mesgs');
+		header('Location: '.$returnUrl);
+		exit;
+	} catch (RuntimeException $exception) {
+		setEventMessages($langs->trans($exception->getMessage()), null, 'errors');
+		// Retain the quote and input: retrying a changed source requires reopening
+		// the dialog, rather than silently accepting a new price or target set.
+		if (is_array($savedQuote)) { $modalQuote = $savedQuote['payload']; }
+	}
+} elseif ($valueProduct > 0) {
+	if (!$canWriteCosts) { accessforbidden(); }
+	try {
+		$modalQuote = $valuation->prepare($id, $valueProduct);
+		$quoteKey = bin2hex(random_bytes(24));
+		$_SESSION['lmdbap_cost_quotes'][$quoteKey] = array('expires' => dol_now() + 1800, 'entity' => (int) $conf->entity, 'user' => (int) $user->id, 'payload' => $modalQuote);
+	} catch (RuntimeException $exception) {
+		setEventMessages($langs->trans($exception->getMessage()), null, 'errors');
+	}
+}
 llxHeader('', $langs->trans('BudgetCostProductList'), '', '', 0, 0, '', '', '', 'classforhorizontalscrolloftabs');
 print dol_get_fiche_head(project_prepare_head($object), 'lmdbap_productcost', $langs->trans('Project'), -1, ($object->public ? 'projectpub' : 'project'));
 if (!empty($_SESSION['pageforbacktolist']['project'])) {
@@ -160,6 +205,9 @@ if (!$user->hasRight('projet', 'all', 'lire')) {
 }
 dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
 lmdbadvancedproject_print_cost_notice($report);
+if (!LmdbAdvancedProjectCompatibility::costValuationAvailable()) {
+	print '<div class="warning">'.$langs->trans('BudgetCostValuationUnavailable').'</div>';
+}
 print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'" name="formfilter" id="formfilter">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="formfilteraction" value="list">';
@@ -184,13 +232,17 @@ foreach ($arrayfields as $field => $definition) {
 		print ajax_combobox('search_type');
 	} elseif ($field === 'entities') {
 		print Form::multiselectarray('search_entities', $entityLabels, array_map('strval', $search['entities']), 0, 0, 'minwidth100');
+	} elseif ($field === 'issues') {
+		$stateOptions = array();
+		foreach ($costStates as $code => $state) { $stateOptions[$code] = $langs->trans($state['label']); }
+		print Form::multiselectarray('search_states', $stateOptions, $searchStates, 0, 0, 'minwidth150');
 	}
 	print '</td>';
 }
 print '<td class="liste_titre center">'.$form->showFilterButtons().'</td></tr><tr class="liste_titre">';
 foreach ($arrayfields as $field => $definition) {
 	if (empty($definition['checked'])) { continue; }
-	print_liste_field_titre($definition['label'], $_SERVER['PHP_SELF'], in_array($field, array('issues', 'entities'), true) ? '' : $field, '', $param, '', $sortfield, $sortorder);
+	print_liste_field_titre($definition['label'], $_SERVER['PHP_SELF'], $field === 'entities' ? '' : $field, '', $param, '', $sortfield, $sortorder);
 }
 print '<th class="center">'.$selectedfields.'</th></tr>';
 $colspan = 1 + count(array_filter($arrayfields, static function (array $field): bool { return !empty($field['checked']); }));
@@ -215,13 +267,14 @@ foreach ($visibleRows as $row) {
 		} elseif ($field === 'type') {
 			print $langs->trans($value === 1 ? 'Service' : 'Product');
 		} elseif ($field === 'issues') {
-			print dolGetBadge($langs->trans($value ? 'BudgetCostIncomplete' : 'BudgetCostComplete'), '', $value ? 'status1' : 'status4');
+			$state = $costStates[$row['valuation_state']];
+			print dolGetBadge($langs->trans($state['label']), '', $state['badge']);
 		} elseif ($field === 'entities') {
 			foreach ($value as $entityId) {
 				print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entityLabels[$entityId] ?? '').'</span></div>';
 			}
-		} elseif ($field === 'unit' && count($row['units']) > 1) {
-			print dol_escape_htmltag(implode(' / ', $row['units']));
+		} elseif ($field === 'unit') {
+			print dol_escape_htmltag(implode(' / ', array_map(static function ($unit) use ($langs): string { return $langs->transnoentities($unit); }, $row['units'])));
 		} elseif (substr($field, -4) === '_qty' && count($row['units']) > 1) {
 			print '—';
 		} elseif ($value === null) {
@@ -233,12 +286,40 @@ foreach ($visibleRows as $row) {
 		}
 		print '</td>';
 	}
-	print '<td class="center">'.$form->textwithpicto('', lmdbadvancedproject_product_cost_tooltip($row), 1, 'help').'</td></tr>';
+	print '<td class="center">'.$form->textwithpicto('', lmdbadvancedproject_product_cost_tooltip($row), 1, 'help');
+	if ($canWriteCosts && !empty($row['can_value']) && $valuation->product((int) $row['product']) !== null) {
+		print ' <a class="butAction" href="'.dol_escape_htmltag($returnUrl.'&value_product='.(int) $row['product']).'">'.$langs->trans('BudgetCostRefresh').'</a>';
+	}
+	print '</td></tr>';
 }
 if (!$visibleRows) {
 	print '<tr class="oddeven"><td colspan="'.$colspan.'"><span class="opacitymedium">'.$langs->trans('NoRecordFound').'</span></td></tr>';
 }
 print '</table></div></form>';
+if (is_array($modalQuote)) {
+	$costOptions = array('free' => $langs->trans('BudgetCostSource_free'));
+	foreach ($modalQuote['choices'] as $key => $choice) { $costOptions[$key] = $choice['label']; }
+	$product = $valuation->product((int) $modalQuote['product']);
+	$unitLabel = '';
+	foreach ($rows as $row) { if ((int) $row['product'] === (int) $modalQuote['product']) { $unitLabel = $langs->transnoentities($row['unit']); break; } }
+	$formQuestion = array(
+		array('type' => 'hidden', 'name' => 'cost_quote', 'value' => $quoteKey),
+		array('type' => 'select', 'name' => 'cost_source', 'label' => $langs->trans('BudgetCostPriceSource'), 'values' => $costOptions, 'default' => $selectedCostSource, 'select_show_empty' => 0, 'morecss' => 'minwidth200 maxwidth500'),
+		array('type' => 'text', 'name' => 'cost_amount', 'label' => $langs->trans('BudgetCostUnitPrice', $conf->currency, $unitLabel), 'value' => dol_escape_htmltag($freeCost), 'moreattr' => 'inputmode="decimal"'),
+		array('type' => 'checkbox', 'name' => 'cost_all', 'label' => $langs->trans('BudgetCostApplyAll'), 'value' => $applyAll, 'moreattr' => 'value="1"'),
+	);
+	print '<div id="lmdbap-cost-dialog">';
+	print $form->formconfirm(dol_escape_htmltag($returnUrl), $langs->trans('BudgetCostValuation'), dol_escape_htmltag(is_object($product) ? $product->ref.' — '.$product->label : '').'<br>'.$langs->trans('BudgetCostValuationHelp', (string) count($modalQuote['targets'])), 'confirm_cost', $formQuestion, 'yes', 0, 0, 650, 0, 'Save', 'Cancel');
+	print '</div>';
+	print ajax_combobox('cost_source');
+	// Native dialog around a native POST form: unlike the v20 AJAX confirmation,
+	// normal submission preserves POST–Redirect–GET and never puts prices in URLs.
+	print '<script>jQuery(function($) { var dialog = $("#lmdbap-cost-dialog");
+		if ($.fn.dialog) { dialog.dialog({modal:true, width:Math.min(720, window.innerWidth - 32), height:"auto", title:'.json_encode($langs->transnoentities('BudgetCostValuation')).'}); }
+		function showFreeCost() { $("#cost_amount").prop("disabled", $("#cost_source").val() !== "free"); }
+		$("#cost_source").on("change", showFreeCost); showFreeCost();
+	});</script>';
+}
 print dol_get_fiche_end();
 llxFooter();
 $db->close();

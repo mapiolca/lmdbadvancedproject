@@ -24,8 +24,15 @@ for version in range(20,25):
             assert column in schema,(tag,table,column)
     assert 'remise' not in read(tag,'install/mysql/tables/llx_product_fournisseur_price_log.sql')
     form=read(tag,'core/class/html.form.class.php')
-    for symbol in ['function selectarray','function multiselectarray','function multiSelectArrayWithCheckbox','function selectDate']:
+    for symbol in ['function selectarray','function multiselectarray','function multiSelectArrayWithCheckbox','function selectDate','function formconfirm']:
         assert symbol in form,(tag,symbol)
+    assert 'newToken()' in form and 'method="POST"' in form,(tag,'native confirmation token and POST')
+    assert 'function list_product_fournisseur_price' in supplier,(tag,'native supplier selection')
+    for symbol in ['product_fourn_entity','product_fourn_price_id','fourn_qty','fourn_unitprice','fourn_remise_percent','fourn_remise','ref_supplier']:
+        assert symbol in supplier,(tag,symbol)
+    assert 'function restrictedProjectArea' in read(tag,'projet/class/project.class.php')
+    assert 'function checkUserAccessToObject' in read(tag,'core/lib/security.lib.php')
+    assert 'read_prices' in read(tag,'core/modules/modProduct.class.php')
     modules=read(tag,'core/modules/DolibarrModules.class.php')
     assert "isset($value['data']) && is_array($value['data'])" in modules
     assert 'new TCPDF($pagetype, $metric, $format' in read(tag,'core/lib/pdf.lib.php')

@@ -2,6 +2,8 @@
 
 Fonctionnalité optionnelle de la branche de développement d’Advanced Project, compatible avec le socle Dolibarr 20 / PHP 8.0. Aucun mouvement de stock, facture ou écriture comptable n’est créé par ce calcul.
 
+La version **1.4.1** complète les coûts manquants avec les consignes par projet et les sources DynamicPrices/PriceList. Les priorités, limites historiques, droits et nouvelles tables sont décrits dans [Compléter les valorisations](COST_VALUATION.md).
+
 ## Activation
 
 Mettre à jour le module puis le désactiver/réactiver pour installer les deux tables historiques et déclarer le listener des événements natifs. Les réglages existants sont conservés. Dans **Configuration → Advanced Project**, activer **Intégrer les expéditions aux coûts** dans l’entité concernée. L’option est désactivée par défaut. Le sélecteur propose le dernier tarif fournisseur net HT (par défaut) ou le PMP à la validation. L’onglet Compatibilité indique les dépendances et le nom des événements utilisés selon la version.
