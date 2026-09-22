@@ -12,6 +12,7 @@ parameters:
     paths:
         - class/lmdbadvancedprojectcostledger.class.php
         - class/lmdbadvancedprojectproductcost.class.php
+        - class/lmdbadvancedprojectcostvaluation.class.php
         - class/lmdbadvancedprojectcompatibility.class.php
         - class/actions_lmdbadvancedproject.class.php
         - core/triggers/interface_99_modLmdbAdvancedProject_CostSnapshots.class.php
@@ -25,3 +26,4 @@ parameters:
         - budgetreportexport.php
     scanFiles:
         - lib/lmdbadvancedproject.lib.php
+        - test/phpstan-cost-providers.php

@@ -5,6 +5,7 @@
 
 require_once __DIR__.'/lmdbadvancedprojectcostledger.class.php';
 require_once __DIR__.'/lmdbadvancedprojectcompatibility.class.php';
+require_once __DIR__.'/lmdbadvancedprojectcostvaluation.class.php';
 
 /**
  * Native document selection and auditable price snapshots for the cost ledger.
@@ -49,7 +50,7 @@ class LmdbAdvancedProjectProductCost
 	 *
 	 * @param array<string,mixed> $filters
 	 *
-	 * @param array{ref?:string,label?:string,type?:string,entities?:list<int>} $search Native list filters, applied in SQL before reconciliation
+	 * @param array{ref?:string,label?:string,type?:string,entities?:list<int>,product_id?:int} $search Native list filters, applied in SQL before reconciliation
 	 *
 	 * @return CostReport
 	 */
@@ -76,6 +77,14 @@ class LmdbAdvancedProjectProductCost
 			return $empty;
 		}
 		$this->loadCurrencies();
+		$valuationEnabled = LmdbAdvancedProjectCompatibility::costValuationAvailable();
+		$valuation = new LmdbAdvancedProjectCostValuation($this->db);
+		$instructions = array();
+		if ($valuationEnabled) {
+			foreach ($this->rows('SELECT ci.* FROM '.MAIN_DB_PREFIX.'lmdbap_cost_instruction ci INNER JOIN '.MAIN_DB_PREFIX.'projet p ON p.rowid=ci.fk_project AND p.entity=ci.entity WHERE p.rowid IN ('.$ids.')') as $instruction) {
+				$instructions[(int) $instruction->fk_project.':'.(int) $instruction->fk_product] = $instruction;
+			}
+		}
 		$productEntities = $this->db->sanitize(getEntity('product'));
 		$lines = array();
 		$queries = array();
@@ -141,22 +150,25 @@ class LmdbAdvancedProjectProductCost
 			CASE WHEN ed.element_type = 'commande' AND ed.fk_elementdet > 0 AND c.rowid IS NULL THEN 1 ELSE 0 END AS source_unavailable,
 			COALESCE(NULLIF(e.fk_projet,0),c.fk_projet) AS project_id, e.fk_projet AS shipment_project, c.fk_projet AS order_project,
 			COALESCE(e.date_expedition,e.date_valid) AS document_date, e.date_valid, ed.rowid AS line_id, ed.qty, 0 AS amount, 0 AS credit,
+			c.rowid AS order_id, l.rowid AS order_line_id,
 			p.rowid AS product_id, p.ref AS product_ref, p.label AS product_label, p.fk_product_type AS product_type,
 			COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0) AS unit_id, u.label AS unit_label, p.entity AS product_entity, p.fk_unit AS product_unit, ".$category['select'].',
 			e.date_expedition, sc.snapshot_pmp, sc.snapshot_tariff, sc.tariff_date, sc.fk_supplier_price, sc.pmp_status, sc.tariff_status,
 			sc.currency, sc.tariff_currency, sc.snapshot_qty, sc.fk_product AS snapshot_product, sc.fk_unit AS snapshot_unit,
-			sc.date_validation AS snapshot_validation, sc.date_shipping AS snapshot_shipping
+			sc.date_validation AS snapshot_validation, sc.date_shipping AS snapshot_shipping'.($valuationEnabled ? ', cf.snapshot_unit_ht AS fallback_price, cf.currency AS fallback_currency, cf.source_code AS fallback_source, cf.source_date AS fallback_date, cf.fk_source AS fallback_id, cf.fk_source_history AS fallback_history' : '').'
 			FROM '.MAIN_DB_PREFIX.'expedition e INNER JOIN '.MAIN_DB_PREFIX.'expeditiondet ed ON ed.fk_expedition = e.rowid
 			LEFT JOIN '.MAIN_DB_PREFIX."commandedet l ON l.rowid = ed.fk_elementdet AND ed.element_type = 'commande'
 			LEFT JOIN ".MAIN_DB_PREFIX.'commande c ON c.rowid = l.fk_commande AND c.entity IN ('.$this->db->sanitize(getEntity('commande')).')
 			INNER JOIN '.MAIN_DB_PREFIX.'product p ON p.rowid = COALESCE(NULLIF(ed.fk_product,0),l.fk_product) AND p.entity IN ('.$productEntities.')
 			LEFT JOIN '.MAIN_DB_PREFIX.'c_units u ON u.rowid = COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0)
 			LEFT JOIN '.MAIN_DB_PREFIX.'lmdbap_shipment_cost sc ON sc.fk_expeditiondet = ed.rowid AND sc.entity = e.entity AND sc.active = 1
+			'.($valuationEnabled ? 'LEFT JOIN '.MAIN_DB_PREFIX.'lmdbap_cost_fallback cf ON cf.fk_shipment_cost=sc.rowid AND cf.entity=sc.entity' : '').'
 			'.$category['join'].' WHERE (e.fk_projet IN ('.$ids.') OR c.fk_projet IN ('.$ids.'))
 			AND e.fk_statut IN (1,2,3) AND e.entity IN ('.$this->db->sanitize(getEntity('expedition')).')';
 		// Filter the product set, then retain every authorized source of those products
 		// so an environment filter cannot remove an invoice that covers a shipment.
 		$predicates = array();
+		if (!empty($search['product_id'])) { $predicates[] = 'cs.product_id = '.(int) $search['product_id']; }
 		if (lmdbadvancedproject_budget_report_content_period_is_active($filters) && !empty($filters['date_end'])) {
 			$predicates[] = "DATE(cs.document_date) <= '".$this->db->escape($filters['date_end'])."'";
 		}
@@ -207,6 +219,7 @@ class LmdbAdvancedProjectProductCost
 				$value = $method === 'pmp' ? $row->snapshot_pmp : $row->snapshot_tariff;
 				$priceCurrency = $method === 'pmp' ? $row->currency : $row->tariff_currency;
 				$line['price'] = $value === null || $priceCurrency !== $conf->currency ? null : (float) $value;
+				if ($value !== null && $priceCurrency !== $conf->currency) { $line['issues'][] = 'BudgetCostCurrencyUnknown'; }
 				$line['price_status'] = (string) ($method === 'pmp' ? $row->pmp_status : $row->tariff_status);
 				$line['currency'] = (string) $priceCurrency;
 				$line['price_date'] = (string) ($method === 'pmp' ? $row->date_valid : $row->tariff_date);
@@ -215,12 +228,35 @@ class LmdbAdvancedProjectProductCost
 				// Historical backfill is read-only and only uses provable net prices.
 				$tariff = self::selectTariff($tariffs[$line['product']] ?? array(), min((string) $row->document_date, (string) $row->date_valid), (string) $row->date_valid);
 				$line['price'] = $tariff['currency'] === $conf->currency ? $tariff['price'] : null;
+				if ($tariff['price'] !== null && $tariff['currency'] !== $conf->currency) { $line['issues'][] = 'BudgetCostCurrencyUnknown'; }
 				$line['price_date'] = $tariff['date'];
 				$line['price_status'] = $tariff['status'];
 				$line['currency'] = $tariff['currency'];
 				$line['price_source'] = 'BudgetCostSupplierTariff';
 			}
 			if (in_array('BudgetCostIncompatibleUnits', $line['issues'], true)) { $line['price'] = null; }
+			$line['order_id'] = (int) $row->order_id;
+			$line['order_line_id'] = (int) $row->order_line_id;
+			$instruction = $instructions[$line['project'].':'.$line['product']] ?? null;
+			if ($valuationEnabled && $line['price'] === null && !$line['issues']) {
+				$choice = null;
+				if ($instruction !== null && (int) $instruction->fk_unit === $line['unit'] && $instruction->currency === $conf->currency) {
+					$choice = array('price' => (float) $instruction->snapshot_unit_ht, 'source' => 'instruction', 'date' => (string) $instruction->date_creation, 'id' => (int) $instruction->rowid, 'history' => 0);
+				} elseif ($validSnapshot && $row->fallback_price !== null && $row->fallback_currency === $conf->currency) {
+					$choice = array('price' => (float) $row->fallback_price, 'source' => (string) $row->fallback_source, 'date' => (string) $row->fallback_date, 'id' => (int) $row->fallback_id, 'history' => (int) $row->fallback_history);
+				} elseif ($row->date_valid) {
+					$choice = $valuation->automatic($line['product'], $line['entity'], $line['order_id'], $line['order_line_id'], min((string) $row->document_date, (string) $row->date_valid));
+				}
+				if ($choice !== null) {
+					$line['price'] = $choice['price'];
+					$line['price_source'] = 'BudgetCostSource_'.$choice['source'];
+					$line['price_date'] = $choice['date'];
+					$line['price_status'] = 'known';
+					$line['currency'] = $conf->currency;
+					$line['price_source_id'] = $choice['id'];
+					$line['price_history_id'] = $choice['history'];
+				}
+			}
 			if (!$row->date_expedition) {
 				$line['price_source'] = $line['price_source'] ?: ($method === 'pmp' ? 'BudgetCostPmp' : 'BudgetCostSupplierTariff');
 			}
@@ -229,6 +265,16 @@ class LmdbAdvancedProjectProductCost
 		}
 		$period = lmdbadvancedproject_budget_report_content_period_is_active($filters);
 		$report = LmdbAdvancedProjectCostLedger::build($lines, $period ? (string) ($filters['date_start'] ?? '') : '', $period ? (string) ($filters['date_end'] ?? '') : '');
+		foreach ($report['products'] as $key => &$productRow) {
+			$productRow['can_value'] = false;
+			$productRow['valuation_unit'] = count($productRow['units']) === 1 ? (int) array_key_first($productRow['units']) : 0;
+			if ($valuationEnabled && !isset($instructions[$key]) && count($productRow['units']) === 1) {
+				foreach ($productRow['events'] as $event) {
+					if ($event['kind'] === 'shipment' && $event['amount'] === null && $event['qty'] != 0 && !$event['line']['issues']) { $productRow['can_value'] = true; break; }
+				}
+			}
+		}
+		unset($productRow);
 		$report['issues'] = array_values(array_unique(array_merge($report['issues'], $issues)));
 		$report['complete'] = !$report['issues'];
 		return $report;
@@ -458,12 +504,13 @@ class LmdbAdvancedProjectProductCost
 		$shipment = $shipments[0];
 		$shippingDate = $shipment->date_expedition ?: $shipment->date_valid;
 		$rows = $this->rows('SELECT ed.rowid, ed.qty, COALESCE(NULLIF(ed.fk_product,0),l.fk_product) AS product_id,
-			COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0) AS unit_id, p.fk_unit AS product_unit FROM '.MAIN_DB_PREFIX.'expeditiondet ed
+			COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0) AS unit_id, p.fk_unit AS product_unit, l.fk_commande AS order_id, l.rowid AS order_line_id FROM '.MAIN_DB_PREFIX.'expeditiondet ed
 			LEFT JOIN '.MAIN_DB_PREFIX."commandedet l ON l.rowid = ed.fk_elementdet AND ed.element_type = 'commande'
 			INNER JOIN ".MAIN_DB_PREFIX.'product p ON p.rowid = COALESCE(NULLIF(ed.fk_product,0),l.fk_product)
 			AND p.entity IN ('.$this->db->sanitize(getEntity('product')).') WHERE ed.fk_expedition = '.$shipmentId);
 		$tariffs = $this->tariffCandidates(array_map(static function ($row): int { return (int) $row->product_id; }, $rows));
 		$pmps = array();
+		$valuation = new LmdbAdvancedProjectCostValuation($this->db);
 		foreach ($rows as $row) {
 			$previous = $this->rows('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost WHERE entity = '.(int) $shipment->entity.' AND fk_expeditiondet = '.(int) $row->rowid.' ORDER BY revision DESC LIMIT 1');
 			if ($previous && (int) $previous[0]->active === 1 && $previous[0]->date_validation === $shipment->date_valid) {
@@ -489,6 +536,13 @@ class LmdbAdvancedProjectProductCost
 			$sql .= ",'".$this->db->escape($conf->currency)."','".$this->db->escape($tariff['currency'])."','".($pmp === null ? 'BudgetCostMissingPrice' : 'known')."','".$this->db->escape($tariff['status'])."',".(int) $user->id.')';
 			if (!$this->db->query($sql)) {
 				throw new RuntimeException('BudgetCostCaptureFailed');
+			}
+			if (!$unitMismatch && LmdbAdvancedProjectCompatibility::costValuationAvailable()) {
+				$choice = $valuation->automatic((int) $row->product_id, (int) $shipment->entity, (int) $row->order_id, (int) $row->order_line_id, min((string) $shippingDate, (string) $shipment->date_valid));
+				if ($choice !== null) {
+					$parent = $this->rows('SELECT rowid FROM '.MAIN_DB_PREFIX.'lmdbap_shipment_cost WHERE entity='.(int) $shipment->entity.' AND fk_expeditiondet='.(int) $row->rowid.' AND revision='.$revision);
+					if (!$parent || !$this->db->query('INSERT INTO '.MAIN_DB_PREFIX.'lmdbap_cost_fallback (entity,fk_shipment_cost,snapshot_unit_ht,currency,source_code,fk_source,fk_source_history,source_date) VALUES ('.(int) $shipment->entity.','.(int) $parent[0]->rowid.','.$choice['price'].",'".$this->db->escape($choice['currency'])."','".$this->db->escape($choice['source'])."',".$choice['id'].','.$choice['history'].",'".$this->db->escape($choice['date'])."')")) { throw new RuntimeException('BudgetCostCaptureFailed'); }
+				}
 			}
 		}
 	}

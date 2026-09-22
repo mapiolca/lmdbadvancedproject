@@ -7,9 +7,9 @@
  * Rebuild analytical costs from currently valid documents, in business-date order.
  * No accounting or stock mutation is performed here.
  *
- * @phpstan-type CostLine array{key:string,kind:string,project:int,product:int,unit:int,qty:float,amount:?float,date:string,document_id:int,ref:string,entity:int,product_ref:string,label:string,product_type:int,unit_label:string,category:string,category_label:string,price:?float,price_source:string,price_date:string,date_fallback:bool,currency?:string,price_status?:string,issues:list<string>}
+ * @phpstan-type CostLine array{key:string,kind:string,project:int,product:int,unit:int,qty:float,amount:?float,date:string,document_id:int,ref:string,entity:int,product_ref:string,label:string,product_type:int,unit_label:string,category:string,category_label:string,price:?float,price_source:string,price_date:string,date_fallback:bool,currency?:string,price_status?:string,issues:list<string>,order_id?:int,order_line_id?:int,price_source_id?:int,price_history_id?:int}
  * @phpstan-type CostEvent array{line:CostLine,cause:CostLine,kind:string,date:string,qty:float,amount:?float,reason:string,unknown_key:string}
- * @phpstan-type ProductCostRow array{project:int,product:int,entity:int,entities:array<int,int>,ref:string,label:string,type:int,unit:string,units:array<int,string>,customer_qty:float,ordered_qty:float,shipped_qty:float,invoiced_qty:float,uncovered_qty:float,remaining_qty:float,invoice_cost:float,shipment_cost:float,order_cost:float,provisional_cost:?float,total:float,issues:list<string>,lines:list<CostLine>,events:list<CostEvent>}
+ * @phpstan-type ProductCostRow array{project:int,product:int,entity:int,entities:array<int,int>,ref:string,label:string,type:int,unit:string,units:array<int,string>,customer_qty:float,ordered_qty:float,shipped_qty:float,invoiced_qty:float,uncovered_qty:float,remaining_qty:float,invoice_cost:float,shipment_cost:float,order_cost:float,provisional_cost:?float,total:float,issues:list<string>,lines:list<CostLine>,events:list<CostEvent>,can_value?:bool,valuation_unit?:int}
  * @phpstan-type CostReport array{products:array<string,ProductCostRow>,events:list<CostEvent>,issues:list<string>,complete:bool}
  */
 class LmdbAdvancedProjectCostLedger
@@ -34,6 +34,7 @@ class LmdbAdvancedProjectCostLedger
 		usort($lines, static function (array $a, array $b) use ($priority): int {
 			return array($a['date'], $priority[$a['kind']], $a['key']) <=> array($b['date'], $priority[$b['kind']], $b['key']);
 		});
+		/** @var array<string,ProductCostRow> $products */
 		$products = array();
 		/** @var array<string,array{product_key:string,invoiced:float,external_invoiced:float,shipped:float,invoice_available:float,order_consumed:float,orders:list<array{line:CostLine,remaining:float}>,shipments:list<array{line:CostLine,remaining:float}>}> $groups */
 		$groups = array();

@@ -26,6 +26,7 @@ class FixtureDB {
 	public function num_rows($result) { return count($result->rows); }
 	public function free($result) { }
 	public function fetch_row($result) { $row=$this->fetch_object($result); return $row ? array_values((array)$row) : false; }
+	public function fetch_array($result) { $row=$this->fetch_object($result); return $row ? (array)$row : false; }
 	public function encrypt($text, $mode=0) { return "'".$this->escape($text)."'"; }
 	public function decrypt($column) { return $column; }
 	public function prefix() { return MAIN_DB_PREFIX; }
@@ -34,6 +35,10 @@ class FixtureDB {
 	public function idate($timestamp) { return date('Y-m-d H:i:s', $timestamp); }
 	public function jdate($date) { return $date ? strtotime($date) : null; }
 	public function lasterror() { return $this->lastError; }
+	public function plimit($limit, $offset = 0) { return $limit > 0 ? ' LIMIT '.(int) $limit.' OFFSET '.(int) $offset : ''; }
+	public function begin() { return $this->connection->beginTransaction(); }
+	public function commit() { return $this->connection->commit(); }
+	public function rollback() { return $this->connection->rollBack(); }
 }
 $db = new FixtureDB();
 $langs = new class {
