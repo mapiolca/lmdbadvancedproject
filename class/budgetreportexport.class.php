@@ -311,16 +311,17 @@ class LmdbAdvancedProjectBudgetReportExport
 		}
 		$detail = $spreadsheet->createSheet();
 		$detail->setTitle($this->sheetTitle($this->outputlangs->transnoentities('BudgetCostContributions')));
-		$this->writeHeaderRow($detail, 1, array('Project', 'Product', 'Ref', 'Date', 'Type', 'Qty', 'AmountHTShort', 'BudgetCostPriceSource', 'Price', 'Date', 'Status', 'BudgetCostCauseDocument', 'Currency', 'BudgetCostEnvironment'));
+		$this->writeHeaderRow($detail, 1, array('Project', 'Product', 'Ref', 'Date', 'Type', 'Qty', 'AmountHTShort', 'BudgetCostPriceSource', 'Price', 'Date', 'Status', 'BudgetCostCauseDocument', 'Currency', 'BudgetCostEnvironment', 'BudgetCostSourceId', 'BudgetCostHistoryId', 'BudgetCostSourceDate', 'BudgetCostInstructionId'));
 		$rowNumber = 2;
 		foreach ($report['events'] as $event) {
 			$line = $event['line'];
 			$values = array($this->data['projects'][$line['project']]['project_ref'] ?? '', $line['product_ref'], $line['ref'], $event['date'],
 				$this->outputlangs->transnoentities('BudgetCostReason_'.$event['reason']), $event['qty'],
 				$event['amount'] ?? $this->outputlangs->transnoentities('BudgetCostMissingPrice'),
-				$line['price_source'] === '' ? '' : $this->outputlangs->transnoentities($line['price_source']),
+				lmdbadvancedproject_cost_price_source_label($line, $this->outputlangs),
 				$line['price'] ?? '', $line['price_date'], implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, array_merge($line['issues'], $line['date_fallback'] ? array('BudgetCostValidationDateFallback') : array(), !empty($line['price_status']) && $line['price_status'] !== 'known' ? array($line['price_status']) : array()))),
-				$event['cause']['ref'], $line['currency'] ?? $conf->currency, $environments[$line['entity']] ?? '');
+				$event['cause']['ref'], $line['currency'] ?? $conf->currency, $environments[$line['entity']] ?? '',
+				$line['price_source_id'] ?? '', $line['price_history_id'] ?? '', $line['price_origin_date'] ?? $line['price_date'], $line['price_instruction_id'] ?? '');
 			foreach ($values as $index => $value) {
 				$cell = Coordinate::stringFromColumnIndex($index + 1).$rowNumber;
 				if (is_float($value)) {
@@ -332,9 +333,9 @@ class LmdbAdvancedProjectBudgetReportExport
 			}
 			$rowNumber++;
 		}
-		$detail->setAutoFilter('A1:N'.max(1, $rowNumber - 1));
+		$detail->setAutoFilter('A1:R'.max(1, $rowNumber - 1));
 		$detail->freezePane('A2');
-		foreach (range('A', 'N') as $column) { $detail->getColumnDimension($column)->setWidth(24); }
+		foreach (range('A', 'R') as $column) { $detail->getColumnDimension($column)->setWidth(24); }
 	}
 
 	/**

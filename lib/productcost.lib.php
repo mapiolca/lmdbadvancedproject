@@ -109,7 +109,7 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 			$parts[] = $langs->trans('Currency').': '.dol_escape_htmltag($line['currency'] ?? '');
 			if (!empty($line['price_status']) && $line['price_status'] !== 'known') { $parts[] = $langs->trans($line['price_status']); }
 			$parts[] = $line['price'] === null ? $langs->trans('BudgetCostMissingPrice')
-				: $langs->trans($line['price_source']).': '.price($line['price']).' ('.dol_print_date($db->jdate($line['price_date']), 'dayhour').')';
+				: dol_escape_htmltag(lmdbadvancedproject_cost_price_source_label($line, $langs)).': '.price($line['price']).' ('.dol_print_date($db->jdate($line['price_date']), 'dayhour').')';
 		}
 	}
 	foreach ($row['events'] as $event) {
@@ -120,4 +120,15 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 		$parts[] = $langs->trans($issue);
 	}
 	return implode('<br>', $parts);
+}
+
+/** Source provenance shared by screen and document renderers.
+ * @param array<string,mixed> $line
+ * @param Translate $outputlangs
+ */
+function lmdbadvancedproject_cost_price_source_label(array $line, $outputlangs): string
+{
+	$label = $line['price_source'] === '' ? '' : $outputlangs->transnoentities($line['price_source']);
+	if (!empty($line['price_origin'])) { $label .= ' — '.$outputlangs->transnoentities($line['price_origin']); }
+	return $label;
 }

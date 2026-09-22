@@ -237,7 +237,9 @@ class LmdbAdvancedProjectCostValuation
 					|| $this->currency((int) $price->product_fourn_entity) !== $conf->currency || (float) $price->fourn_qty <= 0) { continue; }
 				// An expression is never silently replaced by a stored, stale amount.
 				if (!empty($price->fk_supplier_price_expression)) { continue; }
-				$value = self::amount((string) ((float) $price->fourn_unitprice * (1 - (float) $price->fourn_remise_percent / 100) - (float) $price->fourn_remise));
+				$unitPrice = self::amount((string) $price->fourn_unitprice);
+				if ($unitPrice === null) { continue; }
+				$value = self::amount((string) ($unitPrice * (1 - (float) $price->fourn_remise_percent / 100) - (float) $price->fourn_remise));
 				if ($value !== null) {
 					$choices['supplier:'.$price->product_fourn_price_id] = $this->choice($value, 'supplier', (int) $price->product_fourn_price_id, 0, '', $supplier->name.' / '.$price->ref_supplier.' / '.price($price->fourn_qty));
 				}
@@ -313,6 +315,20 @@ class LmdbAdvancedProjectCostValuation
 			if (!$ids) { throw new RuntimeException('BudgetCostConflict'); }
 			// Consistent parent locking serializes this operation across sessions.
 			$this->rows('SELECT rowid FROM '.MAIN_DB_PREFIX.'projet WHERE entity IN ('.$this->db->sanitize(getEntity('project')).') AND rowid IN ('.implode(',', array_map('intval', $ids)).') ORDER BY rowid FOR UPDATE');
+			$this->rows('SELECT rowid FROM '.MAIN_DB_PREFIX.'product WHERE entity IN ('.$this->db->sanitize(getEntity('product')).') AND rowid='.(int) $quote['product'].' FOR UPDATE');
+			if ($source !== 'free') {
+				if (!isset($quote['choices'][$source])) { throw new RuntimeException('BudgetCostConflict'); }
+				$selected = $quote['choices'][$source];
+				$sourceTables = array('supplier' => 'product_fournisseur_price', 'dynamicprices' => 'dynamicprices_product_cost', 'pricelist' => 'pricelist', 'pricelist_history' => 'pricelist');
+				if (isset($sourceTables[$selected['source']])) {
+					$scope = $selected['source'] === 'supplier' ? getEntity('productsupplierprice') : ($selected['source'] === 'dynamicprices' ? (string) $conf->entity : getEntity('commande').','.getEntity('product'));
+					$this->rows('SELECT rowid FROM '.MAIN_DB_PREFIX.$sourceTables[$selected['source']].' WHERE entity IN ('.$this->db->sanitize($scope).') AND fk_product='.(int) $quote['product'].' AND rowid='.(int) $selected['id'].' FOR UPDATE');
+				}
+			}
+			// Reload evidence after acquiring locks, even if this instance also
+			// prepared the dialog. No pre-transaction product cache may be reused.
+			$this->products = $this->choiceCache = array();
+			if (!$this->product($quote['product'])) { throw new RuntimeException('BudgetCostAccessDenied'); }
 			$service = new LmdbAdvancedProjectProductCost($this->db);
 			$report = $service->load($ids, array(), array('product_id' => $quote['product']));
 			$origin = $report['products'][$quote['project'].':'.$quote['product']] ?? null;

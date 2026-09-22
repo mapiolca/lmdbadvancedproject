@@ -147,23 +147,27 @@ $canWriteCosts = LmdbAdvancedProjectCompatibility::costValuationAvailable()
 $modalQuote = null;
 $quoteKey = '';
 $selectedCostSource = GETPOST('cost_source', 'alphanohtml') ?: 'free';
+$selectedCostSource = is_string($selectedCostSource) ? $selectedCostSource : '';
 $freeCost = GETPOST('cost_amount', 'alphanohtml');
+$freeCost = is_string($freeCost) ? $freeCost : '';
 $applyAll = GETPOSTINT('cost_all') === 1;
 $valueProduct = GETPOSTINT('value_product');
 if (!isset($_SESSION['lmdbap_cost_quotes']) || !is_array($_SESSION['lmdbap_cost_quotes'])) { $_SESSION['lmdbap_cost_quotes'] = array(); }
 foreach ($_SESSION['lmdbap_cost_quotes'] as $key => $savedQuote) {
 	if (!is_array($savedQuote) || (int) ($savedQuote['expires'] ?? 0) < dol_now()) { unset($_SESSION['lmdbap_cost_quotes'][$key]); }
 }
+while (count($_SESSION['lmdbap_cost_quotes']) > 20) { array_shift($_SESSION['lmdbap_cost_quotes']); }
 if ($action === 'confirm_cost' && GETPOST('confirm', 'alpha') === 'yes') {
 	if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$canWriteCosts) { accessforbidden(); }
 	// main.inc.php validates the native CSRF token before any operation here.
 	$quoteKey = GETPOST('cost_quote', 'aZ09');
+	$quoteKey = is_string($quoteKey) ? $quoteKey : '';
 	$savedQuote = $_SESSION['lmdbap_cost_quotes'][$quoteKey] ?? null;
 	try {
 		if (!is_array($savedQuote) || (int) $savedQuote['entity'] !== (int) $conf->entity || (int) $savedQuote['user'] !== (int) $user->id
 			|| (int) $savedQuote['payload']['project'] !== $id) { throw new RuntimeException('BudgetCostConflict'); }
 		$count = $valuation->save($savedQuote['payload'], $selectedCostSource, $freeCost, $applyAll, $quoteKey);
-		setEventMessages($langs->trans('BudgetCostApplied', $count), null, 'mesgs');
+		setEventMessages($langs->trans('BudgetCostApplied', (string) $count), null, 'mesgs');
 		header('Location: '.$returnUrl);
 		exit;
 	} catch (RuntimeException $exception) {
@@ -301,7 +305,7 @@ if (is_array($modalQuote)) {
 		array('type' => 'checkbox', 'name' => 'cost_all', 'label' => $langs->trans('BudgetCostApplyAll'), 'value' => $applyAll, 'moreattr' => 'value="1"'),
 	);
 	print '<div id="lmdbap-cost-dialog">';
-	print $form->formconfirm(dol_escape_htmltag($returnUrl), $langs->trans('BudgetCostValuation'), dol_escape_htmltag(is_object($product) ? $product->ref.' — '.$product->label : '').'<br>'.$langs->trans('BudgetCostValuationHelp', count($modalQuote['targets'])), 'confirm_cost', $formQuestion, 'yes', 0, 0, 650, 0, 'Save', 'Cancel');
+	print $form->formconfirm(dol_escape_htmltag($returnUrl), $langs->trans('BudgetCostValuation'), dol_escape_htmltag(is_object($product) ? $product->ref.' — '.$product->label : '').'<br>'.$langs->trans('BudgetCostValuationHelp', (string) count($modalQuote['targets'])), 'confirm_cost', $formQuestion, 'yes', 0, 0, 650, 0, 'Save', 'Cancel');
 	print '</div>';
 	print ajax_combobox('cost_source');
 	// Native dialog around a native POST form: unlike the v20 AJAX confirmation,

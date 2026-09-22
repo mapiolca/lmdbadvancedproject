@@ -1,6 +1,6 @@
 # ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-Current version: **1.4.0**
+Current version: **1.4.1**
 
 ## Features
 
@@ -31,6 +31,10 @@ Date range and project status filters on the global report are preserved in spre
 An entity-specific switch adds provisional costs for shipped products not yet covered by supplier invoices. Choose the latest historical net supplier tariff or the native PMP frozen at shipment validation. Invoices later replace the provisional valuation; dated adjustments preserve period totals. Both historical values are retained, including after disabling the option. Unknown historical prices are reported as incomplete instead of using current prices.
 
 A native **Product list** project tab compares customer/supplier orders, shipments, invoiced purchases, uncovered quantities and remaining commitments. Project/global reports, categories, graphs and PDF/XLSX/ODS outputs share the same reconciliation; spreadsheets also include products and dated contributions. Native invoice allocations, entity scopes and project/report permissions are respected.
+
+Version 1.4.1 completes missing shipment prices using eligible historical PriceList costs, then dated DynamicPrices costs. Rows that remain unvalued offer **Refresh**: select a free unit cost (including zero), Dolibarr cost, PMP, an available optional-provider cost or a net supplier price. The selected amount is frozen for that project/product and its future missing shipment costs. An unchecked option copies the instruction to eligible existing projects; it creates no rule for new projects. Known snapshots and invoices are preserved. Project modification, product-price and source permissions are required. Optional providers are never recalculated during a report consultation.
+
+Reactivate the module after installing 1.4.1 to create the instruction and supplemental snapshot tables. Instructions survive module deactivation and source-price changes. See [valuation rules and historical limits](doc/COST_VALUATION.md) and [1.4.1 validation evidence](doc/VALIDATION_COST_VALUATION.md). Operational browser and database acceptance requires an instance serving this version.
 
 After updating, reactivate the module to install the historical tables and native trigger listener, then opt in from its settings. The option defaults to off; settings and snapshots survive reactivation. The native PMP method requires Stock. See the [detailed rules, examples and historical limitations](doc/SHIPMENT_COSTS.md) and [test/instance validation guide](test/README.md), with [executed checks and remaining limits](doc/VALIDATION_SHIPMENT_COSTS.md).
 

@@ -38,6 +38,14 @@ $user->denied = array('dynamicsprices.cost.read');
 check((new LmdbAdvancedProjectCostValuation($db))->dynamicPrice(1,1), null, 'DynamicPrices permission enforced');
 $user->denied = array();
 
+$db->query("UPDATE ".MAIN_DB_PREFIX."dynamicprices_product_cost SET date_calculation='2026-06-01 00:00:00'");
+$quote=(new LmdbAdvancedProjectCostValuation($db))->prepare(1,1);
+check(isset($quote['choices']['dynamicprices']),true,'Later DynamicPrices proposed for explicit choice');
+check((new LmdbAdvancedProjectCostValuation($db))->save($quote,'dynamicprices','',false,'explicit-dynamic'),1,'Explicit later DynamicPrices frozen');
+check($service->load(array(1))['products']['1:1']['provisional_cost'],104,'Explicit later cost fills old missing shipments');
+$db->query('DELETE FROM '.MAIN_DB_PREFIX.'lmdbap_cost_instruction');
+$db->query("UPDATE ".MAIN_DB_PREFIX."dynamicprices_product_cost SET date_calculation='2026-02-15 00:00:00'");
+
 // Native PriceList selects the correct tier using the full order quantity.
 $conf->pricelist = (object) array('enabled'=>1); $conf->modules['pricelist']=1;
 $db->query('CREATE TABLE '.MAIN_DB_PREFIX.'categorie (rowid INTEGER PRIMARY KEY,entity INTEGER,type INTEGER,label TEXT)');
@@ -74,6 +82,13 @@ $report = $service->load(array(1));
 $first = array_values(array_filter($report['products']['1:1']['lines'], static function ($line) { return $line['kind']==='shipment' && $line['document_id']===1; }));
 check($first[0]['price'],9,'Snapshot retained after provider deactivation and changes');
 check($first[0]['price_source'],'BudgetCostSource_pricelist_history','Snapshot provenance retained');
+check((new LmdbAdvancedProjectCostValuation($db))->save((new LmdbAdvancedProjectCostValuation($db))->prepare(1,1),'free','15',false,'mixed-snapshots'),1,'Fill other missing shipments of a partly frozen product');
+$known=array_values(array_filter($service->load(array(1))['products']['1:1']['lines'],static function($line){return $line['kind']==='shipment' && $line['document_id']===1;}));
+check($known[0]['price'],9,'New instruction preserves known supplemental snapshot');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts SET qty=12,total_ht=144 WHERE rowid=1');
+check($service->load(array(1))['products']['1:1']['provisional_cost'],0,'Full invoice coverage removes provisional balance');
+check($service->load(array(1))['products']['1:1']['shipment_cost'],0,'Full invoice coverage reverses all provisional amounts');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts SET qty=4,total_ht=48 WHERE rowid=1');
 $conf->stock->enabled=1; $conf->modules['stock']=1;
 
 // Native supplier selection includes net discount and enforces supplier access.

@@ -1,5 +1,13 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.1 — preparation
+
+- Complete missing shipment costs with applicable recorded PriceList history and successful dated DynamicPrices costs, without recalculating optional providers; preserve known zero prices and validation snapshots.
+- Add the native Refresh dialog with free, Dolibarr, PMP, optional-provider and net supplier prices. Freeze instructions per project/product, with an explicit opt-in for eligible existing projects and no rule for new projects.
+- Recheck native permissions, project scope, units, currencies and source changes; serialize saves transactionally with unique project/product instructions, stale-quote rejection and idempotent replay.
+- Retain instructions and supplemental evidence after deactivation, and expose provenance across tooltips and PDF/XLSX/ODS outputs. Reactivate the module after updating to install the two additional tables.
+- Add FR/EN translations, historical limitations and native-provider regression scenarios. PHP 8.0 / Dolibarr 20 remain the minimum; operational MySQL/MariaDB and browser acceptance is tracked separately from CLI fixtures.
+
 ## 1.4.0
 
 - Add entity-specific, disabled-by-default shipment valuation using frozen net supplier tariffs or native PMP, with historical price evidence retained across deactivation and revalidation.

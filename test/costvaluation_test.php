@@ -94,6 +94,56 @@ $conf->global->MAIN_USE_ADVANCED_PERMS = 1; $user->denied = array('product.produ
 check((new LmdbAdvancedProjectCostValuation($db))->product(1), null, 'Advanced price permission required');
 $conf->global->MAIN_USE_ADVANCED_PERMS = 0; $user->denied = array();
 
+// Instruction affects the same shared report/exports as the screen.
+$updated = lmdbadvancedproject_load_budget_report_data(1, $filters);
+check($updated['totalspent'],200,'Updated instruction total across the report');
+check($updated['budgetReportForecast']['totals']['supplier_expenses'],200,'Updated category total');
+check(array_sum($updated['mospents']),200,'Updated monthly graph total');
+$book = $build->invoke(new LmdbAdvancedProjectBudgetReportExport($langs,$updated),true);
+check($book->getSheet(0)->getCell('D8')->getValue(),200,'Instruction screen/spreadsheet agreement');
+$origins = array();
+for ($r=2;$r<=$book->getSheet(4)->getHighestRow();$r++) { $origins[]=$book->getSheet(4)->getCell('H'.$r)->getValue(); }
+check(in_array('BudgetCostSource_instruction — BudgetCostSource_native',$origins,true),true,'Export retains instruction origin');
+foreach (array('Xlsx','Ods') as $format) {
+	$class='PhpOffice\\PhpSpreadsheet\\Writer\\'.$format; $file=__DIR__.'/.cache/valuation.'.strtolower($format);
+	(new $class($book))->save($file);
+	$read=\PhpOffice\PhpSpreadsheet\IOFactory::load($file);
+	check((float)$read->getSheet(0)->getCell('D8')->getValue(),200,$format.' instruction amount round trip');
+	$read->disconnectWorksheets();
+}
+$book->disconnectWorksheets();
+
+$db->query('DELETE FROM '.MAIN_DB_PREFIX.'lmdbap_cost_instruction');
+$db->query("UPDATE ".MAIN_DB_PREFIX."const SET value='USD' WHERE entity=2 AND name='MAIN_MONNAIE'");
+check(count((new LmdbAdvancedProjectCostValuation($db))->prepare(1,1)['targets']),1,'Incompatible project currency excluded');
+$db->query("UPDATE ".MAIN_DB_PREFIX."const SET value='EUR' WHERE entity=2 AND name='MAIN_MONNAIE'");
+$quote=(new LmdbAdvancedProjectCostValuation($db))->prepare(1,1);
+$db->query('UPDATE '.MAIN_DB_PREFIX.'expeditiondet SET qty=11 WHERE rowid=2');
+try { $valuation->save($quote,'free','12',true,'stale-target'); check(true,false,'Stale target refused'); }
+catch (RuntimeException $e) { check($e->getMessage(),'BudgetCostConflict','Changed propagation target aborts transaction'); }
+check($db->num_rows($db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_cost_instruction')),0,'No partial propagation on conflict');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'expeditiondet SET qty=10 WHERE rowid=2');
+$quote=(new LmdbAdvancedProjectCostValuation($db))->prepare(1,1);
+insertFixture('projet',array('rowid'=>3,'entity'=>1,'ref'=>'P3','public'=>1));
+insertFixture('expedition',array('rowid'=>4,'ref'=>'SH4','entity'=>1,'fk_projet'=>3,'date_expedition'=>'2026-05-01','date_valid'=>'2026-05-01','fk_statut'=>1));
+insertFixture('expeditiondet',array('rowid'=>4,'fk_expedition'=>4,'fk_product'=>1,'qty'=>1));
+check($valuation->save($quote,'free','19',true,'bounded'),2,'Propagation limited to projects in the server quote');
+check($db->num_rows($db->query('SELECT * FROM '.MAIN_DB_PREFIX.'lmdbap_cost_instruction WHERE fk_project=3')),0,'No instruction on a project created after opening');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'expedition SET fk_statut=0 WHERE rowid=4');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commandedet SET fk_unit=2 WHERE rowid=1');
+check(in_array('BudgetCostIncompatibleUnits',$service->load(array(1))['issues'],true),true,'Instruction cannot mask changed units');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commandedet SET fk_unit=1 WHERE rowid=1');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'expedition SET fk_projet=2 WHERE rowid=1');
+check(in_array('BudgetCostProjectConflict',$service->load(array(1))['issues'],true),true,'Instruction cannot mask contradictory project links');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'expedition SET fk_projet=NULL WHERE rowid=1');
+
+foreach (array('abc','W9c','-0.000001','NaN','1.2.3','') as $input) { check(LmdbAdvancedProjectCostValuation::amount($input,true),null,'Malformed user amount refused before rounding'); }
+check(LmdbAdvancedProjectCostValuation::amount('0',true),0,'Explicit user zero');
+$langs->translations['SeparatorDecimal']=','; $langs->translations['SeparatorThousand']=' ';
+check(LmdbAdvancedProjectCostValuation::amount('12,50',true),12.5,'Native comma decimal input');
+check(LmdbAdvancedProjectCostValuation::amount('1 200,50',true),1200.5,'Native French thousands separator');
+unset($langs->translations['SeparatorDecimal'],$langs->translations['SeparatorThousand']);
+
 $current = (object) array('fk_product'=>1,'entity'=>1,'from_qty'=>10,'fk_soc'=>1,'fk_cat'=>0,'fk_cat_propal'=>0,'fk_cat_order'=>0,'fk_cat_invoice'=>0,'fk_cat_contract'=>0);
 $old = clone $current; $old->rowid=1; $old->datec='2026-01-01 00:00:00'; $old->cost_price=10; $old->cost_price_source='custom';
 $new = clone $old; $new->rowid=2; $new->datec='2026-03-01 00:00:00'; $new->cost_price=12;

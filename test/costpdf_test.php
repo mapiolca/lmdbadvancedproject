@@ -6,7 +6,7 @@ $conf->file=(object)array('dol_document_root'=>array(DOL_DOCUMENT_ROOT),'instanc
 require_once __DIR__.'/../core/modules/project/doc/pdf_budgetreport.modules.php';
 $user = new class($db) extends User { public $allowed=true; public function hasRight($module,$permlevel1,$permlevel2='') { return $this->allowed; } };
 $user->id=1; $user->firstname='Test'; $user->lastname='User';
-foreach (array(DOL_DOCUMENT_ROOT.'/langs/fr_FR/main.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/projects.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/companies.lang',__DIR__.'/../langs/fr_FR/lmdbadvancedproject.lang') as $file) {
+foreach (array(DOL_DOCUMENT_ROOT.'/langs/fr_FR/main.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/projects.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/products.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/companies.lang',__DIR__.'/../langs/fr_FR/lmdbadvancedproject.lang') as $file) {
 	foreach (file($file,FILE_IGNORE_NEW_LINES) as $entry) { if (strpos($entry,'=') !== false && substr($entry,0,1)!=='#') { [$key,$value]=explode('=',$entry,2); $langs->translations[trim($key)]=trim($value); } }
 }
 define('DOL_MAIN_URL_ROOT', 'https://example.invalid');
@@ -56,6 +56,11 @@ copy($model->result['fullpath'],__DIR__.'/.cache/cost-report-footer-hook.pdf');
 $conf->global->PROJECT_FREE_TEXT=implode('<br>',array_fill(0,70,'Pied exceptionnellement long.'));
 check($model->write_file($project,$langs),-1,'Oversized footer refused before rendering content');
 $conf->global->PROJECT_FREE_TEXT='';
+$conf->global->LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD='pmp';
+insertFixture('lmdbap_cost_instruction',array('entity'=>1,'fk_project'=>1,'fk_product'=>1,'fk_unit'=>1,'snapshot_unit_ht'=>15,'currency'=>'EUR','source_code'=>'free','date_creation'=>'2026-05-01 00:00:00','fk_user_author'=>1,'request_key'=>'pdf'));
+$project->context['budgetreport_filters']=$filters;
+check($model->write_file($project,$langs),1,'Instruction and provenance PDF serialization');
+copy($model->result['fullpath'],__DIR__.'/.cache/cost-valuation.pdf');
 $user->allowed=false;
 check($model->write_file($project,$langs),-1,'PDF generation refuses missing rights');
 $user->allowed=true;

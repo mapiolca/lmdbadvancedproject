@@ -240,10 +240,14 @@ class LmdbAdvancedProjectProductCost
 			$instruction = $instructions[$line['project'].':'.$line['product']] ?? null;
 			if ($valuationEnabled && $line['price'] === null && !$line['issues']) {
 				$choice = null;
-				if ($instruction !== null && (int) $instruction->fk_unit === $line['unit'] && $instruction->currency === $conf->currency) {
-					$choice = array('price' => (float) $instruction->snapshot_unit_ht, 'source' => 'instruction', 'date' => (string) $instruction->date_creation, 'id' => (int) $instruction->rowid, 'history' => 0);
-				} elseif ($validSnapshot && $row->fallback_price !== null && $row->fallback_currency === $conf->currency) {
+				if ($validSnapshot && $row->fallback_price !== null && $row->fallback_currency === $conf->currency) {
+					// A validation snapshot is already a known price and stays immutable.
 					$choice = array('price' => (float) $row->fallback_price, 'source' => (string) $row->fallback_source, 'date' => (string) $row->fallback_date, 'id' => (int) $row->fallback_id, 'history' => (int) $row->fallback_history);
+				} elseif ($instruction !== null && (int) $instruction->fk_unit === $line['unit'] && $instruction->currency === $conf->currency) {
+					$choice = array('price' => (float) $instruction->snapshot_unit_ht, 'source' => 'instruction', 'date' => (string) $instruction->date_creation, 'id' => (int) $instruction->fk_source, 'history' => (int) $instruction->fk_source_history);
+					$line['price_origin'] = 'BudgetCostSource_'.$instruction->source_code;
+					$line['price_origin_date'] = (string) $instruction->source_date;
+					$line['price_instruction_id'] = (int) $instruction->rowid;
 				} elseif ($row->date_valid) {
 					$choice = $valuation->automatic($line['product'], $line['entity'], $line['order_id'], $line['order_line_id'], min((string) $row->document_date, (string) $row->date_valid));
 				}

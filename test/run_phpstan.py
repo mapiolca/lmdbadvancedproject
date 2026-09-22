@@ -21,5 +21,11 @@ cache.mkdir(exist_ok=True)
 quote = json.dumps
 config = cache / 'phpstan-run.neon'
 config.write_text('includes:\n    - ' + quote(str(root / 'phpstan.neon')) + '\nparameters:\n    tmpDir: ' + quote(str(cache / 'phpstan')) + '\n    scanDirectories:\n        - ' + quote(str(core)) + '\n    excludePaths:\n        analyseAndScan:\n            - ' + quote(str(core / 'install')) + '\n            - ' + quote(str(core / 'custom')) + '\n')
+# Standalone core endpoints intentionally redeclare a no-op llxHeader().
+# They are not loaded by module pages; analyse the actual main.inc.php contract.
+with config.open('a', encoding='utf-8') as stream:
+    for endpoint in ('asterisk/wrapper.php', 'document.php', 'viewimage.php', 'imports/emptyexample.php', 'public/website/styles.css.php', 'public/website/javascript.js.php', 'public/website/index.php', 'public/emailing/mailing-read.php'):
+        stream.write('            - ' + quote(str(core / endpoint)) + '\n')
+
 env = dict(os.environ, DOLIBARR_ROOT=str(core))
 raise SystemExit(subprocess.call(['php', str(phar), 'analyse', '-c', str(config), '--no-progress', '--memory-limit=1G', '--error-format=' + args.format], cwd=root, env=env))

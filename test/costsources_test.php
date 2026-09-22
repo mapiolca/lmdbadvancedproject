@@ -44,7 +44,7 @@ $db = new FixtureDB();
 $langs = new class {
 	public $translations = array(); public $charset_output = 'UTF-8'; public $defaultlang = 'en_US';
 	public function trans($key, ...$args) { return $this->transnoentities($key, ...$args); }
-	public function transnoentitiesnoconv($key) { return array('SeparatorDecimal' => '.', 'SeparatorThousand' => ',')[$key] ?? $this->transnoentities($key); }
+	public function transnoentitiesnoconv($key) { return $this->translations[$key] ?? array('SeparatorDecimal' => '.', 'SeparatorThousand' => ',')[$key] ?? $this->transnoentities($key); }
 	public function transnoentities($key, ...$args) { return $this->translations[$key] ?? array('BudgetReportExportSheetReport'=>'Report','BudgetReportExportSheetTime'=>'Time','BudgetReportExportSheetCharts'=>'Charts','BudgetCostProductList'=>'Products','BudgetCostContributions'=>'Contributions')[$key] ?? $key; }
 	public function convToOutputCharset($text) { return $text; }
 	public function getCurrencySymbol($currency) { return $currency; }
