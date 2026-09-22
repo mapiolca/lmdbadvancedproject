@@ -1134,10 +1134,13 @@ if (!function_exists('lmdbadvancedproject_build_category_sql_parts')) {
 	 *
 	 * @param  string $lineExtraTable Line extrafields table without prefix
 	 * @param  string $lineAlias      SQL alias of the line table
+	 * @param  string $productAlias   Alias of the resolved, entity-filtered product (shipments can have no order line)
+	 * @param  string $lineEntity     SQL expression for the owner entity of the commercial line
 	 * @return array<string,string>
 	 */
-	function lmdbadvancedproject_build_category_sql_parts($lineExtraTable, $lineAlias)
+	function lmdbadvancedproject_build_category_sql_parts($lineExtraTable, $lineAlias, $productAlias = '', $lineEntity = '')
 	{
+		global $db;
 		$parts = array(
 			'select' => 'NULL AS product_category_key, NULL AS product_category_label, NULL AS line_category_key, NULL AS line_category_label',
 			'join' => '',
@@ -1154,10 +1157,18 @@ if (!function_exists('lmdbadvancedproject_build_category_sql_parts')) {
 			'NULL AS line_category_label',
 		);
 		$join = '';
+		$categoryHasEntity = lmdbadvancedproject_column_exists(MAIN_DB_PREFIX.'c_commercial_category', 'entity');
 
 		if (lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'product_extrafields') && lmdbadvancedproject_column_exists(MAIN_DB_PREFIX.'product_extrafields', 'lmdb_commercial_category')) {
-			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'product_extrafields pex ON pex.fk_object = '.$lineAlias.'.fk_product';
+			if ($productAlias === '') {
+				$productAlias = 'category_product';
+				$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'product '.$productAlias.' ON '.$productAlias.'.rowid = '.$lineAlias.'.fk_product AND '.$productAlias.'.entity IN ('.$db->sanitize(getEntity('product')).')';
+			}
+			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'product_extrafields pex ON pex.fk_object = '.$productAlias.'.rowid';
 			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category pc ON (pc.rowid = pex.lmdb_commercial_category OR BINARY pc.code = BINARY pex.lmdb_commercial_category)';
+			if ($categoryHasEntity) {
+				$join .= ' AND pc.entity = '.$productAlias.'.entity';
+			}
 			$select[0] = 'pc.rowid AS product_category_key';
 			$select[1] = 'pc.label AS product_category_label';
 		}
@@ -1165,6 +1176,7 @@ if (!function_exists('lmdbadvancedproject_build_category_sql_parts')) {
 		if (lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.$lineExtraTable) && lmdbadvancedproject_column_exists(MAIN_DB_PREFIX.$lineExtraTable, 'lmdb_commercial_category')) {
 			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.$lineExtraTable.' lex ON lex.fk_object = '.$lineAlias.'.rowid';
 			$join .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_commercial_category lc ON (lc.rowid = lex.lmdb_commercial_category OR BINARY lc.code = BINARY lex.lmdb_commercial_category)';
+			if ($categoryHasEntity && $lineEntity !== '') { $join .= ' AND lc.entity = '.$lineEntity; }
 			$select[2] = 'lc.rowid AS line_category_key';
 			$select[3] = 'lc.label AS line_category_label';
 		}
@@ -1471,7 +1483,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 		$timeDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ptt.element_date', $filters);
 		$expenseDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ed.date', $filters);
 
-		$categorySql = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'cd');
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'cd', '', 'c.entity');
 		$sql = "SELECT 'customer_order' AS source_type, c.rowid AS document_id, c.ref AS document_ref, c.date_commande AS document_date, c.fk_statut AS document_status, 0 AS document_paid, 0 AS document_billed, cd.fk_product, cd.label AS line_label, cd.description AS line_description, cd.qty, cd.total_ht AS amount_ht, (COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0)) AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."commande c
 			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
@@ -1489,7 +1501,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 		$supplierInvoiceSplitEnabled = lmdbadvancedproject_supplier_invoice_split_report_enabled();
 		$supplierInvoiceSplitExclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'ffd', $supplierInvoiceEntities);
 
-		$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd');
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd', '', 'ff.entity');
 		$sql = "SELECT 'supplier_invoice' AS source_type, ff.rowid AS document_id, ff.ref AS document_ref, ff.datef AS document_date, ff.fk_statut AS document_status, ff.paye AS document_paid, 0 AS document_billed, ffd.fk_product, ffd.label AS line_label, ffd.description AS line_description, ffd.qty, ffd.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
 			FROM ".MAIN_DB_PREFIX."facture_fourn ff
 			INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.fk_facture_fourn = ff.rowid
@@ -1505,7 +1517,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 		}
 
 		if ($supplierInvoiceSplitEnabled) {
-			$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd');
+			$categorySql = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'ffd', '', 'ff.entity');
 			$sql = "SELECT 'supplier_invoice' AS source_type, ff.rowid AS document_id, ff.ref AS document_ref, sip.date AS document_date, ff.fk_statut AS document_status, ff.paye AS document_paid, 0 AS document_billed, ffd.fk_product, ffd.label AS line_label, ffd.description AS line_description, sip.qty, sip.total_ht AS amount_ht, 0 AS budget_ht, ".$categorySql['select']."
 				FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_supplier_invoice_parts sip
 				INNER JOIN ".MAIN_DB_PREFIX."facture_fourn_det ffd ON ffd.rowid = sip.fk_facture_fourn_det
@@ -1526,7 +1538,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			}
 		}
 
-		$categorySql = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'cfd');
+		$categorySql = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'cfd', '', 'cf.entity');
 		$linkedSupplierInvoiceSql = lmdbadvancedproject_get_linked_supplier_invoice_sql($supplierInvoiceEntities);
 		$supplierOrderRemainingExpression = lmdbadvancedproject_supplier_order_remaining_line_expression();
 		$supplierOrderSplitExclusion = lmdbadvancedproject_supplier_order_split_source_exclusion_sql('cf', $supplierInvoiceEntities);
@@ -2649,7 +2661,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			}
 		}
 
-		$productCosts = array('products' => array(), 'events' => array(), 'issues' => array(), 'complete' => true);
+		$productCosts = array('products' => array(), 'events' => array(), 'issues' => array(), 'complete' => true, 'has_cost' => false);
 		$totalshipmentcost = 0.0;
 		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
 			$productCostService = new LmdbAdvancedProjectProductCost($db);

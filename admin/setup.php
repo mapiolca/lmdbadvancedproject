@@ -66,11 +66,10 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 
 $langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
 
-if (!$user->admin) {
+if (!$user->admin || !isModEnabled('lmdbadvancedproject')) {
 	accessforbidden();
 }
 
-$backtopage = GETPOST('backtopage', 'alpha');
 $action = GETPOST('action', 'aZ09');
 $help_url = '';
 $page_name = 'AdvancedProjectSetup';
@@ -134,7 +133,7 @@ if ($action === 'save_shipment_method') {
 
 llxHeader('', $langs->trans($page_name), $help_url);
 
-$linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.$langs->trans('BackToModuleList').'</a>';
+$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?search_keyword=lmdbadvancedproject">'.$langs->trans('BackToModuleList').'</a>';
 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 

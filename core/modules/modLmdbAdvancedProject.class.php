@@ -27,6 +27,7 @@
  * \brief      Description and activation file for module Advanced Project
  */
 include_once DOL_DOCUMENT_ROOT.'/core/modules/DolibarrModules.class.php';
+require_once __DIR__.'/../../class/lmdbadvancedprojectcompatibility.class.php';
 
 /**
  * Description and activation class for module Advanced Project.
@@ -35,6 +36,10 @@ class modLmdbAdvancedProject extends DolibarrModules
 {
 	/** @var string Publisher contact address. */
 	public $editor_email;
+	/** @var string SPDX license identifier, shared by the administration pages. */
+	public $license = 'GPL-3.0-or-later';
+	/** @var string Source repository. */
+	public $source_url = 'https://github.com/mapiolca/lmdbadvancedproject';
 	/**
 	 * Constructor. Define names, constants, directories, boxes, permissions.
 	 *
@@ -88,8 +93,8 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->requiredby = array();
 		$this->conflictwith = array();
 		$this->langfiles = array('lmdbadvancedproject@lmdbadvancedproject');
-		$this->phpmin = array(8, 0);
-		$this->need_dolibarr_version = array(20, 0);
+		$this->phpmin = array_map('intval', explode('.', LmdbAdvancedProjectCompatibility::MIN_PHP_VERSION));
+		$this->need_dolibarr_version = array_map('intval', explode('.', LmdbAdvancedProjectCompatibility::MIN_DOLIBARR_VERSION));
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array(

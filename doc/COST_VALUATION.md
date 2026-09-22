@@ -8,6 +8,10 @@ Le service de coûts est utilisé par les listes, rapports projet et global, cat
 
 Les consignes sont appliquées avant le rapprochement chronologique. Une facture fournisseur reprend toujours la quantité provisoire correspondante ; les répartitions, régularisations et arrondis natifs `MU`/`MT` sont conservés. Une consigne ne résout pas une anomalie de devise, d’unité ou de rattachement. Si l’unité du produit change, l’ancienne consigne n’est pas convertie arbitrairement.
 
+Les expéditions et leurs régularisations utilisent la catégorie commerciale du produit réellement expédié, y compris sans ligne de commande liée. Cette catégorie est prioritaire sur celle de la ligne ; en son absence, la catégorie de ligne reste le repli existant. Les catégories sont résolues dans l’entité propriétaire du produit ou de la ligne. Elles sont lues depuis les données courantes : changer la catégorie du produit reclasse également ses coûts historiques dans les rapports, sans changer les montants ni les instantanés de prix.
+
+Le badge gris **Aucun coût à valoriser** signifie qu’aucune expédition, facture d’achat ou commande fournisseur engagée ne contribue aux coûts jusqu’à la fin de période. Une commande client ou fournisseur en attente ne prouve pas l’existence d’un prix de revient. Le badge vert **Valorisation complète** reste utilisé pour des coûts connus, y compris zéro ; les anomalies conservent le badge orange **Valorisation incomplète**. Les exports reprennent ces états.
+
 ## Actualiser
 
 Le bouton est proposé pour un produit ayant encore des coûts historiques manquants admissibles, avec les droits nécessaires. Une facture couvrant aujourd’hui toute l’expédition n’empêche pas la correction d’une ancienne période restée inconnue.

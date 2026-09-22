@@ -16,6 +16,8 @@ class FixtureDB {
 	public function __construct() { $this->connection = new PDO('sqlite::memory:'); $this->connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION); }
 	public function query($sql) {
 		$sql = preg_replace("/SHOW TABLES LIKE '([^']+)'/", "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '$1'", $sql);
+		$sql = preg_replace("/SHOW COLUMNS FROM (\\w+) LIKE '([^']+)'/", "SELECT * FROM pragma_table_info('$1') WHERE name = '$2'", $sql);
+		$sql = preg_replace('/BINARY ([a-z]+\\.[a-z_]+)/i', '$1 COLLATE BINARY', $sql);
 		$sql = str_replace(' FOR UPDATE', '', $sql);
 		$sql = str_replace('HAVING amount_ht > 0', 'AND amount_ht > 0', $sql);
 		$sql = str_replace('ON DUPLICATE KEY UPDATE fingerprint = fingerprint', 'ON CONFLICT(fingerprint) DO NOTHING', $sql);

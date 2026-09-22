@@ -264,7 +264,8 @@ foreach ($visibleRows as $row) {
 		} elseif ($field === 'type') {
 			print $langs->trans($value === 1 ? 'Service' : 'Product');
 		} elseif ($field === 'issues') {
-			print dolGetBadge($langs->trans($value ? 'BudgetCostIncomplete' : 'BudgetCostComplete'), '', $value ? 'status1' : 'status4');
+			$status = $value ? 'BudgetCostIncomplete' : ($row['has_cost'] ? 'BudgetCostComplete' : 'BudgetCostNotApplicable');
+			print dolGetBadge($langs->trans($status), '', $value ? 'status1' : ($row['has_cost'] ? 'status4' : 'status0'));
 		} elseif ($field === 'entities') {
 			foreach ($value as $entityId) {
 				print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entityLabels[$entityId] ?? '').'</span></div>';

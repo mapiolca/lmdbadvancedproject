@@ -13,16 +13,19 @@ Les fournisseurs optionnels sont exécutés en lecture depuis les checkouts loca
 
 | Contrôle | Résultat |
 |---|---|
-| Moteur chronologique | 635 assertions |
-| Chaîne complète et fournisseurs optionnels | 785 assertions cumulées |
-| Instantanés de validation | 692 assertions cumulées |
-| Réglages conservés | 680 assertions cumulées |
-| Rapports, XLSX/ODS et génération PDF | 703 assertions cumulées |
+| Moteur chronologique | 642 assertions |
+| Chaîne complète et fournisseurs optionnels | 792 assertions cumulées |
+| Instantanés de validation | 699 assertions cumulées |
+| Réglages conservés et métadonnées admin | 696 assertions cumulées |
+| Catégories commerciales et états sans coût | 732 assertions cumulées |
+| Rapports, XLSX/ODS et génération PDF | 745 assertions cumulées |
 | Lint PHP | Tous les fichiers PHP du module hors cache, aucune erreur |
 | Contrats natifs | Lecture automatisée des tags 20, 21, 22, 23 et 24 |
 | PHPStan | Aucune erreur avec les cores 20 et 24, niveau 5, cible PHP 8.0, sans baseline ni suppression d’erreur |
 
 Les comptes cumulent les prérequis et ne s’additionnent pas. Les tests utilisent les vraies classes Product, Project, ProductFournisseur, DynamicPricesCostService et PriceList ; les permissions et entités sont des fixtures. Les tests d’exports sérialisent et relisent réellement XLSX/ODS. Le PDF est généré avec TCPDF natif ; son tableau de provenance a été rendu en PNG et inspecté, avec un pied long fourni par hook.
+
+Compléments du 22 septembre : le test de catégories échouait avant correction quand une catégorie de ligne prenait priorité sur celle du produit. Les scénarios couvrent maintenant les expéditions sans commande, les codes identiques entre entités, le refus d’une catégorie étrangère, la reprise à la facturation et les résumés XLSX/ODS relus. La fixture PDF contient aussi la catégorie commerciale. Les états distinguent absence de contribution (gris), zéro connu (complet) et prix manquant (incomplet), y compris l’historique d’ouverture. Les pages admin reprennent les tableaux et colonnes natifs du modèle Diffusion, le même accès administrateur/module actif, les métadonnées du descripteur et les diagnostics centralisés ; leur nouveau rendu n’a pas encore été validé sur l’instance distante.
 
 Scénarios vérifiés : zéro et texte invalide, arrondis et saisie française, native/PMP/fournisseur net, DynamicPrices actif/réussi/devise/date/droits, choix explicite d’un coût récent, palier PriceList sélectionné sur quantité de commande, historique daté et changement de ciblage, état récent sans coût, priorité des sources, consigne immuable, futur envoi, propagation à deux projets, exclusion des consignes existantes et projets nouveaux, unité/devise/rattachement incompatible, conflits séquentiels, rollback complet, replay sans doublon, couverture partielle puis totale par facture, provenance conservée et cohérence des sorties.
 
@@ -32,7 +35,7 @@ L’instance `develop.lesmetiersdubatiment.fr` a été consultée après connexi
 
 Première recette réelle : réactivation native réussie, disponibilité des tables complémentaires confirmée par la page Compatibilité, module laissé actif. Réglages identiques avant/après : éclatements client/fournisseur et périmètre partagé désactivés, coûts d’expédition activés, méthode « Dernier tarif fournisseur net HT ». Aucune consigne ni donnée métier n’a été créée. La modale s’ouvre sur un produit admissible ; Select2 propose coût natif, PMP nul connu et deux prix fournisseurs, avec case de propagation décochée. Choisir une source désactive la saisie libre. Le POST avec token natif refuse un prix négatif, conserve la saisie et ne valorise pas le produit. Le filtre sans résultat affiche la ligne native ; sa remise à zéro fonctionne. La limite 20 → 50 → 20 soumet le formulaire natif ; aucun champ caché `limit` concurrent. Filtres et limite ont été restaurés. Les fournisseurs optionnels sont indisponibles sur cette instance et n’ont pas été activés.
 
-La recette a révélé des libellés d’unités non traduits et des clés brutes dans Compatibilité : correctifs locaux appliqués aux rendus écran/PDF/classeurs et aux traductions natives. À propos expose désormais explicitement la version et les métadonnées du descripteur avant le README natif. Leur vérification distante attend la mise à jour de la branche sur l’instance.
+La recette a révélé des libellés d’unités non traduits et des clés brutes dans Compatibilité : correctifs locaux appliqués aux rendus écran/PDF/classeurs et aux traductions natives. À propos expose désormais les métadonnées du descripteur et des liens documentaires dans la présentation native inspirée de Diffusion. Leur vérification distante attend la mise à jour de la branche sur l’instance.
 
 Il reste à vérifier sur l’instance servant le dernier commit : enregistrement réussi et propagation, provenance et exports, rejeu des migrations et conservation d’une consigne, verrous simultanés, CSRF absent/erroné, droits partiels et utilisateurs externes, deux entités Multicompany et intégrations optionnelles. Le moteur et la version MySQL/MariaDB n’ont pas été relevés ; la réactivation native seule ne valide pas la concurrence. PHP 8.0 est une cible d’analyse statique ; aucun exécutable PHP 8.0 n’a été utilisé. Les sources des versions 21–23 sont lues, leurs suites complètes ne sont pas exécutées.
 

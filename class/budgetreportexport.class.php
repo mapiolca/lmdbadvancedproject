@@ -267,7 +267,7 @@ class LmdbAdvancedProjectBudgetReportExport
 		$columns = array('project' => 'Project') + lmdbadvancedproject_product_cost_columns();
 		if ($environments) { $columns['entities'] = 'BudgetCostEnvironment'; }
 		$lastColumn = Coordinate::stringFromColumnIndex(count($columns));
-		$this->setText($sheet, 'A1', $this->outputlangs->transnoentities($report['complete'] ? 'BudgetCostComplete' : 'BudgetCostIncomplete'));
+		$this->setText($sheet, 'A1', $this->outputlangs->transnoentities(!$report['complete'] ? 'BudgetCostIncomplete' : ($report['has_cost'] ? 'BudgetCostComplete' : 'BudgetCostNotApplicable')));
 		$sheet->mergeCells('A1:'.$lastColumn.'1');
 		$this->setText($sheet, 'A4', implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, $report['issues'])));
 		$sheet->mergeCells('A4:'.$lastColumn.'4');
@@ -291,6 +291,7 @@ class LmdbAdvancedProjectBudgetReportExport
 					$value = $this->outputlangs->transnoentities($value === 1 ? 'Service' : 'Product');
 				} elseif ($key === 'issues') {
 					$value = implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, $value));
+					if ($value === '') { $value = $this->outputlangs->transnoentities($row['has_cost'] ? 'BudgetCostComplete' : 'BudgetCostNotApplicable'); }
 				} elseif ($key === 'unit') {
 					$value = implode(' / ', array_map(function ($unit): string { return $this->outputlangs->transnoentities($unit); }, $row['units']));
 				} elseif (substr($key, -4) === '_qty' && count($row['units']) > 1) {
@@ -437,7 +438,7 @@ class LmdbAdvancedProjectBudgetReportExport
 		}
 
 		if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
-			$this->setText($sheet, 'A9', $this->outputlangs->transnoentities($this->data['productCosts']['complete'] ? 'BudgetCostComplete' : 'BudgetCostIncomplete'));
+			$this->setText($sheet, 'A9', $this->outputlangs->transnoentities(!$this->data['productCosts']['complete'] ? 'BudgetCostIncomplete' : ($this->data['productCosts']['has_cost'] ? 'BudgetCostComplete' : 'BudgetCostNotApplicable')));
 			$sheet->mergeCells('A9:F9');
 		}
 		$row = $withCharts ? 46 : 11;

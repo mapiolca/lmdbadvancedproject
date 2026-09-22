@@ -99,6 +99,7 @@ function lmdbadvancedproject_product_cost_tooltip(array $row): string
 {
 	global $langs, $db;
 	$parts = array($langs->trans('BudgetCostFormulaHelp'), $langs->trans('BudgetCostQuantityHelp'));
+	if (!$row['has_cost'] && !$row['issues']) { $parts[] = $langs->trans('BudgetCostNotApplicableHelp'); }
 	foreach ($row['lines'] as $line) {
 		$parts[] = lmdbadvancedproject_cost_document_link($line).' — '.dol_print_date($db->jdate($line['date']), 'day').' — '.$langs->trans('Qty').': '.price($line['qty']);
 		if ($line['kind'] === 'supplier_pending') { $parts[] = $langs->trans('BudgetCostSupplierPending'); }

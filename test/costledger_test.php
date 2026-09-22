@@ -52,6 +52,13 @@ check(report(array($missing, $excess))['complete'], true, 'Fully invoiced missin
 check(report(array($missing, $excess), '2026-04-01', '2026-04-30')['complete'], false, 'Unknown earlier reversal in selected period');
 $zero = $shipping; $zero['price'] = 0.0;
 check(report(array($zero))['complete'], true, 'Explicit zero is a valid price');
+check(report(array($zero))['products']['1:1']['has_cost'], true, 'Known zero shipment has a valuation');
+check(report(array($missing))['products']['1:1']['has_cost'], true, 'Missing shipment cost is not confused with absence of cost');
+check(report(array(source('customer', 12, 200, '2026-02-01')))['products']['1:1']['has_cost'], false, 'Customer order alone has no cost to value');
+check(report(array(source('supplier_pending', 12, 200, '2026-02-01')))['has_cost'], false, 'Pending supplier order has no committed cost');
+check(report(array(source('ordered', 12, 0, '2026-02-01')))['has_cost'], true, 'Known zero commitment remains a valuation');
+check(report(array($zero), '2026-04-01', '2026-04-30')['has_cost'], true, 'Opening valuation remains known in a later period');
+check(report(array())['has_cost'], false, 'Empty report has no cost to value');
 $otherProject = $excess; $otherProject['project'] = 2;
 check(total(report(array($shipping, $otherProject))), 280, 'Separate project coverage');
 $otherUnit = $excess; $otherUnit['unit'] = 2;

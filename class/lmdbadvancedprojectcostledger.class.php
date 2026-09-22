@@ -9,8 +9,8 @@
  *
  * @phpstan-type CostLine array{key:string,kind:string,project:int,product:int,unit:int,qty:float,amount:?float,date:string,document_id:int,ref:string,entity:int,product_ref:string,label:string,product_type:int,unit_label:string,category:string,category_label:string,price:?float,price_source:string,price_date:string,date_fallback:bool,currency?:string,price_status?:string,issues:list<string>,order_id?:int,order_line_id?:int,price_source_id?:int,price_history_id?:int,price_origin?:string,price_origin_date?:string,price_instruction_id?:int}
  * @phpstan-type CostEvent array{line:CostLine,cause:CostLine,kind:string,date:string,qty:float,amount:?float,reason:string,unknown_key:string}
- * @phpstan-type ProductCostRow array{project:int,product:int,entity:int,entities:array<int,int>,ref:string,label:string,type:int,unit:string,units:array<int,string>,customer_qty:float,ordered_qty:float,shipped_qty:float,invoiced_qty:float,uncovered_qty:float,remaining_qty:float,invoice_cost:float,shipment_cost:float,order_cost:float,provisional_cost:?float,total:float,issues:list<string>,lines:list<CostLine>,events:list<CostEvent>,can_value?:bool,valuation_unit?:int}
- * @phpstan-type CostReport array{products:array<string,ProductCostRow>,events:list<CostEvent>,issues:list<string>,complete:bool}
+ * @phpstan-type ProductCostRow array{project:int,product:int,entity:int,entities:array<int,int>,ref:string,label:string,type:int,unit:string,units:array<int,string>,customer_qty:float,ordered_qty:float,shipped_qty:float,invoiced_qty:float,uncovered_qty:float,remaining_qty:float,invoice_cost:float,shipment_cost:float,order_cost:float,provisional_cost:?float,total:float,issues:list<string>,lines:list<CostLine>,events:list<CostEvent>,has_cost:bool,can_value?:bool,valuation_unit?:int}
+ * @phpstan-type CostReport array{products:array<string,ProductCostRow>,events:list<CostEvent>,issues:list<string>,complete:bool,has_cost:bool}
  */
 class LmdbAdvancedProjectCostLedger
 {
@@ -51,7 +51,7 @@ class LmdbAdvancedProjectCostLedger
 					'entities' => array(), 'unit' => $line['unit_label'], 'units' => array(), 'customer_qty' => 0.0, 'ordered_qty' => 0.0,
 					'shipped_qty' => 0.0, 'invoiced_qty' => 0.0, 'uncovered_qty' => 0.0, 'remaining_qty' => 0.0,
 					'provisional_cost' => 0.0, 'invoice_cost' => 0.0, 'shipment_cost' => 0.0, 'order_cost' => 0.0, 'total' => 0.0,
-					'issues' => array(), 'lines' => array(), 'events' => array(),
+					'issues' => array(), 'lines' => array(), 'events' => array(), 'has_cost' => false,
 				);
 			}
 			$products[$key]['units'][$line['unit']] = $line['unit_label'];
@@ -153,10 +153,12 @@ class LmdbAdvancedProjectCostLedger
 		$periodEvents = array();
 		$unknown = array();
 		foreach ($events as $event) {
+			$key = $event['line']['project'].':'.$event['line']['product'];
+			// A known zero is a cost; a customer order alone is not. Include opening history.
+			$products[$key]['has_cost'] = true;
 			if ($start !== '' && substr($event['date'], 0, 10) < $start) {
 				continue;
 			}
-			$key = $event['line']['project'].':'.$event['line']['product'];
 			$periodEvents[] = $event;
 			$products[$key]['events'][] = $event;
 			if ($event['amount'] === null) {
@@ -182,7 +184,7 @@ class LmdbAdvancedProjectCostLedger
 		}
 		unset($product);
 		$issues = array_values(array_unique($issues));
-		return array('products' => $products, 'events' => $periodEvents, 'issues' => $issues, 'complete' => !$issues);
+		return array('products' => $products, 'events' => $periodEvents, 'issues' => $issues, 'complete' => !$issues, 'has_cost' => (bool) $events);
 	}
 
 	/**

@@ -57,7 +57,7 @@ class LmdbAdvancedProjectProductCost
 	public function load(array $projectIds, array $filters = array(), array $search = array()): array
 	{
 		global $conf, $user;
-		$empty = array('products' => array(), 'events' => array(), 'issues' => array(), 'complete' => true);
+		$empty = array('products' => array(), 'events' => array(), 'issues' => array(), 'complete' => true, 'has_cost' => false);
 		if (!LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() || !$projectIds) {
 			return $empty;
 		}
@@ -92,14 +92,14 @@ class LmdbAdvancedProjectProductCost
 			COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0) AS unit_id, u.label AS unit_label, p.entity AS product_entity, p.fk_unit AS product_unit";
 		$productJoin = ' INNER JOIN '.MAIN_DB_PREFIX.'product p ON p.rowid = l.fk_product AND p.entity IN ('.$productEntities.')
 			LEFT JOIN '.MAIN_DB_PREFIX.'c_units u ON u.rowid = COALESCE(NULLIF(l.fk_unit,0),p.fk_unit,0)';
-		$category = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'l');
+		$category = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'l', 'p', 'c.entity');
 		$queries[] = "SELECT 'customer' AS kind, c.rowid AS document_id, c.ref, c.entity, c.fk_projet AS project_id,
 			c.date_commande AS document_date, l.rowid AS line_id, l.qty, l.total_ht AS amount, 0 AS credit, ".$base.', '.$category['select'].'
 			FROM '.MAIN_DB_PREFIX.'commande c INNER JOIN '.MAIN_DB_PREFIX.'commandedet l ON l.fk_commande = c.rowid
 			'.$productJoin.$category['join'].' WHERE c.fk_projet IN ('.$ids.') AND c.fk_statut IN (1,2,3)
 			AND c.entity IN ('.$this->db->sanitize(getEntity('commande')).')';
 
-		$category = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'l');
+		$category = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'l', 'p', 'ff.entity');
 		$invoiceEntities = $this->db->sanitize(getEntity('supplier_invoice'));
 		$split = lmdbadvancedproject_supplier_invoice_split_report_enabled();
 		$exclusion = lmdbadvancedproject_supplier_invoice_split_source_exclusion_sql('ff', 'l', $invoiceEntities);
@@ -137,7 +137,7 @@ class LmdbAdvancedProjectProductCost
 				AND ff.fk_statut IN (1,2) AND ff.type <> 2 AND sip.qty > 0 AND ff.entity IN ('.$invoiceEntities.')';
 		}
 
-		$category = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'l');
+		$category = lmdbadvancedproject_build_category_sql_parts('commande_fournisseurdet_extrafields', 'l', 'p', 'c.entity');
 		$queries[] = "SELECT CASE WHEN c.fk_statut IN (1,2) THEN 'supplier_pending' WHEN c.fk_statut = 3 THEN 'ordered' ELSE 'delivered' END AS kind,
 			c.rowid AS document_id, c.ref, c.entity, c.fk_projet AS project_id,
 			COALESCE(c.date_commande,DATE(c.date_creation)) AS document_date, l.rowid AS line_id, l.qty, l.total_ht AS amount, 0 AS credit, ".$base.', '.$category['select'].'
@@ -145,7 +145,7 @@ class LmdbAdvancedProjectProductCost
 			'.$productJoin.$category['join'].' WHERE c.fk_projet IN ('.$ids.') AND c.fk_statut IN (1,2,3,4,5)
 			AND c.entity IN ('.$this->db->sanitize(getEntity('supplier_order')).')';
 
-		$category = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'l');
+		$category = lmdbadvancedproject_build_category_sql_parts('commandedet_extrafields', 'l', 'p', 'c.entity');
 		$query = "SELECT 'shipment' AS kind, e.rowid AS document_id, e.ref, e.entity,
 			CASE WHEN ed.element_type = 'commande' AND ed.fk_elementdet > 0 AND c.rowid IS NULL THEN 1 ELSE 0 END AS source_unavailable,
 			COALESCE(NULLIF(e.fk_projet,0),c.fk_projet) AS project_id, e.fk_projet AS shipment_project, c.fk_projet AS order_project,
@@ -290,6 +290,8 @@ class LmdbAdvancedProjectProductCost
 	private function sourceLine($row): array
 	{
 		global $conf;
+		// The shared resolver expects the native fk_product name, including for shipments.
+		$row->fk_product = (int) $row->product_id;
 		$category = lmdbadvancedproject_get_forecast_category($row);
 		$currency = $this->currencies[(int) $row->entity] ?? '';
 		$currencyMatches = $currency === $conf->currency;

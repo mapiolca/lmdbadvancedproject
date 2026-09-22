@@ -9,6 +9,7 @@ export DOLIBARR_ROOT=/chemin/vers/dolibarr/htdocs
 export DOLIBARR_VERSION=20.0.0 # version correspondant au checkout testé
 php test/costledger_test.php
 php test/costsettings_test.php
+php test/costcategories_test.php
 php test/costsnapshots_test.php
 php test/costpdf_test.php
 php test/costproviders_test.php
@@ -28,6 +29,8 @@ Les deux tables complémentaires sont créées et leurs index rejoués dans la f
 - Sources SQL : répartitions de factures sans double comptage, statut des expéditions, projet hérité/contradictoire, permissions refusées et périmètres d’entités, filtres SQL et liens natifs d’engagement.
 - Instantanés : `Product::fetch()` natif, PMP figé, changement de méthode/tarif/PMP, rejeu, annulation/revalidation, retour en brouillon pendant désactivation, PMP nul et devises incompatibles.
 - Rapports : mêmes montants dans le rapport projet, le global, les catégories et les graphiques mensuels ; documents antérieurs conservés pour le rapprochement.
+- Catégories commerciales : priorité du produit expédié, expédition sans commande, repli sur la catégorie de ligne, codes identiques entre entités, catégorie étrangère refusée, régularisations et résumés XLSX/ODS relus. Le PDF utilise également cette fixture catégorisée.
+- États : aucune contribution de coût (badge gris), coût nul connu (valorisation complète), coût manquant (incomplet), historique d’ouverture conservé et concordance des libellés d’export. Administration : métadonnées du descripteur et prédicats de compatibilité partagés ; rendu distant à contrôler après mise à jour.
 - Exports : création puis relecture réelle XLSX/ODS (totaux, produits, solde provisoire), PDF généré avec le moteur natif, régularisation négative, mesure native des pieds longs/HTML et d’un hook de pied, refus documentaire sans droit ou répertoire de l’entité propriétaire.
 - SQL : les deux créations de table sont rejouées deux fois avec un préfixe long dans la fixture. La validation MySQL/MariaDB réelle et la concurrence restent à effectuer sur instance.
 - PHPStan : niveau 5, cible PHP 8.0, aucune suppression d’erreur ni baseline. `phpstan-native.stub` corrige exclusivement les contrats PHPDoc natifs trop étroits (confirmation, sélecteurs, dimensions PDF, hooks structurés), vérifiés dans le code core. Les gardes runtime sur les retours natifs sont conservées.

@@ -1,6 +1,6 @@
 <?php
 // A native TCPDF render, using test source documents rather than a running ERP.
-require __DIR__.'/costexports_test.php';
+require __DIR__.'/costcategories_test.php';
 if (!defined('DOL_DATA_ROOT')) { define('DOL_DATA_ROOT', __DIR__.'/.cache'); }
 $conf->file=(object)array('dol_document_root'=>array(DOL_DOCUMENT_ROOT),'instance_unique_id'=>'fixture');
 require_once __DIR__.'/../core/modules/project/doc/pdf_budgetreport.modules.php';
