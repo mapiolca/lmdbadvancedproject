@@ -43,6 +43,39 @@ check(count($sharedReport['budgetReportForecast']['categories']), 1, 'Full share
 foreach ($shared['events'] as $event) {
 	check($event['line']['category'], 'cat_1', 'Category belongs to the product owner entity');
 }
+
+// An explicit category can belong to another entity in native product sharing.
+$db->query('UPDATE '.MAIN_DB_PREFIX."product_extrafields SET lmdb_commercial_category='3'");
+$sharedCategory = lmdbadvancedproject_load_budget_report_data(1, $filters);
+foreach ($sharedCategory['productCosts']['events'] as $event) {
+	check($event['line']['category'], 'cat_3', 'Explicit shared category remains visible');
+}
+check($sharedCategory['budgetReportForecast']['categories']['cat_3']['order_budget'], 150, 'Customer budget retains shared product category');
+check($sharedCategory['budgetReportForecast']['categories']['cat_3']['supplier_expenses'], 126, 'Shared category retains reconciled shipment expenses');
+check(count($sharedCategory['budgetReportForecast']['categories']), 1, 'Shared product classification is not replaced by the line category');
+insertFixture('c_commercial_category', array('rowid'=>4, 'entity'=>2, 'code'=>'SHARED_ONLY', 'label'=>'Catégorie partagée', 'active'=>1));
+$db->query('UPDATE '.MAIN_DB_PREFIX."product_extrafields SET lmdb_commercial_category='SHARED_ONLY'");
+$sharedCode = lmdbadvancedproject_load_budget_report_data(1, $filters);
+check($sharedCode['budgetReportForecast']['categories']['cat_4']['order_budget'], 150, 'Legacy code resolves in an authorized shared entity');
+check($sharedCode['totalspent'], 126, 'Legacy shared code does not duplicate costs');
+
+// An explicit identifier wins over a different category with a numeric legacy code.
+insertFixture('c_commercial_category', array('rowid'=>5, 'entity'=>1, 'code'=>'3', 'label'=>'Code numérique', 'active'=>1));
+$db->query('UPDATE '.MAIN_DB_PREFIX."product_extrafields SET lmdb_commercial_category='3'");
+$numericCollision = lmdbadvancedproject_load_budget_report_data(1, $filters);
+check(count($numericCollision['budgetReportForecast']['categories']), 1, 'Numeric code and ID collision cannot multiply lines');
+check($numericCollision['budgetReportForecast']['categories']['cat_3']['order_budget'], 150, 'Exact category ID takes priority over a numeric code');
+$db->query('DELETE FROM '.MAIN_DB_PREFIX.'c_commercial_category WHERE rowid=5');
+
+// Line fallback follows the same sharing rule as the product dictionary.
+$db->query('UPDATE '.MAIN_DB_PREFIX.'product_extrafields SET lmdb_commercial_category=NULL');
+$db->query('UPDATE '.MAIN_DB_PREFIX."expeditiondet SET fk_elementdet=1, element_type='commande'");
+$db->query('UPDATE '.MAIN_DB_PREFIX."commandedet_extrafields SET lmdb_commercial_category='4'");
+foreach ($service->load(array(1))['events'] as $event) {
+	if ($event['kind'] === 'shipment') { check($event['line']['category'], 'cat_4', 'Shared order-line fallback remains visible'); }
+}
+$db->query('UPDATE '.MAIN_DB_PREFIX."commandedet_extrafields SET lmdb_commercial_category='2'");
+$db->query('UPDATE '.MAIN_DB_PREFIX."expeditiondet SET fk_elementdet=NULL, element_type=NULL");
 $mc->scope = '1';
 
 // Missing or inaccessible categories do not invent a product classification.
@@ -63,22 +96,24 @@ $db->query('UPDATE '.MAIN_DB_PREFIX."product_extrafields SET lmdb_commercial_cat
 // The serialized project summary uses the same category and reconciled amount.
 $project = new Project($db); $project->id=1; $project->entity=1; $project->ref='P1'; $project->title='Test';
 $conf->format_date_short='%Y-%m-%d';
-$categoryExport = new LmdbAdvancedProjectBudgetReportExport($langs, $categorized, $project);
-$categoryBook = $build->invoke($categoryExport, true);
-foreach (array('Xlsx', 'Ods') as $format) {
+foreach (array('Matériel électrique' => $categorized, 'Autre entité' => $sharedCategory) as $expectedLabel => $categoryReport) {
+	$categoryExport = new LmdbAdvancedProjectBudgetReportExport($langs, $categoryReport, $project);
+	$categoryBook = $build->invoke($categoryExport, true);
+	foreach (array('Xlsx', 'Ods') as $format) {
 	$writerClass = 'PhpOffice\\PhpSpreadsheet\\Writer\\'.$format;
 	$categoryFile = __DIR__.'/.cache/cost-categories.'.strtolower($format);
 	$writer = new $writerClass($categoryBook); $writer->save($categoryFile);
 	$loaded = \PhpOffice\PhpSpreadsheet\IOFactory::load($categoryFile);
 	$categoryRows = array();
 	foreach ($loaded->getSheet(0)->toArray() as $row) {
-		if ($row[0] === 'Matériel électrique') { $categoryRows[] = $row; }
+		if ($row[0] === $expectedLabel) { $categoryRows[] = $row; }
 	}
 	check(count($categoryRows), 1, $format.' contains product commercial category');
 	check((float) $categoryRows[0][3], 126, $format.' category total includes shipment reconciliation');
 	$loaded->disconnectWorksheets();
+	}
+	$categoryBook->disconnectWorksheets();
 }
-$categoryBook->disconnectWorksheets();
 
 // Customer quantities alone must not claim a complete valuation, including exports.
 $db->query('UPDATE '.MAIN_DB_PREFIX.'expedition SET fk_statut=0');

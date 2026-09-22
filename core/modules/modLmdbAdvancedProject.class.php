@@ -120,8 +120,14 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->dictionaries = array();
 		if (!isModEnabled('dynamicsprices')) {
 			$commercialCategoryHasEntity = $this->tableExists(MAIN_DB_PREFIX."c_commercial_category") && $this->columnExists(MAIN_DB_PREFIX."c_commercial_category", 'entity');
+			$commercialCategoryEntities = $this->db->sanitize(getEntity('product'));
+			if (isModEnabled('multicompany')) {
+				// Keep dictionary administration aligned with the report and native customization.
+				$commercialCategoryEntities = getDolGlobalInt('MULTICOMPANY_C_COMMERCIAL_CATEGORY_CUSTOM_ENABLED')
+					? $this->db->sanitize(getEntity('c_commercial_category')) : '1,'.$commercialCategoryEntities;
+			}
 			$commercialCategorySelectSql = $commercialCategoryHasEntity
-				? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity = '.((int) $conf->entity)
+				? 'SELECT t.rowid as rowid, t.entity, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t WHERE t.entity IN ('.$commercialCategoryEntities.')'
 				: 'SELECT t.rowid as rowid, t.code, t.label, t.active FROM '.MAIN_DB_PREFIX.'c_commercial_category AS t';
 			$commercialCategoryFieldValue = $commercialCategoryHasEntity ? 'code,entity,label' : 'code,label';
 			$commercialCategoryHelp = array(
