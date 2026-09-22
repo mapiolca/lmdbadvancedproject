@@ -181,6 +181,7 @@ BudgetCostProductList=Liste des produits
 BudgetCostEnvironment=Environnement
 BudgetCostComplete=Valorisation complète
 BudgetCostIncomplete=Valorisation incomplète
+BudgetCostUnitMismatch=Incompatibilité d’unité
 BudgetCostMissingPrice=Coût non valorisé
 BudgetCostMissingDate=Un document contributeur n’a pas de date métier exploitable. Le calcul est interrompu.
 BudgetCostReadFailed=Impossible de lire les données de valorisation. Aucun total fiable ne peut être affiché.

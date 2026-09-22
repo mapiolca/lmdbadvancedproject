@@ -105,7 +105,8 @@ class pdf_budgetreport extends ModelePDFProjects
 			$this->error = $langs->transnoentities('BudgetCostAccessDenied');
 			return -1;
 		}
-		$dir = $root.'/'.$objectref;
+		// forobject=1 already includes the native project reference directory.
+		$dir = rtrim($root, '/');
 		$file = $dir.'/'.lmdbadvancedproject_budget_report_filename($object->ref, $outputlangs);
 		if (dol_mkdir($dir) < 0) {
 			$this->error = $langs->transnoentities('ErrorCanNotCreateDir', $dir);

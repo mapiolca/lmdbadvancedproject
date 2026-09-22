@@ -181,6 +181,7 @@ BudgetCostProductList=Product list
 BudgetCostEnvironment=Environment
 BudgetCostComplete=Complete valuation
 BudgetCostIncomplete=Incomplete valuation
+BudgetCostUnitMismatch=Unit mismatch
 BudgetCostMissingPrice=Unvalued cost
 BudgetCostMissingDate=A contributing document has no usable business date. Calculation stopped.
 BudgetCostReadFailed=Unable to read valuation data. Reliable totals cannot be displayed.

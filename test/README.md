@@ -13,6 +13,8 @@ php test/descriptor_bootstrap_test.php
 php test/descriptor_bootstrap_test.php legacy
 php test/descriptor_bootstrap_test.php preloaded
 php test/costcategories_test.php
+php test/costlist_test.php
+MULTICOMPANY_ROOT=/chemin/vers/multicompany php test/costcategorysharing_test.php # avec un core compatible avec ce module tiers
 php test/costsnapshots_test.php
 php test/costpdf_test.php
 php test/costproviders_test.php
@@ -32,10 +34,11 @@ Les deux tables complémentaires sont créées et leurs index rejoués dans la f
 - Sources SQL : répartitions de factures sans double comptage, statut des expéditions, projet hérité/contradictoire, permissions refusées et périmètres d’entités, filtres SQL et liens natifs d’engagement.
 - Instantanés : `Product::fetch()` natif, PMP figé, changement de méthode/tarif/PMP, rejeu, annulation/revalidation, retour en brouillon pendant désactivation, PMP nul et devises incompatibles.
 - Rapports : mêmes montants dans le rapport projet, le global, les catégories et les graphiques mensuels ; documents antérieurs conservés pour le rapprochement.
-- Catégories commerciales : priorité du produit expédié, expédition sans commande, repli sur la catégorie de ligne, codes identiques entre entités, catégorie étrangère refusée, régularisations et résumés XLSX/ODS relus. Le PDF utilise également cette fixture catégorisée.
+- Catégories commerciales : priorité du produit expédié, expédition sans commande, repli sur la catégorie de ligne, codes identiques entre entités, catégorie étrangère refusée, régularisations et résumés XLSX/ODS relus. `costcategorysharing_test.php` exécute le constructeur et `getEntity()` du module Multicompany fourni avec une configuration isolée : dictionnaire maître, produit partagé, séparation des dictionnaires et absence de double comptage. Le PDF utilise également la fixture catégorisée.
 - États : aucune contribution de coût (badge gris), coût nul connu (valorisation complète), coût manquant (incomplet), historique d’ouverture conservé et concordance des libellés d’export. Administration : métadonnées du descripteur et prédicats de compatibilité partagés ; rendu distant à contrôler après mise à jour.
+- Liste des produits : quatre états triés dans l’ordre demandé, références naturelles, tri manuel, sélection multiple avant comptage/pagination, unité incompatible prioritaire en cas de prix également manquant et rapport source conservé. Le HTML du sélecteur natif est vérifié avec deux valeurs sélectionnées, activation Select2 et sélection vide sans JavaScript. La navigation, le changement de limite et la remise à zéro sont à vérifier sur l’instance servant le correctif.
 - Découverte du module : constructeur natif testé sans classe de compatibilité, avec un ancien fichier sans constantes de version et avec cette ancienne classe déjà chargée. Le descripteur reste autonome ; la suite des réglages vérifie l’alignement des versions minimales avec les contrôles métier.
-- Exports : création puis relecture réelle XLSX/ODS (totaux, produits, solde provisoire), PDF généré avec le moteur natif, régularisation négative, mesure native des pieds longs/HTML et d’un hook de pied, refus documentaire sans droit ou répertoire de l’entité propriétaire.
+- Exports : création puis relecture réelle XLSX/ODS (totaux, produits, solde provisoire), PDF généré avec le moteur natif, régularisation négative, mesure native des pieds longs/HTML et d’un hook de pied, refus documentaire sans droit ou répertoire de l’entité propriétaire. Le chemin PDF doit correspondre au téléchargement natif avec une seule référence projet, y compris pour un projet de l’entité 2 consulté depuis l’entité 1 ; un répertoire propriétaire absent interdit tout repli.
 - SQL : les deux créations de table sont rejouées deux fois avec un préfixe long dans la fixture. La validation MySQL/MariaDB réelle et la concurrence restent à effectuer sur instance.
 - PHPStan : niveau 5, cible PHP 8.0, aucune suppression d’erreur ni baseline. `phpstan-native.stub` corrige exclusivement les contrats PHPDoc natifs trop étroits (confirmation, sélecteurs, dimensions PDF, hooks structurés), vérifiés dans le code core. Les gardes runtime sur les retours natifs sont conservées.
 

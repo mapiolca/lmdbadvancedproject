@@ -66,9 +66,12 @@ $action = GETPOST('action', 'aZ09');
 $contextpage = 'lmdbadvancedproject_productcost';
 $search = array('ref' => GETPOST('search_ref', 'alphanohtml'), 'label' => GETPOST('search_label', 'alphanohtml'),
 	'type' => GETPOST('search_type', 'alpha'), 'entities' => array_values(array_map('intval', GETPOST('search_entities', 'array:int'))));
+$costStates = lmdbadvancedproject_product_cost_states();
+$searchStates = array_values(array_intersect(GETPOST('search_states', 'array:aZ09'), array_keys($costStates)));
 $resetFilters = GETPOST('button_removefilter', 'alpha') || GETPOST('button_removefilter_x', 'alpha');
 if ($resetFilters) {
 	$search = array('ref' => '', 'label' => '', 'type' => '', 'entities' => array());
+	$searchStates = array();
 }
 $filters = lmdbadvancedproject_normalize_budget_report_filters(array(
 	'date_start' => $resetFilters ? '' : lmdbadvancedproject_get_budget_report_request_date('date_start'),
@@ -109,8 +112,8 @@ require DOL_DOCUMENT_ROOT.'/core/actions_changeselectedfields.inc.php';
 $form = new Form($db);
 $selectedfields = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $contextpage);
 $sortfield = GETPOST('sortfield', 'aZ09');
-if (!isset($columns[$sortfield]) || in_array($sortfield, array('issues', 'entities'), true)) {
-	$sortfield = 'ref';
+if (!isset($columns[$sortfield]) || $sortfield === 'entities') {
+	$sortfield = 'issues';
 }
 $sortorder = GETPOST('sortorder', 'aZ09') === 'DESC' ? 'DESC' : 'ASC';
 $limit = GETPOSTINT('limit') ?: (int) $conf->liste_limit;
@@ -126,20 +129,16 @@ try {
 	$db->close();
 	exit;
 }
-$rows = array_values($report['products']);
-// Derived monetary columns require reconciliation before ordering/pagination.
-// Text, type and environment filters above are applied to sources in SQL.
-usort($rows, static function (array $left, array $right) use ($sortfield, $sortorder): int {
-	$comparison = is_string($left[$sortfield]) ? strnatcasecmp($left[$sortfield], $right[$sortfield]) : $left[$sortfield] <=> $right[$sortfield];
-	return ($comparison ?: $left['product'] <=> $right['product']) * ($sortorder === 'DESC' ? -1 : 1);
-});
+// State depends on all authorized contributions, so filter it after reconciliation.
+// Source text, type and environment filters remain in SQL; pagination comes last.
+$rows = lmdbadvancedproject_prepare_product_cost_rows($report['products'], $searchStates, $sortfield, $sortorder);
 $total = count($rows);
 if ($page * $limit >= $total) {
 	$page = 0;
 }
 $visibleRows = array_slice($rows, $page * $limit, $limit);
 $param = '&id='.$id.'&'.http_build_query(array('search_ref' => $search['ref'], 'search_label' => $search['label'],
-	'search_type' => $search['type'], 'search_entities' => $search['entities'], 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']));
+	'search_type' => $search['type'], 'search_entities' => $search['entities'], 'search_states' => $searchStates, 'date_start' => $filters['date_start'], 'date_end' => $filters['date_end']));
 $returnUrl = $_SERVER['PHP_SELF'].'?'.ltrim($param, '&').'&sortfield='.urlencode($sortfield).'&sortorder='.$sortorder.'&page='.$page.'&limit='.$limit;
 $valuation = new LmdbAdvancedProjectCostValuation($db);
 $canWriteCosts = LmdbAdvancedProjectCompatibility::costValuationAvailable()
@@ -233,13 +232,17 @@ foreach ($arrayfields as $field => $definition) {
 		print ajax_combobox('search_type');
 	} elseif ($field === 'entities') {
 		print Form::multiselectarray('search_entities', $entityLabels, array_map('strval', $search['entities']), 0, 0, 'minwidth100');
+	} elseif ($field === 'issues') {
+		$stateOptions = array();
+		foreach ($costStates as $code => $state) { $stateOptions[$code] = $langs->trans($state['label']); }
+		print Form::multiselectarray('search_states', $stateOptions, $searchStates, 0, 0, 'minwidth150');
 	}
 	print '</td>';
 }
 print '<td class="liste_titre center">'.$form->showFilterButtons().'</td></tr><tr class="liste_titre">';
 foreach ($arrayfields as $field => $definition) {
 	if (empty($definition['checked'])) { continue; }
-	print_liste_field_titre($definition['label'], $_SERVER['PHP_SELF'], in_array($field, array('issues', 'entities'), true) ? '' : $field, '', $param, '', $sortfield, $sortorder);
+	print_liste_field_titre($definition['label'], $_SERVER['PHP_SELF'], $field === 'entities' ? '' : $field, '', $param, '', $sortfield, $sortorder);
 }
 print '<th class="center">'.$selectedfields.'</th></tr>';
 $colspan = 1 + count(array_filter($arrayfields, static function (array $field): bool { return !empty($field['checked']); }));
@@ -264,8 +267,8 @@ foreach ($visibleRows as $row) {
 		} elseif ($field === 'type') {
 			print $langs->trans($value === 1 ? 'Service' : 'Product');
 		} elseif ($field === 'issues') {
-			$status = $value ? 'BudgetCostIncomplete' : ($row['has_cost'] ? 'BudgetCostComplete' : 'BudgetCostNotApplicable');
-			print dolGetBadge($langs->trans($status), '', $value ? 'status1' : ($row['has_cost'] ? 'status4' : 'status0'));
+			$state = $costStates[$row['valuation_state']];
+			print dolGetBadge($langs->trans($state['label']), '', $state['badge']);
 		} elseif ($field === 'entities') {
 			foreach ($value as $entityId) {
 				print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entityLabels[$entityId] ?? '').'</span></div>';
