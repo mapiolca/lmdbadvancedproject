@@ -86,7 +86,7 @@ class pdf_budgetreport extends ModelePDFProjects
 		if (!is_object($outputlangs)) {
 			$outputlangs = $langs;
 		}
-		$outputlangs->loadLangs(array('main', 'dict', 'companies', 'projects', 'products', 'lmdbadvancedproject@lmdbadvancedproject'));
+		$outputlangs->loadLangs(array('main', 'dict', 'companies', 'projects', 'products', 'other', 'lmdbadvancedproject@lmdbadvancedproject'));
 		if (!isset($object->thirdparty) || !is_object($object->thirdparty)) {
 			$object->fetch_thirdparty();
 		}
@@ -447,7 +447,7 @@ class pdf_budgetreport extends ModelePDFProjects
 					$printedHeader = true;
 				}
 				$this->drawTableRow($pdf, array($line['ref'], $line['product_ref'], lmdbadvancedproject_cost_price_source_label($line, $outputlangs),
-					price($line['price']), $line['unit_label'], dol_print_date($this->db->jdate($line['price_date']), 'dayhour', 'tzuser', $outputlangs), $line['currency'] ?? ''), $widths, $outputlangs);
+					price($line['price']), $outputlangs->transnoentities($line['unit_label']), dol_print_date($this->db->jdate($line['price_date']), 'dayhour', 'tzuser', $outputlangs), $line['currency'] ?? ''), $widths, $outputlangs);
 			}
 		}
 	}

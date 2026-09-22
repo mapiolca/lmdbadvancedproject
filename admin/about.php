@@ -24,7 +24,7 @@
 
 // Load Dolibarr environment
 $res = 0;
-if (!$res && !empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
+if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
 	$res = @include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -41,17 +41,21 @@ if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1)).'/main.inc.php')) {
 if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php')) {
 	$res = @include dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php';
 }
-if (!$res && file_exists('../../main.inc.php')) {
-	$res = @include '../../main.inc.php';
-}
-if (!$res && file_exists('../../../main.inc.php')) {
-	$res = @include '../../../main.inc.php';
+foreach (array('../../main.inc.php', '../../../main.inc.php') as $mainFile) {
+	$resolvedMainFile = realpath(__DIR__.'/'.$mainFile);
+	if (!$res && $resolvedMainFile !== false) {
+		$res = @include $resolvedMainFile;
+	}
 }
 if (!$res) {
 	die('Include of main fails');
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+/** @var DoliDB $db */
+/** @var User $user */
+/** @var Translate $langs */
+global $db, $user, $langs;
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 require_once '../lib/lmdbadvancedproject.lib.php';
 
@@ -76,6 +80,14 @@ print dol_get_fiche_head($head, 'about', $langs->trans($page_name), 0, 'lmdbadva
 
 dol_include_once('/lmdbadvancedproject/core/modules/modLmdbAdvancedProject.class.php');
 $tmpmodule = new modLmdbAdvancedProject($db);
+// getDescLong() renders the README; current metadata comes from the descriptor.
+print '<table class="noborder centpercent">';
+foreach (array('Module' => $tmpmodule->getName(), 'Version' => $tmpmodule->version,
+	'Publisher' => $tmpmodule->editor_name, 'BudgetReportMinimumDolibarrVersion' => implode('.', $tmpmodule->need_dolibarr_version),
+	'BudgetReportMinimumPhpVersion' => implode('.', $tmpmodule->phpmin)) as $label => $value) {
+	print '<tr class="oddeven"><td>'.$langs->trans($label).'</td><td>'.dol_escape_htmltag($value).'</td></tr>';
+}
+print '</table><br>';
 print $tmpmodule->getDescLong();
 
 print dol_get_fiche_end();

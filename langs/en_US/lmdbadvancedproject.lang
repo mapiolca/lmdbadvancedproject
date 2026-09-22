@@ -235,6 +235,7 @@ BudgetCostSourceId=Source identifier
 BudgetCostHistoryId=History identifier
 BudgetCostSourceDate=Source date
 BudgetCostInstructionId=Instruction identifier
+BudgetReportMinimumVersion=Minimum version
 BudgetCostInvalidPrice=Enter a valid unit cost greater than or equal to zero.
 BudgetCostConflict=Prices, permissions or projects have changed, or this proposal has expired. No instruction was replaced. Close and reopen the dialog to review the new values.
 BudgetCostApplied=Instruction saved for %s project(s). Previously processed submissions are not repeated.

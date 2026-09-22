@@ -20,6 +20,8 @@ parameters:
         - lib/budgetreport.lib.php
         - tabs/project_productcost.php
         - admin/setup.php
+        - admin/about.php
+        - admin/compatibility.php
         - class/budgetreportexport.class.php
         - core/modules/project/doc/pdf_budgetreport.modules.php
         - core/modules/modLmdbAdvancedProject.class.php

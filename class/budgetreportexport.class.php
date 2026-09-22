@@ -42,6 +42,7 @@ class LmdbAdvancedProjectBudgetReportExport
 	public function __construct($outputlangs, $data, $project = null)
 	{
 		$this->outputlangs = $outputlangs;
+		$this->outputlangs->loadLangs(array('products', 'other'));
 		$this->data = $data;
 		$this->project = is_object($project) ? $project : null;
 	}
@@ -291,7 +292,7 @@ class LmdbAdvancedProjectBudgetReportExport
 				} elseif ($key === 'issues') {
 					$value = implode('; ', array_map(function ($issue) { return $this->outputlangs->transnoentities($issue); }, $value));
 				} elseif ($key === 'unit') {
-					$value = implode(' / ', $row['units']);
+					$value = implode(' / ', array_map(function ($unit): string { return $this->outputlangs->transnoentities($unit); }, $row['units']));
 				} elseif (substr($key, -4) === '_qty' && count($row['units']) > 1) {
 					$value = '—';
 				}

@@ -2,7 +2,7 @@
 
 // Load Dolibarr environment.
 $res = 0;
-if (!$res && !empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
+if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
 	$res = @include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -16,17 +16,21 @@ while ($i > 0 && $j > 0 && isset($tmp[$i], $tmp2[$j]) && $tmp[$i] === $tmp2[$j])
 if (!$res && $i > 0 && file_exists(substr($tmp, 0, $i + 1).'/main.inc.php')) {
 	$res = @include substr($tmp, 0, $i + 1).'/main.inc.php';
 }
-if (!$res && file_exists('../../main.inc.php')) {
-	$res = @include '../../main.inc.php';
-}
-if (!$res && file_exists('../../../main.inc.php')) {
-	$res = @include '../../../main.inc.php';
+foreach (array('../../main.inc.php', '../../../main.inc.php') as $mainFile) {
+	$resolvedMainFile = realpath(__DIR__.'/'.$mainFile);
+	if (!$res && $resolvedMainFile !== false) {
+		$res = @include $resolvedMainFile;
+	}
 }
 if (!$res) {
 	die('Include of main fails');
 }
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+/** @var DoliDB $db */
+/** @var User $user */
+/** @var Translate $langs */
+global $db, $user, $langs;
 require_once '../lib/lmdbadvancedproject.lib.php';
 require_once '../class/lmdbadvancedprojectcompatibility.class.php';
 
@@ -54,12 +58,12 @@ print '<tr class="oddeven"><td>'.$langs->trans('BudgetReportMinimumPhpVersion').
 print '</table>';
 
 print '<br><table class="noborder centpercent">';
-print '<tr class="liste_titre"><th>'.$langs->trans('Feature').'</th><th>'.$langs->trans('Description').'</th><th>'.$langs->trans('Status').'</th><th>'.$langs->trans('MinimumVersion').'</th><th>'.$langs->trans('Details').'</th></tr>';
+print '<tr class="liste_titre"><th>'.$langs->trans('Feature').'</th><th>'.$langs->trans('Description').'</th><th>'.$langs->trans('Status').'</th><th>'.$langs->trans('BudgetReportMinimumVersion').'</th><th>'.$langs->trans('MoreInformation').'</th></tr>';
 foreach ($features as $feature) {
 	$available = !empty($feature['available']);
 	$details = array();
 	foreach ($feature['details'] as $detailLabel => $detailAvailable) {
-		$details[] = dol_escape_htmltag($detailLabel).': '.$langs->trans($detailAvailable ? 'Available' : 'Unavailable');
+		$details[] = dol_escape_htmltag($detailLabel).': '.$langs->trans($detailAvailable ? 'Available' : 'NotAvailable');
 	}
 	if (!$available && !empty($feature['reason'])) {
 		$details[] = $langs->trans($feature['reason']);
@@ -67,7 +71,7 @@ foreach ($features as $feature) {
 	print '<tr class="oddeven">';
 	print '<td>'.$langs->trans($feature['label']).'</td>';
 	print '<td>'.$langs->trans($feature['description']).'</td>';
-	print '<td>'.($available ? '<span class="badge badge-status4">'.$langs->trans('Available').'</span>' : '<span class="badge badge-status8">'.$langs->trans('Unavailable').'</span>').'</td>';
+	print '<td>'.($available ? '<span class="badge badge-status4">'.$langs->trans('Available').'</span>' : '<span class="badge badge-status8">'.$langs->trans('NotAvailable').'</span>').'</td>';
 	print '<td>Dolibarr '.dol_escape_htmltag($feature['min_dolibarr']).' / PHP '.dol_escape_htmltag($feature['min_php']).'</td>';
 	print '<td>'.implode('<br>', $details).'</td>';
 	print '</tr>';

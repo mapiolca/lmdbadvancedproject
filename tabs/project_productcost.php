@@ -45,7 +45,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/project.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 require_once __DIR__.'/../lib/budgetreport.lib.php';
 
-$langs->loadLangs(array('main', 'projects', 'products', 'orders', 'bills', 'sendings', 'lmdbadvancedproject@lmdbadvancedproject'));
+$langs->loadLangs(array('main', 'projects', 'products', 'other', 'orders', 'bills', 'sendings', 'lmdbadvancedproject@lmdbadvancedproject'));
 if (!LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() || !$user->hasRight('projet', 'lire')
 	|| !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 	accessforbidden();
@@ -269,8 +269,8 @@ foreach ($visibleRows as $row) {
 			foreach ($value as $entityId) {
 				print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entityLabels[$entityId] ?? '').'</span></div>';
 			}
-		} elseif ($field === 'unit' && count($row['units']) > 1) {
-			print dol_escape_htmltag(implode(' / ', $row['units']));
+		} elseif ($field === 'unit') {
+			print dol_escape_htmltag(implode(' / ', array_map(static function ($unit) use ($langs): string { return $langs->transnoentities($unit); }, $row['units'])));
 		} elseif (substr($field, -4) === '_qty' && count($row['units']) > 1) {
 			print '—';
 		} elseif ($value === null) {
@@ -297,7 +297,7 @@ if (is_array($modalQuote)) {
 	foreach ($modalQuote['choices'] as $key => $choice) { $costOptions[$key] = $choice['label']; }
 	$product = $valuation->product((int) $modalQuote['product']);
 	$unitLabel = '';
-	foreach ($rows as $row) { if ((int) $row['product'] === (int) $modalQuote['product']) { $unitLabel = $row['unit']; break; } }
+	foreach ($rows as $row) { if ((int) $row['product'] === (int) $modalQuote['product']) { $unitLabel = $langs->transnoentities($row['unit']); break; } }
 	$formQuestion = array(
 		array('type' => 'hidden', 'name' => 'cost_quote', 'value' => $quoteKey),
 		array('type' => 'select', 'name' => 'cost_source', 'label' => $langs->trans('BudgetCostPriceSource'), 'values' => $costOptions, 'default' => $selectedCostSource, 'select_show_empty' => 0, 'morecss' => 'minwidth200 maxwidth500'),

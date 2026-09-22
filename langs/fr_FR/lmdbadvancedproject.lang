@@ -235,6 +235,7 @@ BudgetCostSourceId=Identifiant de la source
 BudgetCostHistoryId=Identifiant de l’historique
 BudgetCostSourceDate=Date de la source
 BudgetCostInstructionId=Identifiant de la consigne
+BudgetReportMinimumVersion=Version minimale
 BudgetCostInvalidPrice=Saisissez un prix unitaire valide, positif ou égal à zéro.
 BudgetCostConflict=Les prix, les droits ou les projets ont changé, ou cette proposition a expiré. Aucune consigne n’a été remplacée. Fermez puis rouvrez la fenêtre pour vérifier les nouvelles valeurs.
 BudgetCostApplied=Consigne enregistrée pour %s projet(s). Les envois déjà traités ne sont pas répétés.
