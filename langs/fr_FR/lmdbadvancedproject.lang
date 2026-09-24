@@ -272,3 +272,10 @@ BudgetCompatibilityDynamicDescription=Lecture seule des coûts actifs et calcul�
 BudgetCompatibilityDynamicUnavailable=Activer le module dynamicsprices et ses coûts, avec une version proposant le contrat DynamicPricesCostService compatible.
 BudgetCompatibilityPriceListDescription=Lecture des tarifs applicables et des montants historiques enregistrés, selon la commande, le ciblage et le palier.
 BudgetCompatibilityPriceListUnavailable=Activer PriceList avec les méthodes compatibles get_price, getEffectiveCostPriceForRow et getHistory. Aucun remplacement local n’est fourni.
+
+# Project list and card summary (1.5.0)
+BudgetBillingProgress=Progressions facturation
+BudgetBillingNotComputable=Progression non calculable : aucun montant commandé positif.
+BudgetBillingAmounts=Facturé HT : %s / Commandé HT : %s
+BudgetSummaryUnavailable=La synthèse budgétaire est indisponible. Consultez le rapport ou contactez votre administrateur.
+BudgetAboutFeatureProjectSummary=Progression de facturation dans la liste des projets et synthèse budgétaire sous la description de leur fiche.

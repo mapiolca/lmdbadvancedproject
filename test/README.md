@@ -68,3 +68,9 @@ cmp test/.cache/legacy-new.json test/.cache/legacy-base.json
 Agenda, Notifications, nouveaux objets CRUD, numérotation, import et cron : non applicables, aucun mécanisme supplémentaire ajouté. Les listeners consomment les événements natifs sans les réémettre. Aucun nouveau partage indépendant n’est déclaré : les tables d’instantanés suivent les objets natifs propriétaires.
 
 Une première recette navigateur a été exécutée sur Dolibarr 24.0.1/PHP 8.3.33 avec une version intermédiaire de la branche ; aucun fichier serveur n’a été déployé par l’agent. La lecture des tags v20–v24 et l’exécution de fixtures sous PHP 8.4.22 ne constituent pas une certification de toutes les combinaisons ERP/PHP/Multicompany. Les résultats datés et les contrôles distants restant à effectuer figurent dans [le compte rendu 1.4.1](../doc/VALIDATION_COST_VALUATION.md).
+
+## Synthèse des projets — 1.5.0
+
+`php test/projectsummary_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION` comme les fixtures précédentes, avec PDO SQLite, Zip et GD. Il inclut les contrôles du rapport et les exports XLSX/ODS, puis vérifie les requêtes de progression, les ventilations, avoirs, montants nuls, périmètres d’accès, hooks natifs, filtres, comptage et synthèse compacte. Aucune connexion à une base ERP n’est effectuée.
+
+Voir [les preuves et la recette restant à réaliser](../doc/VALIDATION_PROJECT_SUMMARY.md). La variable facultative `LMDBAP_SUMMARY_HTML` écrit le fragment de fiche produit par le hook dans un fichier de test choisi, à conserver dans `test/.cache/`.

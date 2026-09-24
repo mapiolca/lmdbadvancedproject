@@ -62,7 +62,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->editor_url = 'https://lesmetiersdubatiment.fr';
 		$this->editor_email = 'developpeur@lesmetiersdubatiment.fr';
 
-		$this->version = '1.4.1';
+		$this->version = '1.5.0';
 		$this->const_name = 'MAIN_MODULE_LMDBADVANCEDPROJECT';
 		$this->picto = 'project';
 
@@ -78,6 +78,7 @@ class modLmdbAdvancedProject extends DolibarrModules
 				'invoicecard',
 				'projectoverview',
 				'projectOverview',
+				'projectlist',
 				'projectcard',
 				'globalcard', // Only completeTabsHead uses this to guard project tabs.
 				'projectCard',

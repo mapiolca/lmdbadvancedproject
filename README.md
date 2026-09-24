@@ -1,6 +1,6 @@
 # ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-Current version: **1.4.1**
+Current version: **1.5.0**
 
 ## Features
 
@@ -25,6 +25,16 @@ Reports can be exported as XLSX or ODS. Both formats include the total-time deta
 Spreadsheet exports require the PhpSpreadsheet library bundled with Dolibarr 20 and the PHP `ZipArchive` extension. The module compatibility tab reports the availability of these components.
 
 Date range and project status filters on the global report are preserved in spreadsheet exports. Supplier spending is split between ordered supplier orders, delivered supplier orders, and supplier invoices, with percentages displayed in the Spent tile. Detail modals include totals, localized dates, and Dolibarr document links.
+
+## Project list and card summary (1.5.0)
+
+The native project list includes **Invoicing progress** (**Progressions facturation** in French): invoiced HT divided by ordered HT, as a numeric percentage followed by Dolibarr's native progress bar. The column supports native selection, sorting and numeric search (for example `>=50`), with filters retained during pagination. Without a positive order total, it displays an explained dash. Credit notes can produce a negative percentage, and overbilling can exceed 100%; only the bar is bounded to 0–100%.
+
+The native project card shows the five main Budget Report tiles below the description in its right half: Orders, Invoiced, Budget, Spent and Remaining budget. The complete expense breakdown is retained. The compact layout displays Orders/Invoiced, then Budget/Remaining, then Spent across the full half-width; phones stack the tiles. The card always covers all dates, independently of report filters. The full report and card share their totals and renderer, and customer contributions also supply the native project list, including project allocations without double counting.
+
+Reading projects and the module's budget report is required; administrators do not bypass these permissions. Project access and native entity scopes remain separate. Customer contributions additionally respect access to their linked third party (entity, sales assignment and external account); an absent optional third party remains distinct from an inaccessible or dangling link. Existing analytical report rules continue to determine spending. Native document permissions remain necessary for document links in the full report.
+
+After updating all module files, reactivate the module to register `projectlist`, then refresh the browser cache. Existing settings and permissions are preserved. This version introduces no table or migration. Without JavaScript, or if another module changes the description container, the summary remains visible at the native card hook position. See [1.5.0 validation and remaining acceptance checks](doc/VALIDATION_PROJECT_SUMMARY.md).
 
 ## Optional shipment costs
 

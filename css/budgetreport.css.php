@@ -786,3 +786,33 @@ div.mainmenu.budgetreport {
 		font-size: 1.7em;
 	}
 }
+
+/* Compact variant only: never change the native pagination or project columns. */
+#lmdbap-project-summary { margin-top: 16px; }
+.lmdbap-summary-compact .dashboard_budget,
+.lmdbap-summary-compact .dashboard_budget tbody { display: block; }
+.lmdbap-summary-compact .dashboard_budget tr {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell {
+	display: block;
+	width: auto;
+	max-width: none;
+	min-width: 0;
+}
+.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
+.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
+.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
+.lmdbap-summary-compact .budgetreport-summary-amount {
+	font-size: 1.5em;
+	white-space: normal !important;
+	overflow-wrap: anywhere;
+}
+.lmdbap-summary-compact .budgetreport-summary-breakdown { max-width: none; }
+.lmdbap-summary-compact .budgetreport-summary-breakdown div { flex-wrap: wrap; }
+.lmdbap-summary-compact .budgetreport-summary-breakdown strong { white-space: normal; }
+@media (max-width: 570px) {
+	.lmdbap-summary-compact .dashboard_budget tr { grid-template-columns: minmax(0, 1fr); }
+	.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell { grid-column: auto; grid-row: auto; border-right: 0; }
+}

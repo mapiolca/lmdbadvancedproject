@@ -18,6 +18,7 @@ parameters:
         - core/triggers/interface_99_modLmdbAdvancedProject_CostSnapshots.class.php
         - lib/productcost.lib.php
         - lib/budgetreport.lib.php
+        - lib/projectbilling.lib.php
         - tabs/project_productcost.php
         - admin/setup.php
         - admin/about.php

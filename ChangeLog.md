@@ -1,5 +1,12 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.5.0 — preparation
+
+- Add the native project-list column “Progressions facturation”, with numeric percentage, native progress bar, sorting, filtering and column selection. Customer invoice allocations replace their source lines and credit notes retain their sign; a non-positive order total produces an explained dash.
+- Show the five main budget tiles and complete expense breakdown below the project-card description in the native right half, with a compact responsive layout and a visible fallback when JavaScript or the expected container is unavailable.
+- Share customer contribution queries and tile rendering with the Budget Report. The card loads all-period totals without preparing report charts, matrices or forecasts; query failures display an explicit warning instead of zero amounts. Enforce project/report permissions and customer-source third-party/entity scope.
+- Retain Dolibarr 20 / PHP 8.0 minimums and module ID 450021. Reactivate after updating all files to register the additional native hook context, then refresh the browser cache; no new table or data migration. CLI/source/browser-fixture evidence and operational limits are documented separately.
+
 ## 1.4.1 — preparation
 
 - Complete missing shipment costs with applicable recorded PriceList history and successful dated DynamicPrices costs, without recalculating optional providers; preserve known zero prices and validation snapshots.

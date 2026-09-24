@@ -32,7 +32,7 @@ $db = new stdClass(); // No database operation is needed to discover this descri
 require $fixture.'/core/modules/modLmdbAdvancedProject.class.php';
 $module = new modLmdbAdvancedProject($db);
 if ($module->phpmin !== array(8, 0, 0) || $module->need_dolibarr_version !== array(20, 0, 0)
-	|| $module->numero !== 450021 || $module->version !== '1.4.1'
+	|| $module->numero !== 450021 || $module->version !== '1.5.0'
 	|| $module->config_page_url !== array('setup.php@lmdbadvancedproject')) {
 	throw new RuntimeException('Native module discovery metadata changed.');
 }

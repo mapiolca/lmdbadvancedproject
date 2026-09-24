@@ -97,7 +97,7 @@ class LmdbAdvancedProjectProductCost
 			c.date_commande AS document_date, l.rowid AS line_id, l.qty, l.total_ht AS amount, 0 AS credit, ".$base.', '.$category['select'].'
 			FROM '.MAIN_DB_PREFIX.'commande c INNER JOIN '.MAIN_DB_PREFIX.'commandedet l ON l.fk_commande = c.rowid
 			'.$productJoin.$category['join'].' WHERE c.fk_projet IN ('.$ids.') AND c.fk_statut IN (1,2,3)
-			AND c.entity IN ('.$this->db->sanitize(getEntity('commande')).')';
+			AND c.entity IN ('.$this->db->sanitize(getEntity('commande')).')'.lmdbadvancedproject_billing_document_scope('c');
 
 		$category = lmdbadvancedproject_build_category_sql_parts('facture_fourn_det_extrafields', 'l', 'p', 'ff.entity');
 		$invoiceEntities = $this->db->sanitize(getEntity('supplier_invoice'));
