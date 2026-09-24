@@ -278,4 +278,5 @@ BudgetBillingProgress=Progressions facturation
 BudgetBillingNotComputable=Progression non calculable : aucun montant commandé positif.
 BudgetBillingAmounts=Facturé HT : %s / Commandé HT : %s
 BudgetSummaryUnavailable=La synthèse budgétaire est indisponible. Consultez le rapport ou contactez votre administrateur.
+BudgetReportScrollTablesHelp=Faites défiler les tableaux horizontalement pour voir toutes les colonnes.
 BudgetAboutFeatureProjectSummary=Progression de facturation dans la liste des projets et synthèse budgétaire sous la description de leur fiche.

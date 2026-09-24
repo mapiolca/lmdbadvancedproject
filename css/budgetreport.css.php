@@ -270,9 +270,12 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-filter-date-field > label:first-child {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
+	display: block;
+}
+
+.budgetreport-filter-date-field > label > span:first-child {
+	display: block;
+	margin-bottom: 4px;
 }
 
 .budgetreport-filter-field > span,
@@ -362,6 +365,10 @@ div.mainmenu.budgetreport {
 
 .dashboard_budget .budgetreport-summary-cell {
 	box-sizing: border-box;
+	/* Eldy gives native table cells a fixed height, unsuitable for stacked tiles. */
+	height: auto;
+	min-width: 0;
+	margin: 0;
 	width: 20%;
 	max-width: 20%;
 	padding: 10px 6px 12px;
@@ -384,6 +391,14 @@ div.mainmenu.budgetreport {
 	font-size: 2em;
 	line-height: 1.1;
 	color: #333;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.budgetreport-summary-rate {
+	display: block;
+	font-size: 0.65em;
+	line-height: 1.5;
 }
 
 .budgetreport-summary-breakdown {
@@ -399,17 +414,22 @@ div.mainmenu.budgetreport {
 
 .budgetreport-summary-breakdown div {
 	display: flex;
+	flex-wrap: wrap;
 	justify-content: space-between;
 	gap: 10px;
 	margin-top: 4px;
 }
 
 .budgetreport-summary-breakdown span {
+	flex: 1 1 140px;
 	overflow-wrap: anywhere;
 }
 
 .budgetreport-summary-breakdown strong {
-	white-space: nowrap;
+	margin-left: auto;
+	max-width: 100%;
+	white-space: normal;
+	overflow-wrap: anywhere;
 	font-weight: 600;
 }
 
@@ -445,6 +465,7 @@ div.mainmenu.budgetreport {
 
 .budgetchart,
 .budgetbarchart {
+	position: relative;
 	height: 350px;
 	max-height: 350px;
 }
@@ -463,8 +484,10 @@ div.mainmenu.budgetreport {
 }
 
 .budgetreport-chart-content {
-	min-width: 560px;
+	min-width: 0;
 }
+
+.budgetreport-scroll-hint { display: none; }
 
 .budgetreport-month-section .budgetbarchart {
 	margin-bottom: 8px;
@@ -723,26 +746,32 @@ div.mainmenu.budgetreport {
 	}
 
 	.dashboard_budget,
-	.dashboard_budget tbody,
-	.dashboard_budget tr,
-	.dashboard_budget .budgetreport-summary-cell {
+	.dashboard_budget tbody {
 		display: block;
 		width: 100%;
 	}
+	.dashboard_budget tr {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 
 	.dashboard_budget .budgetreport-summary-cell {
-		border-right: 0;
+		display: block;
+		width: auto;
 		max-width: none;
-		padding-left: 8px;
-		padding-right: 8px;
+		padding: 16px 10px;
 	}
+	.dashboard_budget .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; border-right: 0; }
+	.dashboard_budget .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
+	.dashboard_budget .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
+	.budgetreport-summary-breakdown { max-width: none; }
 
 	.budgetreport-summary-label {
 		font-size: 110%;
 	}
 
 	.budgetreport-summary-amount {
-		font-size: 2em;
+		font-size: 1.5em;
 	}
 }
 
@@ -776,15 +805,41 @@ div.mainmenu.budgetreport {
 	.budgetreport-filter-field,
 	.budgetreport-filter-actions {
 		width: 100%;
+		min-width: 0;
 	}
+	.budgetreport-filter-period { width: 100%; }
+	.budgetreport-filter-field input,
+	.budgetreport-filter-field select { font-size: 16px; min-height: 40px; max-width: 100%; }
+	.budgetreport-filter-actions > * { flex: 1 1 auto; margin: 0; }
+	.budgetreport-export-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+	.budgetreport-export-actions > a,
+	.budgetreport-export-actions .divButAction { flex: 1 1 140px; margin: 0; }
+	.budgetreport-export-actions .divButAction { display: flex; }
+	.budgetreport-export-actions .divButAction > a { flex: 1; margin: 0; }
+	.budgetreport-export-actions .butAction { box-sizing: border-box; white-space: normal; text-align: center; }
 
 	.budgetreport-filter-actions .button {
 		text-align: center;
 	}
 
 	.budgetreport-summary-amount {
-		font-size: 1.7em;
+		font-size: 1.4em;
 	}
+	.budgetreport-charts-row { gap: 12px; }
+	.budgetchart { height: 400px; max-height: none; margin-bottom: 12px; }
+	.budgetchart canvas { max-height: none; }
+	.budgetreport-time-table .budgetreport-time-label { min-width: 130px; max-width: 160px; }
+	.budgetreport-time-table th,
+	.budgetreport-time-table td { min-width: 70px; }
+	.budgetreport-forecast-label-col,
+	.budgetreport-forecast-label-truncate,
+	.budgetreport-extra-task-label-col,
+	.budgetreport-extra-task-label-truncate,
+	.budgetreport-extra-expense-comment-col,
+	.budgetreport-extra-expense-comment-truncate { width: 20ch; min-width: 16ch; max-width: 20ch; white-space: normal; overflow-wrap: anywhere; }
+	.budgetreport-scroll-hint { display: block; margin: 16px 0 0; }
+	.budgetreport-modal-dialog { max-width: calc(100vw - 16px); margin: 8px auto; }
+	.budgetreport-modal-body { padding: 10px; }
 }
 
 /* Compact variant only: never change the native pagination or project columns. */
@@ -806,13 +861,11 @@ div.mainmenu.budgetreport {
 .lmdbap-summary-compact .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
 .lmdbap-summary-compact .budgetreport-summary-amount {
 	font-size: 1.5em;
-	white-space: normal !important;
-	overflow-wrap: anywhere;
 }
 .lmdbap-summary-compact .budgetreport-summary-breakdown { max-width: none; }
-.lmdbap-summary-compact .budgetreport-summary-breakdown div { flex-wrap: wrap; }
-.lmdbap-summary-compact .budgetreport-summary-breakdown strong { white-space: normal; }
-@media (max-width: 570px) {
+@media (max-width: 359px) {
+	.dashboard_budget tr,
 	.lmdbap-summary-compact .dashboard_budget tr { grid-template-columns: minmax(0, 1fr); }
+	.dashboard_budget .budgetreport-summary-cell,
 	.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell { grid-column: auto; grid-row: auto; border-right: 0; }
 }

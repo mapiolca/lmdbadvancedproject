@@ -58,6 +58,23 @@ Le hook natif `printFieldListFooter` est appelé après le rendu des totaux. Un 
 
 Contrôles complémentaires exécutés : template natif `list_print_total.tpl.php` sur core20/core24, puis navigateur avec cellule manquante/déjà comptée, sans entité, progression masquée et décalage ambigu. Totaux de page et structure de total général simulée à partir du même rendu : 12/12 cellules après correction, position du montant conservée, aucun ajout en double malgré deux chargements du script. Nouvelle fixture de fiche issue de la sortie réelle après initialisation `globalcard` en premier : cinq tuiles sous la description, dans `fichehalfright`, à **390 px**, sans débordement horizontal. Le thème reste simplifié ; les nouveaux correctifs ne sont ni déployés ni validés sur le serveur distant par cette intervention.
 
+### Adaptation mobile de la fiche et du rapport
+
+Les captures utilisateur montrent des tuiles superposées et des camemberts partiellement hors écran. Diagnostic en lecture seule sur le rapport servi par Dolibarr **24.0.1** : la règle native `table.noborder > tbody > tr > td` impose `height: 32px` (`theme/eldy/global.inc.php`, règle également observée dans la feuille calculée du navigateur). Cette hauteur subsiste quand le module transforme les cellules en blocs ou en grille. La largeur minimale de 560 px des graphiques explique leur débordement sur téléphone.
+
+Le correctif reste dans le module : hauteur automatique et marges adaptées aux cellules de synthèse, grille commune de deux colonnes sur mobile, dépenses en pleine largeur, une colonne sous 360 px, montants autorisés à revenir à la ligne et taux de facturation sur sa propre ligne. Les graphiques épousent leur conteneur ; leurs légendes natives passent dessous avec abréviation visuelle des seuls libellés trop larges. Les données et textes complets des infobulles sont conservés. Filtres, actions d’export, colonnes de texte et fenêtres de détail s’adaptent aux petites largeurs. Les tableaux utilisent `div-table-responsive-no-min` et sont accessibles au clavier pour le défilement horizontal. Aucun calcul, droit, filtre SQL, export documentaire ni réglage de l’instance n’est changé.
+
+Les deux copies natives de Chart.js **3.7.1**, issues des tags Dolibarr 20.0.0 et 24.0.0 cités plus haut, ont une empreinte SHA-256 identique. `DolGraph::draw_chart()` utilise les options `plugins.legend` sur ce socle ; le correctif réutilise la bibliothèque fournie par Dolibarr, son générateur de légendes, sa mesure de police et ses interactions. Aucune dépendance ajoutée.
+
+Vérifications locales du 24 septembre, PHP **8.4.22** :
+
+- Reproduction avant correction avec la règle Eldy exacte : chaque tuile mesure 32 px, pour un contenu allant jusqu’à 197 px ; après correction, aucun contenu ne dépasse sa cellule.
+- Sorties réelles des fonctions PHP sur les fixtures SQL, bibliothèque Chart.js native, règle Eldy et styles de base de thème simulés. **20 cas** dans Chromium : fiche, rapport projet, synthèse à grands montants/solde négatif et rapport global, à **320, 360, 390, 768 et 1280 px**. Aucun chevauchement, aucune tuile rognée, aucun graphique plus large que son conteneur ni débordement horizontal de page. La fixture globale exclut les liens de factures, dont le constructeur natif v24 requiert une connexion `DoliDB` réelle ; ces liens n’ont pas été testés par cette fixture.
+- Captures inspectées à 320/360/390 px ; légendes lisibles avec ellipses seulement lorsque nécessaire. Matrice temporelle défilée jusqu’à sa dernière colonne au clavier ; fenêtre de détail de commande ouverte et fermée à 360 px, contenu défilable et dialogue contenu dans l’écran. Aucun avertissement ou erreur JavaScript observé.
+- **777 assertions** sur core20 puis core24, syntaxe PHP et PHPStan **niveau 5 / cible PHP 8.0** sans erreur avec les commandes indiquées plus haut. Les modifications sont uniquement de présentation ; aucun nouveau scénario financier n’est introduit.
+
+Limites : ces pages locales incluent les règles natives responsables du défaut et le moteur de graphiques réel, mais pas l’intégralité du thème, les autres modules ni Safari/iOS. Le nouveau code n’est pas déployé sur l’instance ; recette finale sur le téléphone et rafraîchissement du cache CSS restent nécessaires. Les contrôles précédents sur une structure de thème simplifiée ne détectaient pas la hauteur native des cellules.
+
 ## Recette sur instance restant à réaliser
 
 1. Déployer le commit de la PR dans une instance de test et confirmer la version servie. Réactiver en relevant les réglages avant/après ; vérifier conservation des options et droits, contexte de liste actif et cache CSS renouvelé.
