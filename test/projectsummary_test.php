@@ -176,23 +176,42 @@ $object->entity=1;
 $object->public=1;
 $hookmanager->contextarray=array('projectcard','globalcard');
 $hookmanager->hooksSorted=array('projectcard'=>array('lmdbadvancedproject'=>$hooks),'globalcard'=>array('lmdbadvancedproject'=>$hooks));
-$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
-check(substr_count($hookmanager->resPrint,'id="lmdbap-project-summary"'),1,'Native HookManager renders the card section once');
-check(substr_count($hookmanager->resPrint,'class="center valignmiddle budgetreport-summary-cell"'),5,'Five complete tiles on card');
-$rendered = $hookmanager->resPrint;
+// projet/card.php executes this hook without printing HookManager::resPrint.
+// Capture the actual page output, not the hook's unused return buffer.
+$rendered = '';
+foreach (array('classic', 'phone') as $layout) {
+	$conf->browser->layout = $layout;
+	ob_start();
+	$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
+	$rendered = (string) ob_get_clean();
+	check(substr_count($rendered,'id="lmdbap-project-summary"'),1,'Page emits exactly one section: '.$layout);
+	check(substr_count($rendered,'class="center valignmiddle budgetreport-summary-cell"'),5,'Page emits five tiles: '.$layout);
+	check($hookmanager->resPrint,'','Card output does not remain in unused hook buffer: '.$layout);
+}
+$conf->browser->layout = 'classic';
 $action='edit';
+ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
-check($hookmanager->resPrint,'','Editing card has no financial section');
+check((string) ob_get_clean(),'','Editing card has no financial section');
 $action='';
+$user->denied = array('lmdbadvancedproject.budgetreport.read');
+$db->queries = array();
+ob_start();
+$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
+check((string) ob_get_clean(),'','Denied report permission emits no financial section');
+check(count($db->queries),0,'Denied card does not query financial data');
+$user->denied = array();
 $conf->modules['lmdbadvancedproject']=0;
 $conf->lmdbadvancedproject->enabled=0;
+ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
-check($hookmanager->resPrint,'','Disabled module contributes no card content');
+check((string) ob_get_clean(),'','Disabled module contributes no card content');
 $conf->modules['lmdbadvancedproject']=1;
 $conf->lmdbadvancedproject->enabled=1;
 $db->fail=true;
+ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
-check(strpos($hookmanager->resPrint,'BudgetSummaryUnavailable')!==false,true,'Query failure produces warning, never zero tiles');
+check(strpos((string) ob_get_clean(),'BudgetSummaryUnavailable')!==false,true,'Query failure emits warning on page, never zero tiles');
 $db->fail=false;
 if (getenv('LMDBAP_SUMMARY_HTML')) { file_put_contents(getenv('LMDBAP_SUMMARY_HTML'),$rendered); }
 echo $checks." assertions passed including billing list, compact report parity and native card hooks.\n";

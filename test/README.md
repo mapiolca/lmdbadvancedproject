@@ -73,4 +73,6 @@ Une première recette navigateur a été exécutée sur Dolibarr 24.0.1/PHP 8.3.
 
 `php test/projectsummary_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION` comme les fixtures précédentes, avec PDO SQLite, Zip et GD. Il inclut les contrôles du rapport et les exports XLSX/ODS, puis vérifie les requêtes de progression, les ventilations, avoirs, montants nuls, périmètres d’accès, hooks natifs, filtres, comptage et synthèse compacte. Aucune connexion à une base ERP n’est effectuée.
 
+Pour la fiche, le test capture la sortie effectivement émise par `mainCardTabAddMore`, comme la page native qui n’affiche pas `HookManager::resPrint`. Les configurations de navigateur `classic` et `phone` doivent produire chacune un seul bloc et cinq tuiles ; les refus de permission, l’édition et la désactivation ne doivent rien émettre. Une erreur SQL doit produire un avertissement visible.
+
 Voir [les preuves et la recette restant à réaliser](../doc/VALIDATION_PROJECT_SUMMARY.md). La variable facultative `LMDBAP_SUMMARY_HTML` écrit le fragment de fiche produit par le hook dans un fichier de test choisi, à conserver dans `test/.cache/`.
