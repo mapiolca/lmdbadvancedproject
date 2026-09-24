@@ -140,6 +140,51 @@ for ($i=0;$i<100;$i++) {
 check($totalarray['nbfield'],2,'Totals keep native columns aligned');
 check(count($db->queries),$before,'No query per rendered list row');
 check(strpos($hookmanager->resPrint,'5%') !== false,true,'Native value hook renders computed ratio');
+// Native total template, with the same uncounted entity cell as Multicompany 22.0.1.
+$totalarray = array('nbfield'=>9, 'pos'=>array(8=>'p.opp_amount'), 'val'=>array('p.opp_amount'=>123.45));
+$hookmanager->executeHooks('printFieldListValue',array('arrayfields'=>$arrayfields,'obj'=>$row,'i'=>0,'totalarray'=>&$totalarray),$object,$action);
+check($totalarray['nbfield'],10,'Billing contributes its column to native totals');
+$billingCell = $hookmanager->resPrint;
+$totalarray['nbfield']++; // Native status column, after hook columns.
+$num=1;
+$limit=20;
+$offset=0;
+$conf->global->MAIN_GRANDTOTAL_LIST_SHOW=0;
+ob_start();
+include DOL_DOCUMENT_ROOT.'/core/tpl/list_print_total.tpl.php';
+$nativeFooter = (string) ob_get_clean();
+check(substr_count($nativeFooter,'<td'),11,'Native totals include billing; only the third-party entity cell is uncounted');
+$hookmanager->executeHooks('printFieldListFooter',array('arrayfields'=>$arrayfields),$object,$action);
+check(strpos($hookmanager->resPrint,'/js/projectlist.js')!==false,true,'Native footer hook loads targeted cell alignment');
+if (getenv('LMDBAP_LIST_HTML')) {
+	$html = '<!doctype html><html><meta charset="utf-8"><title>Native project total fixtures</title><style>table{border-collapse:collapse;margin:20px 0;width:100%}td,th{border:1px solid #ccc;padding:8px}.liste_total{background:#eee}</style>';
+	foreach (array('missing', 'already-counted', 'no-entity', 'hidden-billing', 'ambiguous') as $case) {
+		$header = '<tr class="liste_titre">';
+		$values = '<tr class="oddeven">';
+		foreach (array('Select','Ref','Title','Third party','End','Assigned','Opportunity','Amount','Probability') as $label) {
+			$header .= '<th>'.$label.'</th>';
+			$values .= '<td></td>';
+		}
+		if ($case !== 'no-entity') {
+			$header .= '<th>Environment</th>';
+			$values .= '<td><div class="refidno multicompany-entity-card-container">TEST</div></td>';
+		}
+		if ($case !== 'hidden-billing') {
+			$header .= '<th class="lmdbap-billing-progress">Billing</th>';
+			$values .= $billingCell;
+		}
+		$header .= '<th>Status</th></tr>';
+		$values .= '<td>Open</td></tr>';
+		$footer = $nativeFooter;
+		if ($case === 'already-counted') { $footer = str_replace('</tr>', '<td></td></tr>', $footer); }
+		if ($case === 'ambiguous') { $footer = preg_replace('/<td><\/td>/', '', $footer, 1); }
+		$grandFooter = str_replace('liste_total', 'liste_grandtotal', $footer);
+		$html .= '<h2>'.$case.'</h2><table id="'.$case.'"><thead>'.$header.'</thead><tbody>'.$values.'</tbody>'.$footer.$grandFooter.'</table>';
+	}
+	// Loading twice must not add a duplicate cell.
+	$html .= '<script src="../../js/projectlist.js"></script><script src="../../js/projectlist.js"></script></html>';
+	file_put_contents(getenv('LMDBAP_LIST_HTML'), $html);
+}
 $_GET['search_lmdbap_billing']='>=5';
 $hookmanager->executeHooks('doActions',$parameters,$object,$action);
 $hookmanager->executeHooks('printFieldListWhere',array(),$object,$action);
@@ -154,6 +199,8 @@ check($hookmanager->resPrint,'&search_lmdbap_billing=%3E%3D5','Filter retained i
 $arrayfields['lmdbap_billing_rate']['checked']=0;
 $hookmanager->executeHooks('printFieldListValue',array('arrayfields'=>$arrayfields,'obj'=>$row),$object,$action);
 check($hookmanager->resPrint,'','Hidden column has no cell');
+$hookmanager->executeHooks('printFieldListFooter',array('arrayfields'=>$arrayfields),$object,$action);
+check($hookmanager->resPrint,'','Hidden billing column contributes no footer script');
 $_GET['button_removefilter']='1';
 $hookmanager->executeHooks('doActions',$parameters,$object,$action);
 $hookmanager->executeHooks('printFieldListWhere',array(),$object,$action);
@@ -174,8 +221,13 @@ $user->denied = array();
 $object->id=1;
 $object->entity=1;
 $object->public=1;
-$hookmanager->contextarray=array('projectcard','globalcard');
-$hookmanager->hooksSorted=array('projectcard'=>array('lmdbadvancedproject'=>$hooks),'globalcard'=>array('lmdbadvancedproject'=>$hooks));
+$hookmanager = new HookManager($db);
+// Another module may register globalcard before any module registers projectcard.
+// Preserve that native insertion order, then let initHooks load our real class.
+$hookmanager->hooksSorted = array('globalcard'=>array());
+$conf->modules_parts['hooks'] = array('lmdbadvancedproject'=>array('projectcard','globalcard'));
+$hookmanager->initHooks(array('projectcard','globalcard'));
+check(array_keys($hookmanager->hooksSorted),array('globalcard','projectcard'),'Native initialization retains the first context inserted by another module');
 // projet/card.php executes this hook without printing HookManager::resPrint.
 // Capture the actual page output, not the hook's unused return buffer.
 $rendered = '';
@@ -189,6 +241,12 @@ foreach (array('classic', 'phone') as $layout) {
 	check($hookmanager->resPrint,'','Card output does not remain in unused hook buffer: '.$layout);
 }
 $conf->browser->layout = 'classic';
+$projectContext = $hookmanager->contextarray;
+$hookmanager->contextarray = array('globalcard');
+ob_start();
+$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
+check((string) ob_get_clean(),'','Global card alone must not expose project summary');
+$hookmanager->contextarray = $projectContext;
 $action='edit';
 ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
@@ -213,5 +271,10 @@ ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
 check(strpos((string) ob_get_clean(),'BudgetSummaryUnavailable')!==false,true,'Query failure emits warning on page, never zero tiles');
 $db->fail=false;
+$hookmanager = new HookManager($db);
+$hookmanager->initHooks(array('projectcard','globalcard'));
+ob_start();
+$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
+check(substr_count((string) ob_get_clean(),'id="lmdbap-project-summary"'),1,'Project-first native initialization also emits exactly one section');
 if (getenv('LMDBAP_SUMMARY_HTML')) { file_put_contents(getenv('LMDBAP_SUMMARY_HTML'),$rendered); }
 echo $checks." assertions passed including billing list, compact report parity and native card hooks.\n";

@@ -510,7 +510,7 @@ class ActionsLmdbadvancedproject
 			return 0;
 		}
 		if (!empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
-			$this->resprints = getTitleFieldOfList($langs->trans('BudgetBillingProgress'), 0, $_SERVER['PHP_SELF'], 'lmdbap_billing_rate', '', (string) ($parameters['param'] ?? ''), '', (string) ($parameters['sortfield'] ?? ''), (string) ($parameters['sortorder'] ?? ''), 'center ');
+			$this->resprints = getTitleFieldOfList($langs->trans('BudgetBillingProgress'), 0, $_SERVER['PHP_SELF'], 'lmdbap_billing_rate', '', (string) ($parameters['param'] ?? ''), '', (string) ($parameters['sortfield'] ?? ''), (string) ($parameters['sortorder'] ?? ''), 'center lmdbap-billing-progress ');
 			if (isset($parameters['totalarray']) && is_array($parameters['totalarray'])) {
 				$parameters['totalarray']['nbfield'] = (int) ($parameters['totalarray']['nbfield'] ?? 0) + 1;
 			}
@@ -538,13 +538,34 @@ class ActionsLmdbadvancedproject
 			$row = $parameters['obj'] ?? null;
 			require_once __DIR__.'/../lib/budgetreport.lib.php';
 			if (is_object($row) && isset($row->lmdbap_billing_invoiced, $row->lmdbap_billing_orders)) {
-				$this->resprints = '<td class="center">'.lmdbadvancedproject_billing_progress((float) $row->lmdbap_billing_invoiced, (float) $row->lmdbap_billing_orders).'</td>';
+				$this->resprints = '<td class="center lmdbap-billing-progress">'.lmdbadvancedproject_billing_progress((float) $row->lmdbap_billing_invoiced, (float) $row->lmdbap_billing_orders).'</td>';
 			} else {
-				$this->resprints = '<td class="center opacitymedium">—</td>';
+				$this->resprints = '<td class="center opacitymedium lmdbap-billing-progress">—</td>';
 			}
 			if (empty($parameters['i']) && isset($parameters['totalarray']) && is_array($parameters['totalarray'])) {
 				$parameters['totalarray']['nbfield'] = (int) ($parameters['totalarray']['nbfield'] ?? 0) + 1;
 			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Reconcile native totals when Multicompany emits an uncounted environment cell.
+	 * The native total template has already run at this hook; amounts stay untouched.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListFooter($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user;
+		$this->resprints = '';
+		if (in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			&& isModEnabled('lmdbadvancedproject') && $user->hasRight('projet', 'lire') && $user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')
+			&& !empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
+			$this->resprints = '<script src="'.dol_buildpath('/lmdbadvancedproject/js/projectlist.js', 1).'?v=1.5.0"></script>';
 		}
 		return 0;
 	}
@@ -561,7 +582,8 @@ class ActionsLmdbadvancedproject
 	{
 		global $user, $langs;
 		$this->resprints = '';
-		if (($parameters['currentcontext'] ?? '') !== 'projectcard'
+		// HookManager runs each module once, under whichever context was inserted first.
+		if (!in_array('projectcard', explode(':', $parameters['context'] ?? ''), true)
 			|| !$object instanceof Project || $object->id <= 0 || in_array($action, array('create', 'edit'), true)
 			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
 			return 0;
