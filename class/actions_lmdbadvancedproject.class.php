@@ -606,10 +606,9 @@ class ActionsLmdbadvancedproject
 			$body = '<div class="warning">'.dol_escape_htmltag($langs->trans('BudgetSummaryUnavailable')).'</div>';
 			dol_syslog(__METHOD__.': summary unavailable', LOG_ERR);
 		}
-		$url = dol_buildpath('/lmdbadvancedproject/tabs/project_budgetreport.php', 1).'?id='.(int) $object->id;
 		// Native projet/card.php (v20–v24) calls this hook without printing resPrint.
 		print '<section id="lmdbap-project-summary" aria-label="'.dol_escape_htmltag($langs->trans('BudgetReportProjectTab')).'">'
-			.'<div class="div-table-responsive-no-min"><div class="titre"><a href="'.$url.'">'.$langs->trans('BudgetReportProjectTab').'</a></div>'.$body.'</div></section>'
+			.'<div class="div-table-responsive-no-min">'.$body.'</div></section>'
 			.'<script src="'.dol_buildpath('/lmdbadvancedproject/js/projectsummary.js', 1).'?v=1.5.0"></script>';
 		return 0;
 	}
