@@ -29,14 +29,15 @@ function lmdbadvancedproject_add_product_cost_forecast(array &$forecast, array $
 
 /**
 	 * @param array<string,mixed> $report
+	 * @param bool $explainChronology Show period help on full reports, keep warnings on compact cards
 	 * @return void */
-function lmdbadvancedproject_print_cost_notice(array $report): void
+function lmdbadvancedproject_print_cost_notice(array $report, bool $explainChronology = true): void
 {
 	global $langs;
 	if (getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST') && !LmdbAdvancedProjectCompatibility::shipmentCostAvailable()) {
 		print '<div class="warning">'.$langs->trans('BudgetCostUnavailable').'</div>';
 	}
-	if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+	if ($explainChronology && LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
 		print '<div class="info">'.$langs->trans('BudgetCostChronologyHelp').' '.$langs->trans('BudgetCostQuantityHelp').'</div>';
 	}
 	if (!$report['complete']) {

@@ -114,7 +114,7 @@ print '</table></div></div></div><div class="clearboth"></div><br>';
 
 print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
 print '<tr class="liste_titre"><th>'.$langs->trans('Features').'</th></tr>';
-foreach (array('BudgetAboutFeatureReports', 'BudgetAboutFeatureAllocations', 'BudgetAboutFeatureCosts', 'BudgetAboutFeatureExports') as $feature) {
+foreach (array('BudgetAboutFeatureReports', 'BudgetAboutFeatureProjectSummary', 'BudgetAboutFeatureAllocations', 'BudgetAboutFeatureCosts', 'BudgetAboutFeatureExports') as $feature) {
 	print '<tr class="oddeven"><td>'.$langs->trans($feature).'</td></tr>';
 }
 print '</table></div>';

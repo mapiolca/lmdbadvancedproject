@@ -10,8 +10,8 @@
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
-require_once dol_buildpath('/lmdbadvancedproject/class/lmdbadvancedprojectsupplierinvoicepart.class.php');
-require_once dol_buildpath('/lmdbadvancedproject/class/lmdbadvancedprojectcustomerinvoicepart.class.php');
+require_once __DIR__.'/lmdbadvancedprojectsupplierinvoicepart.class.php';
+require_once __DIR__.'/lmdbadvancedprojectcustomerinvoicepart.class.php';
 
 /**
  * Hooks for Advanced Project.
@@ -35,6 +35,12 @@ class ActionsLmdbadvancedproject
 
 	/** @var string Hook rendered output */
 	public $resprints = '';
+
+	/** @var array{orders:string,invoiced:string,rate:string}|null Request-local list expressions */
+	private $billingSql = null;
+
+	/** @var string Native numeric search syntax */
+	private $billingSearch = '';
 
 	/**
 	 * Constructor.
@@ -334,6 +340,28 @@ class ActionsLmdbadvancedproject
 	{
 		global $langs, $user;
 
+		// Register before the native selected-fields action on every supported core.
+		if (in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)) {
+			global $sortfield;
+			$this->resprints = '';
+			if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+				if (isset($parameters['arrayfields']) && is_array($parameters['arrayfields'])) {
+					unset($parameters['arrayfields']['lmdbap_billing_rate']);
+				}
+				if (is_string($sortfield) && strpos($sortfield, 'lmdbap_billing_') !== false) { $sortfield = 'p.ref'; }
+				return 0;
+			}
+			$langs->load('lmdbadvancedproject@lmdbadvancedproject');
+			if (isset($parameters['arrayfields']) && is_array($parameters['arrayfields'])) {
+				$parameters['arrayfields']['lmdbap_billing_rate'] = array('label' => 'BudgetBillingProgress', 'checked' => 1, 'position' => 180);
+			}
+			$this->billingSearch = trim((string) GETPOST('search_lmdbap_billing', 'alpha'));
+			if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')) {
+				$this->billingSearch = '';
+			}
+			return 0;
+		}
+
 		$context = $this->getInvoiceContext($parameters);
 		if ($context === '' || !in_array($action, array('lmdbadvancedproject_edit_split', 'lmdbadvancedproject_update_split'), true)) {
 			return 0;
@@ -371,6 +399,218 @@ class ActionsLmdbadvancedproject
 
 		$this->renderSplitForm($context, $source, $messages, $errors);
 		exit;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListSelect($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		global $arrayfields, $sortfield;
+		if (empty($arrayfields['lmdbap_billing_rate']['checked']) && $this->billingSearch === '' && strpos((string) $sortfield, 'lmdbap_billing_rate') === false) { return 0; }
+		require_once __DIR__.'/../lib/budgetreport.lib.php';
+		$this->billingSql = lmdbadvancedproject_billing_expressions();
+		$this->resprints = ', '.$this->billingSql['orders'].' AS lmdbap_billing_orders, '.$this->billingSql['invoiced'].' AS lmdbap_billing_invoiced, '.$this->billingSql['rate'].' AS lmdbap_billing_rate';
+		return 0;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListWhere($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if ($this->billingSearch !== '') {
+			require_once __DIR__.'/../lib/budgetreport.lib.php';
+			if ($this->billingSql === null) { $this->billingSql = lmdbadvancedproject_billing_expressions(); }
+			$this->resprints = str_replace('lmdbap_billing_rate', $this->billingSql['rate'], natural_search('lmdbap_billing_rate', $this->billingSearch, 1));
+		}
+		return 0;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListSearchParam($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if ($this->billingSearch !== '') {
+			$this->resprints = '&search_lmdbap_billing='.urlencode($this->billingSearch);
+		}
+		return 0;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListOption($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if (!empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
+			$this->resprints = '<td class="liste_titre center"><input class="flat maxwidth75" type="text" name="search_lmdbap_billing" value="'.dol_escape_htmltag($this->billingSearch).'" aria-label="'.dol_escape_htmltag($langs->trans('BudgetBillingProgress')).'"></td>';
+		}
+		return 0;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListTitle($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if (!empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
+			$this->resprints = getTitleFieldOfList($langs->trans('BudgetBillingProgress'), 0, $_SERVER['PHP_SELF'], 'lmdbap_billing_rate', '', (string) ($parameters['param'] ?? ''), '', (string) ($parameters['sortfield'] ?? ''), (string) ($parameters['sortorder'] ?? ''), 'center lmdbap-billing-progress ');
+			if (isset($parameters['totalarray']) && is_array($parameters['totalarray'])) {
+				$parameters['totalarray']['nbfield'] = (int) ($parameters['totalarray']['nbfield'] ?? 0) + 1;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Extend the native project list without replacing other hooks.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListValue($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		if (!in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if (!empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
+			$row = $parameters['obj'] ?? null;
+			require_once __DIR__.'/../lib/budgetreport.lib.php';
+			if (is_object($row) && isset($row->lmdbap_billing_invoiced, $row->lmdbap_billing_orders)) {
+				$this->resprints = '<td class="center lmdbap-billing-progress">'.lmdbadvancedproject_billing_progress((float) $row->lmdbap_billing_invoiced, (float) $row->lmdbap_billing_orders).'</td>';
+			} else {
+				$this->resprints = '<td class="center opacitymedium lmdbap-billing-progress">—</td>';
+			}
+			if (empty($parameters['i']) && isset($parameters['totalarray']) && is_array($parameters['totalarray'])) {
+				$parameters['totalarray']['nbfield'] = (int) ($parameters['totalarray']['nbfield'] ?? 0) + 1;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Reconcile native totals when Multicompany emits an uncounted environment cell.
+	 * The native total template has already run at this hook; amounts stay untouched.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function printFieldListFooter($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user;
+		$this->resprints = '';
+		if (in_array('projectlist', explode(':', $parameters['context'] ?? ''), true)
+			&& isModEnabled('lmdbadvancedproject') && $user->hasRight('projet', 'lire') && $user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')
+			&& !empty($parameters['arrayfields']['lmdbap_billing_rate']['checked'])) {
+			$this->resprints = '<script src="'.dol_buildpath('/lmdbadvancedproject/js/projectlist.js', 1).'?v=1.5.0"></script>';
+		}
+		return 0;
+	}
+
+	/**
+	 * Render once on the native card, then move below its description in the DOM.
+	 * @param array<string,mixed> $parameters
+	 * @param CommonObject $object
+	 * @param string $action
+	 * @param HookManager $hookmanager
+	 * @return int
+	 */
+	public function mainCardTabAddMore($parameters, &$object, &$action, $hookmanager)
+	{
+		global $user, $langs;
+		$this->resprints = '';
+		// HookManager runs each module once, under whichever context was inserted first.
+		if (!in_array('projectcard', explode(':', $parameters['context'] ?? ''), true)
+			|| !$object instanceof Project || $object->id <= 0 || in_array($action, array('create', 'edit'), true)
+			|| !isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			return 0;
+		}
+		if ($object->restrictedProjectArea($user, 'read') <= 0) { return 0; }
+		require_once __DIR__.'/../lib/budgetreport.lib.php';
+		$langs->loadLangs(array('lmdbadvancedproject@lmdbadvancedproject', 'projects'));
+		try {
+			$data = lmdbadvancedproject_load_budget_report_data((int) $object->id, array(), true);
+			if (empty($data['projects'])) { return 0; }
+			ob_start();
+			try {
+				lmdbadvancedproject_print_cost_notice($data['productCosts'], false);
+				lmdbadvancedproject_render_budget_summary($data, true);
+				$body = (string) ob_get_contents();
+			} finally {
+				ob_end_clean();
+			}
+		} catch (RuntimeException $exception) {
+			$body = '<div class="warning">'.dol_escape_htmltag($langs->trans('BudgetSummaryUnavailable')).'</div>';
+			dol_syslog(__METHOD__.': summary unavailable', LOG_ERR);
+		}
+		// Native projet/card.php (v20–v24) calls this hook without printing resPrint.
+		print '<section id="lmdbap-project-summary" aria-label="'.dol_escape_htmltag($langs->trans('BudgetReportProjectTab')).'">'
+			.'<div class="div-table-responsive-no-min">'.$body.'</div></section>'
+			.'<script src="'.dol_buildpath('/lmdbadvancedproject/js/projectsummary.js', 1).'?v=1.5.0"></script>';
+		return 0;
 	}
 
 	/**

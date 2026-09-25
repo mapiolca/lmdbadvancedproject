@@ -68,3 +68,13 @@ cmp test/.cache/legacy-new.json test/.cache/legacy-base.json
 Agenda, Notifications, nouveaux objets CRUD, numérotation, import et cron : non applicables, aucun mécanisme supplémentaire ajouté. Les listeners consomment les événements natifs sans les réémettre. Aucun nouveau partage indépendant n’est déclaré : les tables d’instantanés suivent les objets natifs propriétaires.
 
 Une première recette navigateur a été exécutée sur Dolibarr 24.0.1/PHP 8.3.33 avec une version intermédiaire de la branche ; aucun fichier serveur n’a été déployé par l’agent. La lecture des tags v20–v24 et l’exécution de fixtures sous PHP 8.4.22 ne constituent pas une certification de toutes les combinaisons ERP/PHP/Multicompany. Les résultats datés et les contrôles distants restant à effectuer figurent dans [le compte rendu 1.4.1](../doc/VALIDATION_COST_VALUATION.md).
+
+## Synthèse des projets — 1.5.0
+
+`php test/projectsummary_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION` comme les fixtures précédentes, avec PDO SQLite, Zip et GD. Il inclut les contrôles du rapport et les exports XLSX/ODS, puis vérifie les requêtes de progression, les ventilations, avoirs, montants nuls, périmètres d’accès, hooks natifs, filtres, comptage et synthèse compacte. Aucune connexion à une base ERP n’est effectuée.
+
+Pour la fiche, le test capture la sortie effectivement émise par `mainCardTabAddMore`, comme la page native qui n’affiche pas `HookManager::resPrint`. Il utilise `HookManager::initHooks()` avec `globalcard` déjà initialisé par un autre module, puis avec `projectcard` en premier. Les configurations de navigateur `classic` et `phone` doivent produire chacune un seul bloc et cinq tuiles ; le seul contexte `globalcard`, les refus de permission, l’édition et la désactivation ne doivent rien émettre. Une erreur SQL doit produire un avertissement visible.
+
+Voir [les preuves et la recette restant à réaliser](../doc/VALIDATION_PROJECT_SUMMARY.md). La variable facultative `LMDBAP_SUMMARY_HTML` écrit le fragment de fiche produit par le hook dans un fichier de test choisi, à conserver dans `test/.cache/`.
+
+`LMDBAP_LIST_HTML` écrit une page de fixtures basée sur `list_print_total.tpl.php` natif : cellule d’entité non comptée, déjà comptée, sans entité, progression masquée et décalage ambigu. Servir le module localement puis ouvrir cette page sous `test/.cache/` pour contrôler `js/projectlist.js`. Les deux chargements du script doivent laisser les totaux de page et généraux à 12 cellules dans les deux premiers cas, 11 dans les deux suivants et 10 dans le cas ambigu. Le montant doit conserver sa valeur et sa colonne ; aucune somme des pourcentages n’est ajoutée.

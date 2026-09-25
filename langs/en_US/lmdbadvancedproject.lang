@@ -272,3 +272,11 @@ BudgetCompatibilityDynamicDescription=Read-only access to active, successfully c
 BudgetCompatibilityDynamicUnavailable=Enable the dynamicsprices module and its costs, with a version providing the compatible DynamicPricesCostService contract.
 BudgetCompatibilityPriceListDescription=Read applicable prices and recorded historical amounts using the order, target and quantity tier.
 BudgetCompatibilityPriceListUnavailable=Enable PriceList with compatible get_price, getEffectiveCostPriceForRow and getHistory methods. No local replacement is provided.
+
+# Project list and card summary (1.5.0)
+BudgetBillingProgress=Invoicing progress
+BudgetBillingNotComputable=Progress cannot be calculated without a positive order amount.
+BudgetBillingAmounts=Invoiced excl. tax: %s / Ordered excl. tax: %s
+BudgetSummaryUnavailable=The budget summary is unavailable. Open the report or contact your administrator.
+BudgetReportScrollTablesHelp=Scroll tables horizontally to see all columns.
+BudgetAboutFeatureProjectSummary=Billing progress in the project list and a budget summary below the project card description.

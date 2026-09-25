@@ -9,6 +9,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
 require_once __DIR__.'/../class/lmdbadvancedprojectproductcost.class.php';
 require_once __DIR__.'/productcost.lib.php';
+require_once __DIR__.'/projectbilling.lib.php';
 
 if (!function_exists('lmdbadvancedproject_round_amount')) {
 	/**
@@ -441,7 +442,7 @@ if (!function_exists('lmdbadvancedproject_supplier_invoice_split_report_enabled'
 	{
 		global $conf;
 
-		return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT)
+		return getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT') > 0
 			&& lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts');
 	}
 }
@@ -456,7 +457,7 @@ if (!function_exists('lmdbadvancedproject_customer_invoice_split_report_enabled'
 	{
 		global $conf;
 
-		return !empty($conf->global->LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT)
+		return getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT') > 0
 			&& lmdbadvancedproject_table_exists(MAIN_DB_PREFIX.'lmdbadvancedproject_customer_invoice_parts');
 	}
 }
@@ -608,9 +609,9 @@ if (!function_exists('lmdbadvancedproject_get_budget_report_project_options')) {
 		$sql = 'SELECT DISTINCT p.rowid, p.ref, p.title';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'projet p';
 		if (!LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
-			$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'commande c ON c.fk_projet = p.rowid AND c.entity IN ('.$orderEntities.') AND c.fk_statut > 0';
+			$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'commande c ON c.fk_projet = p.rowid AND c.entity IN ('.$orderEntities.') AND c.fk_statut > 0'.lmdbadvancedproject_billing_document_scope('c');
 		}
-		$sql .= ' WHERE p.entity IN ('.$projectEntities.')';
+		$sql .= ' WHERE p.entity IN ('.$projectEntities.')'.lmdbadvancedproject_billing_document_scope('p');
 		if (is_array($authorizedProjectIds)) {
 			$sql .= ' AND p.rowid IN ('.(empty($authorizedProjectIds) ? '0' : implode(',', array_map('intval', $authorizedProjectIds))).')';
 		}
@@ -1508,7 +1509,7 @@ if (!function_exists('lmdbadvancedproject_load_project_forecast')) {
 			INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
 			".$categorySql['join']."
 			WHERE c.fk_projet = ".$projectId." AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.") AND cd.product_type IN (0,1)
-			AND ".$orderDateCondition;
+			AND ".$orderDateCondition.lmdbadvancedproject_billing_document_scope('c');
 		$resql = $db->query($sql);
 		if ($resql) {
 			while ($obj = $db->fetch_object($resql)) {
@@ -2040,7 +2041,7 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 	{
 		global $langs;
 
-		print '<div class="budgetreport-table-scroll">';
+		print '<div class="div-table-responsive-no-min budgetreport-table-scroll" tabindex="0">';
 		print '<table class="budgettbl budgetreport-forecast-table">';
 		print '<tr>';
 		print '<th>'.$langs->trans('LMDB_CommercialCategoryExtrafield').'</th>';
@@ -2083,7 +2084,7 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 
 		print '<div class="budgetreport-forecast-extra">';
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportTimeSpentTotal').'</div>';
-		print '<div class="budgetreport-table-scroll">';
+		print '<div class="div-table-responsive-no-min budgetreport-table-scroll" tabindex="0">';
 		print '<table class="budgettbl budgetreport-extra-subtable">';
 		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Task').'</th><th class="budgetreport-extra-task-label-col">'.$langs->trans('Label').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportContributorCount').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportTimeSpentHours').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('BudgetReportSpent').'</th></tr>';
 		foreach ($forecast['time']['lines'] as $line) {
@@ -2101,7 +2102,7 @@ if (!function_exists('lmdbadvancedproject_print_project_forecast')) {
 		print '</div>';
 
 		print '<div class="budgettitle budgetreport-forecast-subtitle">'.$langs->trans('BudgetReportExpenseReportDetails').'</div>';
-		print '<div class="budgetreport-table-scroll">';
+		print '<div class="div-table-responsive-no-min budgetreport-table-scroll" tabindex="0">';
 		print '<table class="budgettbl budgetreport-extra-subtable">';
 		print '<tr><th class="budgetreport-extra-compact-col">'.$langs->trans('Date').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('Ref').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('User').'</th><th class="budgetreport-extra-expense-comment-col">'.$langs->trans('BudgetReportExpenseComment').'</th><th class="budgetreport-extra-compact-col">'.$langs->trans('AmountHTShort').'</th></tr>';
 		foreach ($forecast['expenses']['lines'] as $line) {
@@ -2128,11 +2129,15 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 	 *
 	 * @param  int                 $budgetReportProjectId Project id for project tab, 0 for global report
 	 * @param  array<string,mixed> $filters               Global or project report filters
+	 * @param bool $summaryOnly Load totals without forecasts or chart preparation
 	 * @return array<string,mixed>
 	 */
-	function lmdbadvancedproject_load_budget_report_data($budgetReportProjectId = 0, $filters = array())
+	function lmdbadvancedproject_load_budget_report_data($budgetReportProjectId = 0, $filters = array(), $summaryOnly = false)
 	{
-		global $db, $conf, $langs;
+		global $db, $conf, $langs, $user;
+		if (!isModEnabled('lmdbadvancedproject') || !$user->hasRight('projet', 'lire') || !$user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+			throw new RuntimeException('BudgetCostAccessDenied');
+		}
 		if (getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST') === 1 && !LmdbAdvancedProjectCompatibility::shipmentCostAvailable()) {
 			throw new RuntimeException('BudgetCostUnavailable');
 		}
@@ -2162,31 +2167,28 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$vendorInvoiceProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ff.fk_projet = ".$budgetReportProjectId : "";
 		$supplierOrderProjectSqlFilter = $budgetReportProjectId > 0 ? " AND cf.fk_projet = ".$budgetReportProjectId : "";
 		$expenseProjectSqlFilter = $budgetReportProjectId > 0 ? " AND ed.fk_projet = ".$budgetReportProjectId : "";
-		if ($budgetReportProjectId <= 0) {
-			$restrictedProjectIds = null;
-			$authorizedProjectIds = lmdbadvancedproject_get_budget_report_authorized_project_ids();
-			if (is_array($authorizedProjectIds)) {
-				$restrictedProjectIds = array_values(array_unique(array_map('intval', $authorizedProjectIds)));
-			}
-			if (!empty($filters['project_ids'])) {
-				$requestedProjectIds = array_values(array_unique(array_map('intval', $filters['project_ids'])));
-				$restrictedProjectIds = is_array($restrictedProjectIds)
-					? array_values(array_intersect($restrictedProjectIds, $requestedProjectIds))
-					: $requestedProjectIds;
-			}
-			if (is_array($restrictedProjectIds)) {
-				$restrictedProjectsSql = empty($restrictedProjectIds) ? '0' : implode(',', $restrictedProjectIds);
-				$projectSqlFilter .= ' AND p.rowid IN ('.$restrictedProjectsSql.')';
-				$orderProjectSqlFilter .= ' AND c.fk_projet IN ('.$restrictedProjectsSql.')';
-				$vendorInvoiceProjectSqlFilter .= ' AND ff.fk_projet IN ('.$restrictedProjectsSql.')';
-				$supplierOrderProjectSqlFilter .= ' AND cf.fk_projet IN ('.$restrictedProjectsSql.')';
-				$expenseProjectSqlFilter .= ' AND ed.fk_projet IN ('.$restrictedProjectsSql.')';
-			}
+		$restrictedProjectIds = null;
+		$authorizedProjectIds = lmdbadvancedproject_get_budget_report_authorized_project_ids();
+		if (is_array($authorizedProjectIds)) {
+			$restrictedProjectIds = array_values(array_unique(array_map('intval', $authorizedProjectIds)));
+		}
+		if (!empty($filters['project_ids'])) {
+			$requestedProjectIds = array_values(array_unique(array_map('intval', $filters['project_ids'])));
+			$restrictedProjectIds = is_array($restrictedProjectIds)
+				? array_values(array_intersect($restrictedProjectIds, $requestedProjectIds))
+				: $requestedProjectIds;
+		}
+		if (is_array($restrictedProjectIds)) {
+			$restrictedProjectsSql = empty($restrictedProjectIds) ? '0' : implode(',', $restrictedProjectIds);
+			$projectSqlFilter .= ' AND p.rowid IN ('.$restrictedProjectsSql.')';
+			$orderProjectSqlFilter .= ' AND c.fk_projet IN ('.$restrictedProjectsSql.')';
+			$vendorInvoiceProjectSqlFilter .= ' AND ff.fk_projet IN ('.$restrictedProjectsSql.')';
+			$supplierOrderProjectSqlFilter .= ' AND cf.fk_projet IN ('.$restrictedProjectsSql.')';
+			$expenseProjectSqlFilter .= ' AND ed.fk_projet IN ('.$restrictedProjectsSql.')';
 		}
 		$contentPeriodIsActive = lmdbadvancedproject_budget_report_content_period_is_active($filters);
 		$contentFilters = $filters;
 		$orderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('c.date_commande', $contentFilters);
-		$customerInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('f.datef', $contentFilters);
 		$timeDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ptt.element_date', $contentFilters);
 		$supplierInvoiceDateCondition = lmdbadvancedproject_build_content_date_sql_condition('ff.datef', $contentFilters);
 		$supplierOrderDateCondition = lmdbadvancedproject_build_content_date_sql_condition('COALESCE(cf.date_commande, DATE(cf.date_creation))', $contentFilters);
@@ -2199,7 +2201,6 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		$projectEntities = lmdbadvancedproject_get_entity_filter('project', $projectDisplayEntityShared);
 		$projectDataEntities = lmdbadvancedproject_get_entity_filter('project', 1);
 		$orderEntities = lmdbadvancedproject_get_entity_filter('commande', 1);
-		$customerInvoiceEntities = lmdbadvancedproject_get_entity_filter('facture', 1);
 		$supplierInvoiceEntities = lmdbadvancedproject_get_entity_filter('supplier_invoice', 1);
 		$supplierOrderEntities = lmdbadvancedproject_get_entity_filter('supplier_order', 1);
 		$expenseReportEntities = lmdbadvancedproject_get_entity_filter('expensereport', 1);
@@ -2209,26 +2210,27 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$budgetReportMulticompanyInfoKey = $entityShared ? 'BudgetReportMulticompanyAllEntitiesInfo' : 'BudgetReportMulticompanyCurrentEntityInfo';
 		}
 
-		$projectOrderJoin = LmdbAdvancedProjectCompatibility::isShipmentCostEnabled() ? "LEFT JOIN" : "INNER JOIN";
-		$sql = "SELECT p.*, COALESCE(cmd.total_orders,0) AS total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget FROM ".MAIN_DB_PREFIX."projet p
-			".$projectOrderJoin." (
-				SELECT c.fk_projet, SUM(CASE WHEN ".$orderDateCondition." THEN COALESCE(c.total_ht, 0) ELSE 0 END) as total_orders
-				FROM ".MAIN_DB_PREFIX."commande c
-				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
-				GROUP BY c.fk_projet
-			) cmd ON cmd.fk_projet = p.rowid
+		$billingSources = lmdbadvancedproject_billing_sources($filters);
+		$billingExpressions = lmdbadvancedproject_billing_expressions($filters);
+		$projectOrderFilter = '';
+		if ($budgetReportProjectId <= 0 && !LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) {
+			// Retain projects with orders outside the observation period, as before.
+			$projectOrderFilter = ' AND EXISTS (SELECT c.rowid FROM '.MAIN_DB_PREFIX.'commande c WHERE c.fk_projet = p.rowid AND c.fk_statut > 0 AND c.entity IN ('.$orderEntities.')'.lmdbadvancedproject_billing_document_scope('c').')';
+		}
+		$sql = "SELECT p.*, ".$billingExpressions['orders']." AS total_orders, COALESCE(cmdbudget.total_budget, 0) AS total_budget, ".$billingExpressions['invoiced']." AS total_invoiced FROM ".MAIN_DB_PREFIX."projet p
 			LEFT JOIN (
 				SELECT c.fk_projet, SUM(CASE WHEN ".$orderDateCondition." THEN COALESCE(cd.buy_price_ht, 0) * COALESCE(cd.qty, 0) ELSE 0 END) as total_budget
 				FROM ".MAIN_DB_PREFIX."commande c
 				INNER JOIN ".MAIN_DB_PREFIX."commandedet cd ON cd.fk_commande = c.rowid
-				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter."
+				WHERE c.fk_projet > 0 AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")".$orderProjectSqlFilter.lmdbadvancedproject_billing_document_scope('c')."
 				GROUP BY c.fk_projet
 			) cmdbudget ON cmdbudget.fk_projet = p.rowid
-			WHERE p.entity IN (".$projectEntities.")".$projectSqlFilter.$projectStatusSqlFilter.$projectDateSqlFilter."
-			ORDER BY cmd.total_orders DESC";
+			WHERE p.entity IN (".$projectEntities.")".$projectSqlFilter.$projectStatusSqlFilter.$projectDateSqlFilter.$projectOrderFilter.lmdbadvancedproject_billing_document_scope('p')."
+			ORDER BY total_orders DESC";
 
 		$result = $db->query($sql);
-		$nbtotalofrecords = $result ? $db->num_rows($result) : 0;
+		if (!$result) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+		$nbtotalofrecords = $db->num_rows($result);
 
 		$i=0;
 		while ($i<$nbtotalofrecords) {
@@ -2244,12 +2246,14 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				"budget" => $projectBudget,
 				"orders" => $projectOrders,
 				"order_details" => array(),
-				"invoiced" => 0,
+				"invoiced" => (float) $obj->total_invoiced,
 				"invoice_details" => array(),
 				"spent" => 0,
 			);
 			$budget += $projectBudget;
 			$totalorders += $projectOrders;
+			$totalcustomerinvoices += (float) $obj->total_invoiced;
+			if ($summaryOnly) { $i++; continue; }
 
 			if (empty($obj->dateo)) {
 				// Projects without a start date stay in totals but cannot be plotted by month.
@@ -2297,20 +2301,16 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 			$i++;
 		}
-		if ($result) {
-			$db->free($result);
-		}
+		$db->free($result);
 
 		/** @var array<int,list<array{id:int,ref:string,date:string,amount:float}>> $customerOrderDetails */
 		$customerOrderDetails = array();
 		$selectedReportProjectIds = array_map('intval', array_keys($projects));
-		if (!empty($selectedReportProjectIds)) {
+		if (!$summaryOnly && !empty($selectedReportProjectIds)) {
 			$selectedReportProjectsSql = implode(',', $selectedReportProjectIds);
-			$sqlCustomerOrderDetails = "SELECT c.fk_projet, c.rowid AS order_id, c.ref AS order_ref, c.date_commande AS order_date, COALESCE(c.total_ht, 0) AS total_order
-				FROM ".MAIN_DB_PREFIX."commande c
-				WHERE c.fk_projet IN (".$selectedReportProjectsSql.") AND c.fk_statut > 0 AND c.entity IN (".$orderEntities.")
-				AND ".$orderDateCondition."
-				ORDER BY c.date_commande DESC, c.ref DESC";
+			$sqlCustomerOrderDetails = "SELECT bo.fk_projet, bo.document_id AS order_id, bo.ref AS order_ref, bo.document_date AS order_date, bo.amount AS total_order
+				FROM (".$billingSources['orders'].") bo WHERE bo.fk_projet IN (".$selectedReportProjectsSql.")
+				ORDER BY bo.document_date DESC, bo.ref DESC";
 			$resultCustomerOrderDetails = $db->query($sqlCustomerOrderDetails);
 			if (!$resultCustomerOrderDetails) {
 				dol_syslog(__FUNCTION__.': failed to load customer order details: '.$db->lasterror(), LOG_ERR);
@@ -2338,34 +2338,12 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 
 		/** @var array<int,list<array{id:int,ref:string,type:int,date:string,amount:float}>> $customerInvoiceDetails */
 		$customerInvoiceDetails = array();
-		if (!empty($selectedReportProjectIds)) {
+		if (!$summaryOnly && !empty($selectedReportProjectIds)) {
 			$selectedCustomerInvoiceProjectsSql = implode(',', $selectedReportProjectIds);
-			$customerInvoiceSplitEnabled = lmdbadvancedproject_customer_invoice_split_report_enabled();
-			if ($customerInvoiceSplitEnabled) {
-				$directInvoiceContributionsSql = "SELECT f.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, SUM(COALESCE(fd.total_ht, 0)) AS total_invoice
-					FROM ".MAIN_DB_PREFIX."facture f
-					INNER JOIN ".MAIN_DB_PREFIX."facturedet fd ON fd.fk_facture = f.rowid
-					WHERE f.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")
-					AND ".$customerInvoiceDateCondition."
-					AND NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cipx WHERE cipx.fk_facture_det = fd.rowid)
-					GROUP BY f.fk_projet, f.rowid, f.ref, f.type, f.datef";
-				$splitInvoiceContributionsSql = "SELECT cip.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, SUM(COALESCE(cip.total_ht, 0)) AS total_invoice
-					FROM ".MAIN_DB_PREFIX."lmdbadvancedproject_customer_invoice_parts cip
-					INNER JOIN ".MAIN_DB_PREFIX."facture f ON f.rowid = cip.fk_facture
-					WHERE cip.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.") AND cip.entity IN (".$customerInvoiceEntities.")
-					AND ".$customerInvoiceDateCondition."
-					GROUP BY cip.fk_projet, f.rowid, f.ref, f.type, f.datef";
-				$sqlCustomerInvoiceDetails = "SELECT invoice_contribution.fk_projet, invoice_contribution.invoice_id, invoice_contribution.invoice_ref, invoice_contribution.invoice_type, invoice_contribution.invoice_date, SUM(invoice_contribution.total_invoice) AS total_invoice
-					FROM (".$directInvoiceContributionsSql." UNION ALL ".$splitInvoiceContributionsSql.") invoice_contribution
-					GROUP BY invoice_contribution.fk_projet, invoice_contribution.invoice_id, invoice_contribution.invoice_ref, invoice_contribution.invoice_type, invoice_contribution.invoice_date
-					ORDER BY invoice_contribution.invoice_date DESC, invoice_contribution.invoice_ref DESC";
-			} else {
-				$sqlCustomerInvoiceDetails = "SELECT f.fk_projet, f.rowid AS invoice_id, f.ref AS invoice_ref, f.type AS invoice_type, f.datef AS invoice_date, COALESCE(f.total_ht, 0) AS total_invoice
-					FROM ".MAIN_DB_PREFIX."facture f
-					WHERE f.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.") AND f.fk_statut IN (1,2) AND f.entity IN (".$customerInvoiceEntities.")
-					AND ".$customerInvoiceDateCondition."
-					ORDER BY f.datef DESC, f.ref DESC";
-			}
+			$sqlCustomerInvoiceDetails = "SELECT bi.fk_projet, bi.document_id AS invoice_id, bi.ref AS invoice_ref, bi.type AS invoice_type, bi.document_date AS invoice_date, SUM(bi.amount) AS total_invoice
+				FROM (".$billingSources['invoices'].") bi WHERE bi.fk_projet IN (".$selectedCustomerInvoiceProjectsSql.")
+				GROUP BY bi.fk_projet, bi.document_id, bi.ref, bi.type, bi.document_date
+				ORDER BY bi.document_date DESC, bi.ref DESC";
 
 			$resultCustomerInvoiceDetails = $db->query($sqlCustomerInvoiceDetails);
 			if (!$resultCustomerInvoiceDetails) {
@@ -2393,10 +2371,6 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				continue;
 			}
 			$projects[$pid]['invoice_details'] = $customerInvoiceDetails[$pid];
-			foreach ($customerInvoiceDetails[$pid] as $invoiceDetail) {
-				$projects[$pid]['invoiced'] += (float) $invoiceDetail['amount'];
-			}
-			$totalcustomerinvoices += (float) $projects[$pid]['invoiced'];
 		}
 
 		$timespent = array();
@@ -2409,7 +2383,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 		);
 		$selectedProjectIds = array_map('intval', array_keys($projects));
 
-		if ($budgetReportProjectId > 0 && !empty($selectedProjectIds)) {
+		if (!$summaryOnly && $budgetReportProjectId > 0 && !empty($selectedProjectIds)) {
 			$sqlTasks = "SELECT pt.rowid, pt.fk_projet, pt.ref, pt.label
 				FROM ".MAIN_DB_PREFIX."projet_task pt
 				WHERE pt.fk_projet = ".$budgetReportProjectId."
@@ -2430,7 +2404,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				}
 				$db->free($resultTasks);
 			}
-		} else {
+		} elseif (!$summaryOnly) {
 			foreach ($projects as $projectId => $projectData) {
 				$timeBreakdown['rows'][(int) $projectId] = array(
 					'id' => (int) $projectId,
@@ -2451,7 +2425,13 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$groupBy = $budgetReportProjectId > 0
 				? 'pt.rowid, pt.ref, pt.label, month_key'
 				: 'pt.fk_projet, month_key';
-			$sql0 = "SELECT pt.fk_projet, ".$groupSelect." DATE_FORMAT(ptt.element_date, '%Y-%m') AS month_key,
+			$monthSelect = "DATE_FORMAT(ptt.element_date, '%Y-%m')";
+			if ($summaryOnly) {
+				$groupSelect = "pt.fk_projet AS breakdown_id, '' AS breakdown_ref, '' AS breakdown_label,";
+				$groupBy = 'pt.fk_projet';
+				$monthSelect = "'1970-01'"; // Internal accumulation bucket, never rendered.
+			}
+			$sql0 = "SELECT pt.fk_projet, ".$groupSelect." ".$monthSelect." AS month_key,
 				SUM(ptt.element_duration) / 3600.0 AS total_hours,
 				SUM((ptt.element_duration / 3600.0) * CASE
 					WHEN ptt.thm IS NOT NULL AND ptt.thm > 0 THEN ptt.thm
@@ -2470,40 +2450,40 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				GROUP BY ".$groupBy."
 				ORDER BY month_key ASC";
 			$result0 = $db->query($sql0);
-			if ($result0) {
-				while (is_object($obj = $db->fetch_object($result0))) {
-					$projectId = (int) $obj->fk_projet;
-					$rowId = (int) $obj->breakdown_id;
-					$monthKey = (string) $obj->month_key;
-					$hours = empty($obj->total_hours) ? 0.0 : (float) $obj->total_hours;
-					$cost = empty($obj->totalspent) ? 0.0 : (float) $obj->totalspent;
+			if (!$result0) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+			while (is_object($obj = $db->fetch_object($result0))) {
+				$projectId = (int) $obj->fk_projet;
+				$rowId = (int) $obj->breakdown_id;
+				$monthKey = (string) $obj->month_key;
+				$hours = empty($obj->total_hours) ? 0.0 : (float) $obj->total_hours;
+				$cost = empty($obj->totalspent) ? 0.0 : (float) $obj->totalspent;
 
-					if (!isset($timespent[$projectId][$monthKey])) {
-						$timespent[$projectId][$monthKey] = 0.0;
-					}
-					$timespent[$projectId][$monthKey] += $cost;
-					if (!isset($motimehours[$monthKey])) {
-						$motimehours[$monthKey] = 0.0;
-					}
-					$motimehours[$monthKey] += $hours;
-					$cleanmos[$monthKey] = $monthKey;
-
-					if (!isset($timeBreakdown['rows'][$rowId])) {
-						$timeBreakdown['rows'][$rowId] = array(
-							'id' => $rowId,
-							'project_id' => $projectId,
-							'ref' => (string) $obj->breakdown_ref,
-							'label' => (string) $obj->breakdown_label,
-							'months' => array(),
-							'total_hours' => 0.0,
-						);
-					}
-					$timeBreakdown['rows'][$rowId]['months'][$monthKey] = $hours;
-					$timeBreakdown['rows'][$rowId]['total_hours'] += $hours;
-					$totalTimeHours += $hours;
+				if (!isset($timespent[$projectId][$monthKey])) {
+					$timespent[$projectId][$monthKey] = 0.0;
 				}
-				$db->free($result0);
+				$timespent[$projectId][$monthKey] += $cost;
+				if (!isset($motimehours[$monthKey])) {
+					$motimehours[$monthKey] = 0.0;
+				}
+				$motimehours[$monthKey] += $hours;
+				$cleanmos[$monthKey] = $monthKey;
+
+				$totalTimeHours += $hours;
+				if ($summaryOnly) { continue; }
+				if (!isset($timeBreakdown['rows'][$rowId])) {
+					$timeBreakdown['rows'][$rowId] = array(
+						'id' => $rowId,
+						'project_id' => $projectId,
+						'ref' => (string) $obj->breakdown_ref,
+						'label' => (string) $obj->breakdown_label,
+						'months' => array(),
+						'total_hours' => 0.0,
+					);
+				}
+				$timeBreakdown['rows'][$rowId]['months'][$monthKey] = $hours;
+				$timeBreakdown['rows'][$rowId]['total_hours'] += $hours;
 			}
+			$db->free($result0);
 		}
 
 		foreach ($projects as $pid=>$data) {
@@ -2531,7 +2511,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			AND ".$supplierInvoiceDateCondition."
 			GROUP BY ff.fk_projet, ff.datef";
 		$result1 = $db->query($sql1);
-		$nbtotal1 = $result1 ? $db->num_rows($result1) : 0;
+		if (!$result1) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+		$nbtotal1 = $db->num_rows($result1);
 		$i=0;
 		while ($i<$nbtotal1) {
 			$obj = $db->fetch_object($result1);
@@ -2541,9 +2522,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$vendorinvs[$obj->fk_projet][$obj->datef] += (float) $obj->total_inv;
 			$i++;
 		}
-		if ($result1) {
-			$db->free($result1);
-		}
+		$db->free($result1);
 
 		if ($supplierInvoiceSplitEnabled) {
 			$supplierInvoicePartProjectSqlFilter = $budgetReportProjectId > 0 ? " AND sip.fk_projet = ".$budgetReportProjectId : "";
@@ -2555,7 +2534,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				AND ".$supplierInvoiceDateCondition."
 				GROUP BY sip.fk_projet, ff.datef";
 			$resultSupplierInvoiceParts = $db->query($sqlSupplierInvoiceParts);
-			$nbtotalSupplierInvoiceParts = $resultSupplierInvoiceParts ? $db->num_rows($resultSupplierInvoiceParts) : 0;
+			if (!$resultSupplierInvoiceParts) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+			$nbtotalSupplierInvoiceParts = $db->num_rows($resultSupplierInvoiceParts);
 			$i=0;
 			while ($i<$nbtotalSupplierInvoiceParts) {
 				$obj = $db->fetch_object($resultSupplierInvoiceParts);
@@ -2565,9 +2545,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 				$vendorinvs[$obj->fk_projet][$obj->datef] += (float) $obj->total_inv;
 				$i++;
 			}
-			if ($resultSupplierInvoiceParts) {
-				$db->free($resultSupplierInvoiceParts);
-			}
+			$db->free($resultSupplierInvoiceParts);
 		}
 
 		foreach ($projects as $pid=>$data) {
@@ -2603,7 +2581,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			AND ".$supplierOrderDateCondition."
 			GROUP BY cf.fk_projet, order_date, supplier_order_bucket";
 		$result3 = $db->query($sql3);
-		$nbtotal3 = $result3 ? $db->num_rows($result3) : 0;
+		if (!$result3) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+		$nbtotal3 = $db->num_rows($result3);
 		$i=0;
 		while ($i<$nbtotal3) {
 			$obj = $db->fetch_object($result3);
@@ -2616,9 +2595,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			}
 			$i++;
 		}
-		if ($result3) {
-			$db->free($result3);
-		}
+		$db->free($result3);
 
 		foreach ($projects as $pid=>$data) {
 			if (isset($supplierorders[$pid])) {
@@ -2650,7 +2627,8 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			AND ".$expenseDateCondition."
 			GROUP BY ed.fk_projet, ed.date ";
 		$result2 = $db->query($sql2);
-		$nbtotal2 = $result2 ? $db->num_rows($result2) : 0;
+		if (!$result2) { throw new RuntimeException('BudgetSummaryUnavailable'); }
+		$nbtotal2 = $db->num_rows($result2);
 		$i=0;
 		while ($i<$nbtotal2) {
 			$obj = $db->fetch_object($result2);
@@ -2660,9 +2638,7 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 			$expenses[$obj->fk_projet][$obj->date] += (float) $obj->total_exp;
 			$i++;
 		}
-		if ($result2) {
-			$db->free($result2);
-		}
+		$db->free($result2);
 
 		foreach ($projects as $pid=>$data) {
 			if (isset($expenses[$pid])) {
@@ -2705,6 +2681,19 @@ if (!function_exists('lmdbadvancedproject_load_budget_report_data')) {
 					}
 				}
 			}
+		}
+
+		if ($summaryOnly) {
+			$totalspent = $totaltime + $totalvendinv + $totalsupplierordersremaining + $totalexpenses + $totalshipmentcost;
+			return array(
+				'projects' => $projects, 'totalorders' => $totalorders, 'totalcustomerinvoices' => $totalcustomerinvoices,
+				'budget' => $budget, 'totalspent' => $totalspent, 'balance' => $budget - $totalspent,
+				'totaltime' => $totaltime, 'totalTimeHours' => $totalTimeHours, 'totalvendinv' => $totalvendinv,
+				'totalsupplierordersorderedremaining' => $totalsupplierordersorderedremaining,
+				'totalsupplierordersdeliveredremaining' => $totalsupplierordersdeliveredremaining,
+				'totalsupplierordersremaining' => $totalsupplierordersremaining,
+				'totalexpenses' => $totalexpenses, 'totalshipmentcost' => $totalshipmentcost, 'productCosts' => $productCosts,
+			);
 		}
 
 		ksort($cleanmos);
@@ -2880,7 +2869,7 @@ if (!function_exists('lmdbadvancedproject_print_time_breakdown')) {
 
 		print '<div class="budgetreport-time-section">';
 		print '<div class="budgettitle">'.$langs->trans('BudgetReportTimeBreakdownByMonth').'</div>';
-		print '<div class="budgetreport-time-scroll">';
+		print '<div class="div-table-responsive-no-min budgetreport-time-scroll" tabindex="0">';
 		print '<table class="budgettbl budgetreport-time-table">';
 		print '<thead><tr><th class="budgetreport-time-label">'.$firstColumnLabel.'</th>';
 		foreach ($monthAxis as $monthData) {
@@ -2930,6 +2919,79 @@ if (!function_exists('lmdbadvancedproject_print_time_breakdown')) {
 		print '<td class="right nowrap"><b>'.lmdbadvancedproject_format_hours($timeBreakdown['total_hours']).'</b></td></tr>';
 		print '</tbody></table></div></div>';
 	}
+}
+
+/**
+ * Shared financial tiles. Compact layout is used only on the native project card.
+ * @param array<string,mixed> $data Loaded report or summary
+ * @param bool $compact Half-width layout
+ * @return void
+ */
+function lmdbadvancedproject_render_budget_summary(array $data, $compact = false)
+{
+	global $db, $conf, $langs;
+	$totalorders = (float) ($data['totalorders'] ?? 0);
+	$totalcustomerinvoices = (float) ($data['totalcustomerinvoices'] ?? 0);
+	$budget = (float) ($data['budget'] ?? 0);
+	$totalspent = (float) ($data['totalspent'] ?? 0);
+	$balance = (float) ($data['balance'] ?? 0);
+	$totaltime = (float) ($data['totaltime'] ?? 0);
+	$totalTimeHours = (float) ($data['totalTimeHours'] ?? 0);
+	$totalvendinv = (float) ($data['totalvendinv'] ?? 0);
+	$totalsupplierordersorderedremaining = (float) ($data['totalsupplierordersorderedremaining'] ?? 0);
+	$totalsupplierordersdeliveredremaining = (float) ($data['totalsupplierordersdeliveredremaining'] ?? 0);
+	$totalexpenses = (float) ($data['totalexpenses'] ?? 0);
+	$totalshipmentcost = (float) ($data['totalshipmentcost'] ?? 0);
+	$blncolor = $balance < 0 ? 'red' : 'green';
+	$formBudgetReport = new Form($db);
+?>
+<div class="budgetreport-summary-fullwidth<?php echo $compact ? ' lmdbap-summary-compact' : ''; ?>">
+<table class="noborder centpercent dashboard_budget" role="presentation">
+	<tr>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
+			<div class="budgetreport-summary-amount">
+				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
+			</div>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportInvoiced"); ?></div>
+			<div class="budgetreport-summary-amount">
+				<?php echo lmdbadvancedproject_format_price($totalcustomerinvoices); ?>
+				<span class="budgetreport-summary-rate"><?php echo '('.($totalorders > 0 ? lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders) : '—').')'; ?></span>
+			</div>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
+			<div class="budgetreport-summary-amount">
+				<?php echo lmdbadvancedproject_format_price($budget); ?>
+			</div>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
+			<div class="budgetreport-summary-amount">
+				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
+			</div>
+			<div class="budgetreport-summary-breakdown">
+				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).') &middot; '.lmdbadvancedproject_format_hours($totalTimeHours, true); ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
+				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
+				<?php if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) { ?><div><span><?php echo $formBudgetReport->textwithtooltip($langs->trans('BudgetCostShipmentsNet'), $langs->trans('BudgetCostChronologyHelp')); ?></span><strong><?php echo price(price2num($totalshipmentcost, 'MT'), 0, $langs, 1, -1, -1, $conf->currency).' ('.lmdbadvancedproject_format_spent_percentage($totalshipmentcost, $totalspent).')'; ?></strong></div><?php } ?>
+				<div><span><?php echo $langs->trans("BudgetReportStaffExpenses"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')'; ?></strong></div>
+			</div>
+		</td>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
+			<div class="budgetreport-summary-amount" style='color:<?php echo $blncolor; ?>'>
+				<?php echo lmdbadvancedproject_format_price($balance); ?>
+			</div>
+		</td>
+	</tr>
+</table>
+</div>
+
+<?php
 }
 
 if (!function_exists('lmdbadvancedproject_render_budget_report')) {
@@ -3043,50 +3105,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 <?php } ?>
 </div>
 
-<div class="budgetreport-summary-fullwidth">
-<table class="noborder centpercent dashboard_budget" role="presentation">
-	<tr>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
-			<div class="nowraponall budgetreport-summary-amount">
-				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
-			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportInvoiced"); ?></div>
-			<div class="nowraponall budgetreport-summary-amount">
-				<?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders).')'; ?>
-			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
-			<div class="nowraponall budgetreport-summary-amount">
-				<?php echo lmdbadvancedproject_format_price($budget); ?>
-			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
-			<div class="nowraponall budgetreport-summary-amount">
-				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
-			</div>
-			<div class="budgetreport-summary-breakdown">
-				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).') &middot; '.lmdbadvancedproject_format_hours($totalTimeHours, true); ?></strong></div>
-				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
-				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
-				<div><span><?php echo $langs->trans("BudgetReportVendorInvoices"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalvendinv).' ('.lmdbadvancedproject_format_spent_percentage($totalvendinv, $totalspent).')'; ?></strong></div>
-				<?php if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) { ?><div><span><?php echo $formBudgetReport->textwithtooltip($langs->trans('BudgetCostShipmentsNet'), $langs->trans('BudgetCostChronologyHelp')); ?></span><strong><?php echo price(price2num($totalshipmentcost, 'MT'), 0, $langs, 1, -1, -1, $conf->currency).' ('.lmdbadvancedproject_format_spent_percentage($totalshipmentcost, $totalspent).')'; ?></strong></div><?php } ?>
-				<div><span><?php echo $langs->trans("BudgetReportStaffExpenses"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')'; ?></strong></div>
-			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
-			<div class="nowraponall budgetreport-summary-amount" style='color:<?php echo $blncolor; ?>'>
-				<?php echo lmdbadvancedproject_format_price($balance); ?>
-			</div>
-		</td>
-	</tr>
-</table>
-</div>
+<?php lmdbadvancedproject_render_budget_summary($budgetReportData); ?>
 
 <div class="budgetreport-report">
 
@@ -3149,6 +3168,25 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		return value.join('.');
 	}
 
+	// Keep native legend toggles and full tooltip labels; shorten only what cannot fit.
+	function budgetReportLegendLabels(chart) {
+		var defaults = chart.config.type === 'pie' ? Chart.overrides.pie.plugins.legend.labels : Chart.defaults.plugins.legend.labels;
+		var labels = defaults.generateLabels(chart);
+		var options = chart.options.plugins.legend.labels;
+		var font = Chart.helpers.toFont(options.font);
+		var maxWidth = Math.max(40, chart.width - options.boxWidth - 2 * options.padding - font.size);
+		chart.ctx.save();
+		chart.ctx.font = font.string;
+		labels.forEach(function(item) {
+			var text = String(item.text);
+			if (chart.ctx.measureText(text).width > maxWidth) {
+				while (text.length > 1 && chart.ctx.measureText(text + '…').width > maxWidth) text = text.slice(0, -1);
+				item.text = text + '…';
+			}
+		});
+		chart.ctx.restore();
+		return labels;
+	}
 	var budgetFormattedValues = <?php echo json_encode(array_values($budgetFormattedValues)); ?>;
 	var budget_config = {
 			type: 'pie',
@@ -3172,7 +3210,16 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				responsive: true,
 				maintainAspectRatio: false,
 				legend: {
-					position: 'right',
+					position: 'bottom',
+					labels: { boxWidth: 12, padding: 10 }
+				},
+				plugins: {
+					legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, generateLabels: budgetReportLegendLabels } },
+					tooltip: {
+						callbacks: {
+							label: function(context) { return context.label+': '+budgetFormattedValues[context.dataIndex]; }
+						}
+					}
 				},
 				title: {
 					display: false,
@@ -3230,7 +3277,16 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 				responsive: true,
 				maintainAspectRatio: false,
 				legend: {
-					position: 'right',
+					position: 'bottom',
+					labels: { boxWidth: 12, padding: 10 }
+				},
+				plugins: {
+					legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, generateLabels: budgetReportLegendLabels } },
+					tooltip: {
+						callbacks: {
+							label: function(context) { return context.label+': '+spentFormattedValues[context.dataIndex]; }
+						}
+					}
 				},
 				title: {
 					display: false,
@@ -3337,7 +3393,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	if (usesModernChartApi) {
 		month_config.options.plugins = {
 			legend: {
-				position: 'top'
+				position: 'top',
+				labels: { boxWidth: 12, padding: 10 }
 			},
 			title: {
 				display: false,
@@ -3388,7 +3445,8 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		};
 	} else {
 		month_config.options.legend = {
-			position: 'top'
+			position: 'top',
+			labels: { boxWidth: 12, padding: 10 }
 		};
 		month_config.options.title = {
 			display: false,
@@ -3506,6 +3564,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	</script>
 </div>
 
+<p class="opacitymedium budgetreport-scroll-hint"><?php echo $langs->trans('BudgetReportScrollTablesHelp'); ?></p>
 <?php if ($budgetReportProjectId <= 0) { ?>
 	<?php lmdbadvancedproject_print_time_breakdown($timeBreakdown, $monthAxis); ?>
 <?php } ?>
@@ -3516,7 +3575,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 	<?php lmdbadvancedproject_print_project_forecast($budgetReportForecast, $timeBreakdown, $monthAxis); ?>
 <?php } else { ?>
 	<div class="budgettitle"><?php echo $langs->trans("BudgetReportBudgetVsSpentByProject"); ?></div>
-	<div class="budgetreport-table-scroll">
+	<div class="div-table-responsive-no-min budgetreport-table-scroll" tabindex="0">
 	<table class="budgettbl">
 		<tr>
 			<th><?php echo $langs->trans("BudgetReportProject"); ?></th>
@@ -3563,7 +3622,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		<tr>
 			<td><b><?php echo $langs->trans("BudgetReportTotal"); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalorders); ?></b></td>
-			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders).')'; ?></b></td>
+			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.($totalorders > 0 ? lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders) : '—').')'; ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
 			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>
