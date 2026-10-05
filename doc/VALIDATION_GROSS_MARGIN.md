@@ -39,3 +39,9 @@ Les checkouts exécutés correspondent aux commits `697bf01970740a3339cd99cf055b
 - Copier tous les fichiers du patch, puis rafraîchir le cache navigateur. Aucune migration ni modification supplémentaire du core n'est requise. Régénérer les documents dont le contenu doit refléter cette version et la permission de l'utilisateur générateur.
 
 Le numéro de version est passé de la préparation 1.5.1 à 1.6.0 à la demande de l’utilisateur. Seules les métadonnées et leurs attentes de test changent ; les validations fonctionnelles ci-dessus restent applicables. Les trois modes de découverte du descripteur et le lint ont été réexécutés après cet alignement.
+
+## Ajustement visuel des bordures
+
+Le tableau de synthèse utilise désormais un contour droit et des séparateurs de 1 px dans la couleur du thème. La classe native `noborder`, dont les coins de dernière ligne ne conviennent pas à cette grille, est retirée de ce seul tableau de présentation. Les séparateurs doublés sont supprimés, notamment après Budget Restant et avant le détail des dépenses. Les calculs et droits restent inchangés.
+
+Après cet ajustement : suite de marge réexécutée sur core24 (870 assertions), lint PHP et diff vérifiés ; fixture locale Edge inspectée aux quatre largeurs indiquées ci-dessus. Le rendu sur une instance déployée reste à vérifier après actualisation du cache navigateur.

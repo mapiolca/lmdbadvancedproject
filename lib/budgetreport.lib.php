@@ -2947,7 +2947,7 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 	$formBudgetReport = new Form($db);
 ?>
 <div class="budgetreport-summary-fullwidth<?php echo ($compact ? ' lmdbap-summary-compact' : '').($showMargin ? ' lmdbap-summary-with-margin' : ''); ?>">
-<table class="noborder centpercent dashboard_budget" role="presentation">
+<table class="centpercent dashboard_budget" role="presentation">
 	<tr>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
 			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>

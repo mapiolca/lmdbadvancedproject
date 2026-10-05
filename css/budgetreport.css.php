@@ -356,7 +356,12 @@ div.mainmenu.budgetreport {
 }
 
 .dashboard_budget {
+	/* Avoid noborder's per-row corners when its single row becomes a grid. */
 	table-layout: fixed;
+	border: 1px solid var(--colortopbordertitle1, rgba(0,0,0,0.14));
+	border-bottom: 0;
+	border-radius: 0;
+	border-collapse: separate;
 	width: 100%;
 	max-width: none;
 	margin: 0;
@@ -372,8 +377,8 @@ div.mainmenu.budgetreport {
 	width: 20%;
 	max-width: 20%;
 	padding: 10px 6px 12px;
-	border-right: solid 2px rgba(0,0,0,0.2);
-	border-bottom: solid 2px rgba(0,0,0,0.2);
+	border-right: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
+	border-bottom: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
 }
 
 .dashboard_budget .budgetreport-summary-cell:last-child {
@@ -405,7 +410,7 @@ div.mainmenu.budgetreport {
 	max-width: 320px;
 	margin: 10px auto 0;
 	padding-top: 8px;
-	border-top: 1px solid rgba(0,0,0,0.14);
+	border-top: 1px solid var(--colortopbordertitle1, rgba(0,0,0,0.14));
 	font-size: 88%;
 	line-height: 1.25;
 	text-align: left;
@@ -762,7 +767,7 @@ div.mainmenu.budgetreport {
 		padding: 16px 10px;
 	}
 	.dashboard_budget .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; border-right: 0; }
-	.dashboard_budget .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
+	.dashboard_budget .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; border-right: 0; }
 	.dashboard_budget .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
 	.budgetreport-summary-breakdown { max-width: none; }
 
@@ -857,7 +862,7 @@ div.mainmenu.budgetreport {
 	min-width: 0;
 }
 .lmdbap-summary-compact .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
-.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
+.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; border-right: 0; }
 .lmdbap-summary-compact .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
 .lmdbap-summary-compact .budgetreport-summary-amount {
 	font-size: 1.5em;
@@ -872,27 +877,29 @@ div.mainmenu.budgetreport {
 .lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-spent-heading {
 	grid-column: 1; grid-row: 3;
 	padding: 10px 6px 12px;
-	border-right: solid 2px rgba(0,0,0,0.2);
-	border-bottom: solid 2px rgba(0,0,0,0.2);
+	border-right: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
+	border-bottom: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
 }
 .lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-cell:nth-child(6) { grid-column: 2; grid-row: 3; }
 .lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-breakdown {
 	grid-column: 1 / -1; grid-row: 4;
 	margin: 0; padding: 8px 6px;
-	border-bottom: solid 2px rgba(0,0,0,0.2);
+	border-top: 0;
+	border-bottom: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
 }
 @media (max-width: 980px) {
 	.lmdbap-summary-with-margin:not(.lmdbap-summary-compact) .budgetreport-summary-cell { width: auto; max-width: none; }
 	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(4) { display: contents; }
 	.lmdbap-summary-with-margin .budgetreport-spent-heading {
 		grid-column: 1; grid-row: 3; padding: 16px 10px;
-		border-right: solid 2px rgba(0,0,0,0.2);
-		border-bottom: solid 2px rgba(0,0,0,0.2);
+		border-right: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
+		border-bottom: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
 	}
 	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(6) { grid-column: 2; grid-row: 3; }
 	.lmdbap-summary-with-margin .budgetreport-summary-breakdown {
 		grid-column: 1 / -1; grid-row: 4; margin: 0; padding: 8px 10px;
-		border-bottom: solid 2px rgba(0,0,0,0.2);
+		border-top: 0;
+		border-bottom: solid 1px var(--colortopbordertitle1, rgba(0,0,0,0.14));
 	}
 }
 @media (max-width: 359px) {
