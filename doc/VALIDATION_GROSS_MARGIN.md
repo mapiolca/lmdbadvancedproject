@@ -45,3 +45,11 @@ Le numéro de version est passé de la préparation 1.5.1 à 1.6.0 à la demande
 Le tableau de synthèse utilise désormais un contour droit et des séparateurs de 1 px dans la couleur du thème. La classe native `noborder`, dont les coins de dernière ligne ne conviennent pas à cette grille, est retirée de ce seul tableau de présentation. Les séparateurs doublés sont supprimés, notamment après Budget Restant et avant le détail des dépenses. Les calculs et droits restent inchangés.
 
 Après cet ajustement : suite de marge réexécutée sur core24 (870 assertions), lint PHP et diff vérifiés ; fixture locale Edge inspectée aux quatre largeurs indiquées ci-dessus. Le rendu sur une instance déployée reste à vérifier après actualisation du cache navigateur.
+
+## Style natif Eldy
+
+À la demande de l’utilisateur, le contour et les séparateurs verticaux personnalisés sont remplacés par la classe native `bordertop`. Les libellés utilisent toujours `opacitymedium` et `center` ; les couleurs de texte courantes proviennent désormais du thème. Le CSS du module conserve la grille responsive et les tailles des indicateurs. Le détail des dépenses est placé sous la grille également dans le rapport large. Aucun changement de calcul, de droit ou de document.
+
+Lecture de sources : `.bordertop` et son usage de `--colortopbordertitle1` existent dans Eldy sur les tags 20.0.0 à 24.0.0 du checkout core. v25 reste non vérifiée localement ; la capture fournie montre une instance 25.0.0-alpha, sans identifier sa révision ou le code du module servi. Les aperçus utilisent la règle `.bordertop` extraite du core24, avec une variable de couleur et un contexte simulés. Ils ne constituent pas une recette sur une instance complète.
+
+Contrôles après ce changement : 870 assertions sur core20 et core24 sous PHP 8.4.22 ; PHPStan niveau 5, cible PHP 8.0 avec core24, sans erreur ; lint et diff réussis. Aperçus Edge à 1600, 760, 390 et 320 px, sans débordement horizontal. Aucune installation ni modification du core.

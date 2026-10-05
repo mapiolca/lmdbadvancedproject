@@ -2947,35 +2947,52 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 	$formBudgetReport = new Form($db);
 ?>
 <div class="budgetreport-summary-fullwidth<?php echo ($compact ? ' lmdbap-summary-compact' : '').($showMargin ? ' lmdbap-summary-with-margin' : ''); ?>">
-<table class="centpercent dashboard_budget" role="presentation">
-	<tr>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+<div class="dashboard_budget">
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
 			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportMarket"); ?></div>
 			<div class="budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($totalorders); ?>
 			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+		</div>
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
 			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportInvoiced"); ?></div>
 			<div class="budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($totalcustomerinvoices); ?>
 				<span class="budgetreport-summary-rate"><?php echo '('.($totalorders > 0 ? lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders) : '—').')'; ?></span>
 			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+		</div>
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
 			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportBudget"); ?></div>
 			<div class="budgetreport-summary-amount">
 				<?php echo lmdbadvancedproject_format_price($budget); ?>
 			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+		</div>
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
+			<div class="budgetreport-summary-amount" style='color:<?php echo $blncolor; ?>'>
+				<?php echo lmdbadvancedproject_format_price($balance); ?>
+			</div>
+		</div>
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
 			<div class="budgetreport-spent-heading">
 				<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
 				<div class="budgetreport-summary-amount">
 					<?php echo lmdbadvancedproject_format_price($totalspent); ?>
 				</div>
 			</div>
-			<div class="budgetreport-summary-breakdown">
+		</div>
+
+<?php if ($showMargin) { $grossMargin = (float) price2num($totalorders - $totalspent, 'MT'); ?>
+		<div class="bordertop center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans('BudgetReportGrossMargin'); ?></div>
+			<div class="budgetreport-summary-amount" style="color:<?php echo $grossMargin < 0 ? 'red' : 'green'; ?>">
+				<?php echo lmdbadvancedproject_format_price($grossMargin); ?>
+				<span class="budgetreport-summary-rate"><?php echo '('.($totalorders > 0 ? round($grossMargin / $totalorders * 100).'%' : '-').')'; ?></span>
+			</div>
+		</div>
+<?php } ?>
+</div>
+	<div class="bordertop budgetreport-summary-breakdown">
 				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).') &middot; '.lmdbadvancedproject_format_hours($totalTimeHours, true); ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersOrdered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersorderedremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersorderedremaining, $totalspent).')'; ?></strong></div>
 				<div><span><?php echo $langs->trans("BudgetReportSupplierOrdersDelivered"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalsupplierordersdeliveredremaining).' ('.lmdbadvancedproject_format_spent_percentage($totalsupplierordersdeliveredremaining, $totalspent).')'; ?></strong></div>
@@ -2983,24 +3000,6 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 				<?php if (LmdbAdvancedProjectCompatibility::isShipmentCostEnabled()) { ?><div><span><?php echo $formBudgetReport->textwithtooltip($langs->trans('BudgetCostShipmentsNet'), $langs->trans('BudgetCostChronologyHelp')); ?></span><strong><?php echo price(price2num($totalshipmentcost, 'MT'), 0, $langs, 1, -1, -1, $conf->currency).' ('.lmdbadvancedproject_format_spent_percentage($totalshipmentcost, $totalspent).')'; ?></strong></div><?php } ?>
 				<div><span><?php echo $langs->trans("BudgetReportStaffExpenses"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')'; ?></strong></div>
 			</div>
-		</td>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportLeftToSpend"); ?></div>
-			<div class="budgetreport-summary-amount" style='color:<?php echo $blncolor; ?>'>
-				<?php echo lmdbadvancedproject_format_price($balance); ?>
-			</div>
-		</td>
-<?php if ($showMargin) { $grossMargin = (float) price2num($totalorders - $totalspent, 'MT'); ?>
-		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans('BudgetReportGrossMargin'); ?></div>
-			<div class="budgetreport-summary-amount" style="color:<?php echo $grossMargin < 0 ? 'red' : 'green'; ?>">
-				<?php echo lmdbadvancedproject_format_price($grossMargin); ?>
-				<span class="budgetreport-summary-rate"><?php echo '('.($totalorders > 0 ? round($grossMargin / $totalorders * 100).'%' : '-').')'; ?></span>
-			</div>
-		</td>
-<?php } ?>
-	</tr>
-</table>
 </div>
 
 <?php
