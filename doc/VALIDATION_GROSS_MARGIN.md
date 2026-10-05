@@ -1,4 +1,4 @@
-# Validation de la marge brute — 1.5.1
+# Validation de la marge brute — 1.6.0
 
 Contrôles du 5 octobre 2026. Base : `b226642f817adc8b081bd782cb90f998fca59428` (1.5.0). Branche dédiée : `fix/1.5.1-marge-brute`. La version est préparée pour une nouvelle PR ; aucune fusion, release ou installation serveur n'est réalisée par ce travail.
 
@@ -9,7 +9,7 @@ Contrôles du 5 octobre 2026. Base : `b226642f817adc8b081bd782cb90f998fca59428` 
 - Appels directs à `$user->hasRight('margins', 'liretous')` pour les tuiles, le tableau global et les générateurs PDF/XLSX/ODS. Un administrateur sans ce droit ne reçoit aucune marge explicite ; le reste du rapport reste accessible selon ses permissions.
 - XLSX/ODS : montant et ratio numériques, format pourcentage entier, tiret si ratio indéfini ; colonnes globales et totaux conditionnels. Le taux total provient des montants cumulés, pas de la moyenne des taux. Aucune valeur de marge supplémentaire dans les feuilles de données/graphiques.
 - PDF : sixième tuile avec montant et pourcentage sur deux lignes. Répertoire de l'entité propriétaire et refus documentaires natifs conservés.
-- Descripteur et README en 1.5.1 ; À propos lit déjà le descripteur. ID 450021 et famille Les Métiers du Bâtiment conservés, aucun nouvel ID attribué. Aucun nouveau droit, SQL, objet, trigger, Agenda, Notification, cron, numérotation ou import.
+- Descripteur et README en 1.6.0 ; À propos lit déjà le descripteur. ID 450021 et famille Les Métiers du Bâtiment conservés, aucun nouvel ID attribué. Aucun nouveau droit, SQL, objet, trigger, Agenda, Notification, cron, numérotation ou import.
 - Les documents déjà générés ne sont pas réécrits et conservent les droits documentaires existants. Les figures financières autorisées permettent toujours de recalculer une marge : cette évolution contrôle ses affichages explicites, sans changer l'accès aux commandes ou dépenses.
 
 ## Contrôles exécutés
@@ -37,3 +37,5 @@ Les checkouts exécutés correspondent aux commits `697bf01970740a3339cd99cf055b
 - Après déploiement, comparer fiche, onglet et rapport global avec un même projet, puis exporter avec/sans le droit Visualiser les marges. Vérifier aussi un compte externe autorisé et un projet partagé entre deux entités, les périodes et un coût incomplet.
 - Vérifier les URL directes de génération et la conservation du CSRF et des autres droits avec des sessions réelles. Les refus de génération PDF et les droits d'export sont couverts au niveau fixture ; le bootstrap HTTP complet n'a pas été exécuté.
 - Copier tous les fichiers du patch, puis rafraîchir le cache navigateur. Aucune migration ni modification supplémentaire du core n'est requise. Régénérer les documents dont le contenu doit refléter cette version et la permission de l'utilisateur générateur.
+
+Le numéro de version est passé de la préparation 1.5.1 à 1.6.0 à la demande de l’utilisateur. Seules les métadonnées et leurs attentes de test changent ; les validations fonctionnelles ci-dessus restent applicables. Les trois modes de découverte du descripteur et le lint ont été réexécutés après cet alignement.

@@ -1,6 +1,6 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.5.1 — preparation
+## 1.6.0 — preparation
 
 - Show gross margin and its percentage after remaining budget on the project card and budget-report summary, using the same filtered orders and retained expenses as the global report.
 - Apply the native View margins permission to every explicit margin in screens and PDF/XLSX/ODS exports, including existing global columns; retain the other authorized budget figures.
