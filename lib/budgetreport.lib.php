@@ -2969,7 +2969,7 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 		$details[] = array('label' => $formBudgetReport->textwithtooltip($langs->trans('BudgetCostShipmentsNet'), $langs->trans('BudgetCostChronologyHelp')), 'value' => price(price2num($totalshipmentcost, 'MT'), 0, $langs, 1, -1, -1, $conf->currency).' ('.lmdbadvancedproject_format_spent_percentage($totalshipmentcost, $totalspent).')');
 	}
 	$details[] = array('label' => $langs->trans('BudgetReportStaffExpenses'), 'value' => lmdbadvancedproject_format_price($totalexpenses).' ('.lmdbadvancedproject_format_spent_percentage($totalexpenses, $totalspent).')');
-	$columns = $compact ? 2 : count($indicators);
+	$columns = count($indicators);
 	static $summaryNumber = 0;
 	$summaryNumber++;
 	print '<div class="div-table-responsive-no-min budgetreport-summary-fullwidth">';

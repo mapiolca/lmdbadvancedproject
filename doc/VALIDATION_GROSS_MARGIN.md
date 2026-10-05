@@ -61,3 +61,9 @@ Correction de présentation demandée après clarification : la synthèse utilis
 Référence : fichier core local `htdocs/admin/tools/ui/content/tables.php`, exemple Basic usage. La page distante indiquée par l’utilisateur n’est pas accessible par l’outil web. La disposition native remplace la transformation du tableau en grille sur téléphone ; le tableau conserve ses lignes/cellules et défile dans son conteneur. Aucune modification des calculs, documents, permissions ou du core.
 
 Contrôles du tableau natif : suite de marge 870 assertions sur core20/core24 sous PHP 8.4.22 ; PHPStan niveau 5/cible PHP 8.0 avec core24 sans erreur ; lint et diff réussis. Contrôle DOM Edge sur 1600/760/390/320 px : lignes réellement `table-row`, sommes des `colspan` cohérentes sur toutes les lignes avec/sans marge, aucun débordement de page ; défilement interne du rapport à 390/320 px. Aperçu avec CSS Eldy local dont les blocs PHP sont retirés et variables de contexte simulées : le style exact de l’instance déployée reste à vérifier.
+
+## Titres sur une ligne
+
+À la demande de l’utilisateur, la fiche affiche désormais ses cinq ou six indicateurs dans une seule ligne d’en-têtes, suivie d’une ligne de valeurs, comme le rapport. L’ordre propre à la fiche reste Commandes, Facturé, Budget, Budget Restant, Dépensé, Marge brute. Sans permission, la colonne Marge brute est omise. Le conteneur natif conserve le défilement horizontal sur mobile, sans réduction des caractères ni conversion des lignes du tableau en grille.
+
+Vérification de cet ajustement : 870 assertions avec core24, lint et diff réussis. DOM Edge à 1600/760/390/320 px : une seule ligne d’en-têtes (six colonnes avec droit, cinq sans), `colspan` cohérents, aucun débordement de page et défilement interne à 390/320 px. PHPStan n’est pas relancé pour cette substitution de l’entier du nombre de colonnes ; le contrôle niveau 5 de la structure native précédente reste pertinent. Pas de déploiement.
