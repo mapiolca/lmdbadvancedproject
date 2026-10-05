@@ -5,7 +5,7 @@
 - Show gross margin and its percentage after remaining budget on the project card and budget-report summary, using the same filtered orders and retained expenses as the global report.
 - Apply the native View margins permission to every explicit margin in screens and PDF/XLSX/ODS exports, including existing global columns; retain the other authorized budget figures.
 - Export numeric margin amounts and percentages, and adapt compact/mobile layouts to the optional sixth tile. Non-positive orders show an undefined percentage; no database migration is required. Regenerate existing reports as needed.
-- Use native theme separators and text styles for budget summaries, with no custom frame or vertical borders; keep expense details below the responsive indicator grid.
+- Render budget summaries in native tagtable/liste tables with title rows, amount cells and expense rows; remove the custom tile grid and use native responsive table scrolling.
 
 ## 1.5.0 — preparation
 

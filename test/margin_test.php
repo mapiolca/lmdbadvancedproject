@@ -102,9 +102,8 @@ if (getenv('LMDBAP_MARGIN_HTML')) {
 	ob_start(); lmdbadvancedproject_render_budget_summary($sample, true); $deniedHtml = (string) ob_get_clean();
 	$user->denied = array();
 	$style = preg_replace('/<\?php.*?\?>/s', '', file_get_contents(__DIR__.'/../css/budgetreport.css.php'));
-	$coreTheme = file_get_contents(DOL_DOCUMENT_ROOT.'/theme/eldy/global.inc.php');
-	preg_match('/\.bordertop\s*\{[^}]+\}/', $coreTheme, $nativeBorder);
-	$style = ($nativeBorder[0] ?? '').$style;
-	file_put_contents(getenv('LMDBAP_MARGIN_HTML'), '<!doctype html><meta charset="utf-8"><style>:root{--colortopbordertitle1:#ddd}body{font:14px Arial;margin:16px}table{border-collapse:collapse}.opacitymedium{opacity:.65}.center{text-align:center}.valignmiddle{vertical-align:middle}</style><style>'.$style.'</style><h2>Fiche projet</h2><div style="max-width:760px">'.$compactHtml.'</div><h2>Rapport</h2>'.$fullHtml.'<h2>Sans droit</h2><div style="max-width:760px">'.$deniedHtml.'</div>');
+	$coreTheme = preg_replace('/<\?php.*?\?>/s', '', file_get_contents(DOL_DOCUMENT_ROOT.'/theme/eldy/global.inc.php'));
+	$style = $coreTheme.$style;
+	file_put_contents(getenv('LMDBAP_MARGIN_HTML'), '<!doctype html><meta charset="utf-8"><style>:root{--colortopbordertitle1:#ddd;--colorbacktabcard1:#fff;--colorbacktitle1:#eee;--colortext:#333;--colorbacklineodd:#fff;--colorbacklineeven:#fafafa;--colorbacklinepair:#fafafa;--colorbacklineimpair:#fff;--inputbackgroundcolor:#fff}body{font:14px Arial;margin:16px}table{border-collapse:collapse}.opacitymedium{opacity:.65}.center{text-align:center}.right{text-align:right}.left{text-align:left}.valignmiddle{vertical-align:middle}</style><style>'.$style.'</style><h2>Fiche projet</h2><div style="max-width:760px">'.$compactHtml.'</div><h2>Rapport</h2>'.$fullHtml.'<h2>Sans droit</h2><div style="max-width:760px">'.$deniedHtml.'</div>');
 }
 echo $checks." assertions passed including gross margins and permissions.\n";

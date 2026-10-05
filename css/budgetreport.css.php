@@ -347,75 +347,7 @@ div.mainmenu.budgetreport {
 	white-space: nowrap;
 }
 
-.budgetreport-summary-fullwidth {
-	display: block;
-	max-width: none;
-	margin-bottom: 30px;
-	margin-left: 0;
-	margin-right: 0;
-}
 
-/* Native bordertop/opacitymedium classes supply the theme's visual treatment. */
-.dashboard_budget {
-	display: grid;
-	grid-template-columns: repeat(5, minmax(0, 1fr));
-	width: 100%;
-}
-.dashboard_budget .budgetreport-summary-cell {
-	min-width: 0;
-	padding: 10px 6px 12px;
-}
-.dashboard_budget .budgetreport-summary-cell:nth-child(4) { order: 1; }
-.dashboard_budget .budgetreport-summary-cell:nth-child(6) { order: 2; }
-
-.budgetreport-summary-label {
-	font-size: 110%;
-	line-height: 1.2;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-amount {
-	display: block;
-	font-size: 2em;
-	line-height: 1.1;
-	white-space: normal;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-rate {
-	display: block;
-	font-size: 0.65em;
-	line-height: 1.5;
-}
-
-.budgetreport-summary-breakdown {
-	margin: 0;
-	padding: 8px 6px;
-	font-size: 88%;
-	line-height: 1.25;
-	text-align: left;
-}
-
-.budgetreport-summary-breakdown div {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	gap: 10px;
-	margin-top: 4px;
-}
-
-.budgetreport-summary-breakdown span {
-	flex: 1 1 140px;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-breakdown strong {
-	margin-left: auto;
-	max-width: 100%;
-	white-space: normal;
-	overflow-wrap: anywhere;
-	font-weight: 600;
-}
 
 .budgetreport-charts-row {
 	display: grid;
@@ -703,42 +635,9 @@ div.mainmenu.budgetreport {
 	padding: 16px;
 }
 
-@media only screen and (max-width: 1400px) {
-	.budgetreport-summary-amount {
-		font-size: 1.8em;
-	}
-}
-
-@media only screen and (max-width: 1180px) {
-	.dashboard_budget .budgetreport-summary-cell {
-		padding-left: 4px;
-		padding-right: 4px;
-	}
-
-	.budgetreport-summary-label {
-		font-size: 100%;
-	}
-
-	.budgetreport-summary-amount {
-		font-size: 1.6em;
-	}
-}
-
 @media only screen and (max-width: 980px) {
 	.budgetreport-charts-row {
 		grid-template-columns: 1fr !important;
-	}
-
-	.dashboard_budget { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-	.dashboard_budget .budgetreport-summary-cell:nth-child(n) { order: 0; padding: 16px 10px; }
-	.budgetreport-summary-fullwidth:not(.lmdbap-summary-with-margin) .budgetreport-summary-cell:last-child { grid-column: 1 / -1; }
-
-	.budgetreport-summary-label {
-		font-size: 110%;
-	}
-
-	.budgetreport-summary-amount {
-		font-size: 1.5em;
 	}
 }
 
@@ -789,9 +688,6 @@ div.mainmenu.budgetreport {
 		text-align: center;
 	}
 
-	.budgetreport-summary-amount {
-		font-size: 1.4em;
-	}
 	.budgetreport-charts-row { gap: 12px; }
 	.budgetchart { height: 400px; max-height: none; margin-bottom: 12px; }
 	.budgetchart canvas { max-height: none; }
@@ -809,17 +705,5 @@ div.mainmenu.budgetreport {
 	.budgetreport-modal-body { padding: 10px; }
 }
 
-/* Layout only; Eldy (or the active theme) supplies separators and text colors. */
+/* Keep the native summary table below the project description. */
 #lmdbap-project-summary { margin-top: 16px; }
-.lmdbap-summary-with-margin .dashboard_budget { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.lmdbap-summary-compact .dashboard_budget { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell { order: 0; }
-.lmdbap-summary-compact:not(.lmdbap-summary-with-margin) .budgetreport-summary-cell:last-child { grid-column: 1 / -1; }
-.lmdbap-summary-compact .budgetreport-summary-amount { font-size: 1.5em; }
-@media (max-width: 980px) {
-	.lmdbap-summary-with-margin .dashboard_budget { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 359px) {
-	.budgetreport-summary-fullwidth .dashboard_budget { grid-template-columns: minmax(0, 1fr); }
-	.budgetreport-summary-fullwidth .dashboard_budget .budgetreport-summary-cell { order: 0; grid-column: auto; }
-}
