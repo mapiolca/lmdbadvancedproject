@@ -78,3 +78,9 @@ Pour la fiche, le test capture la sortie effectivement émise par `mainCardTabAd
 Voir [les preuves et la recette restant à réaliser](../doc/VALIDATION_PROJECT_SUMMARY.md). La variable facultative `LMDBAP_SUMMARY_HTML` écrit le fragment de fiche produit par le hook dans un fichier de test choisi, à conserver dans `test/.cache/`.
 
 `LMDBAP_LIST_HTML` écrit une page de fixtures basée sur `list_print_total.tpl.php` natif : cellule d’entité non comptée, déjà comptée, sans entité, progression masquée et décalage ambigu. Servir le module localement puis ouvrir cette page sous `test/.cache/` pour contrôler `js/projectlist.js`. Les deux chargements du script doivent laisser les totaux de page et généraux à 12 cellules dans les deux premiers cas, 11 dans les deux suivants et 10 dans le cas ambigu. Le montant doit conserver sa valeur et sa colonne ; aucune somme des pourcentages n’est ajoutée.
+
+## Marge brute — 1.5.1
+
+Après les prérequis ci-dessus, exécuter `php test/margin_test.php`, `php test/costpdf_test.php`, puis `python test/margin_pdf_test.py` avec un Python disposant de pypdf et pdfplumber. Le premier couvre les marges positives/négatives/nulles, les commandes non positives, les droits natifs refusés même à un administrateur, les totaux pondérés et la relecture XLSX/ODS avec/sans colonnes de marge. Le second génère aussi cinq variantes de tuiles PDF ; le contrôle Python vérifie le contenu, l'absence de marge sans permission et les bornes de ces tuiles. `LMDBAP_MARGIN_HTML` permet de produire une fixture locale pour la recette responsive.
+
+La compatibilité native de `margins.liretous` est vérifiée par `check_native_contracts.py` dans les tags v20 à v24. Résultats, limites v25 et recette d'instance : [validation 1.5.1](../doc/VALIDATION_GROSS_MARGIN.md).

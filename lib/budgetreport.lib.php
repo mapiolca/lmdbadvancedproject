@@ -2929,7 +2929,8 @@ if (!function_exists('lmdbadvancedproject_print_time_breakdown')) {
  */
 function lmdbadvancedproject_render_budget_summary(array $data, $compact = false)
 {
-	global $db, $conf, $langs;
+	global $db, $conf, $langs, $user;
+	$showMargin = $user->hasRight('margins', 'liretous');
 	$totalorders = (float) ($data['totalorders'] ?? 0);
 	$totalcustomerinvoices = (float) ($data['totalcustomerinvoices'] ?? 0);
 	$budget = (float) ($data['budget'] ?? 0);
@@ -2945,7 +2946,7 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 	$blncolor = $balance < 0 ? 'red' : 'green';
 	$formBudgetReport = new Form($db);
 ?>
-<div class="budgetreport-summary-fullwidth<?php echo $compact ? ' lmdbap-summary-compact' : ''; ?>">
+<div class="budgetreport-summary-fullwidth<?php echo ($compact ? ' lmdbap-summary-compact' : '').($showMargin ? ' lmdbap-summary-with-margin' : ''); ?>">
 <table class="noborder centpercent dashboard_budget" role="presentation">
 	<tr>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
@@ -2968,9 +2969,11 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 			</div>
 		</td>
 		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
-			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
-			<div class="budgetreport-summary-amount">
-				<?php echo lmdbadvancedproject_format_price($totalspent); ?>
+			<div class="budgetreport-spent-heading">
+				<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans("BudgetReportSpent"); ?></div>
+				<div class="budgetreport-summary-amount">
+					<?php echo lmdbadvancedproject_format_price($totalspent); ?>
+				</div>
 			</div>
 			<div class="budgetreport-summary-breakdown">
 				<div><span><?php echo $langs->trans("BudgetReportTimeSpentTotal"); ?></span><strong><?php echo lmdbadvancedproject_format_price($totaltime).' ('.lmdbadvancedproject_format_spent_percentage($totaltime, $totalspent).') &middot; '.lmdbadvancedproject_format_hours($totalTimeHours, true); ?></strong></div>
@@ -2987,6 +2990,15 @@ function lmdbadvancedproject_render_budget_summary(array $data, $compact = false
 				<?php echo lmdbadvancedproject_format_price($balance); ?>
 			</div>
 		</td>
+<?php if ($showMargin) { $grossMargin = (float) price2num($totalorders - $totalspent, 'MT'); ?>
+		<td colspan="3" class="center valignmiddle budgetreport-summary-cell">
+			<div class="opacitymedium budgetreport-summary-label"><?php echo $langs->trans('BudgetReportGrossMargin'); ?></div>
+			<div class="budgetreport-summary-amount" style="color:<?php echo $grossMargin < 0 ? 'red' : 'green'; ?>">
+				<?php echo lmdbadvancedproject_format_price($grossMargin); ?>
+				<span class="budgetreport-summary-rate"><?php echo '('.($totalorders > 0 ? round($grossMargin / $totalorders * 100).'%' : '-').')'; ?></span>
+			</div>
+		</td>
+<?php } ?>
 	</tr>
 </table>
 </div>
@@ -3583,7 +3595,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			<th><?php echo $langs->trans("BudgetReportInvoices"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportBudget"); ?></th>
 			<th><?php echo $langs->trans("BudgetReportSpent"); ?></th>
-			<th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th>
+			<?php if ($user->hasRight('margins', 'liretous')) { ?><th><?php echo $langs->trans("BudgetReportGrossMargin"); ?></th><?php } ?>
 			<th><?php echo $langs->trans("BudgetReportBalance"); ?></th>
 		</tr>
 
@@ -3592,7 +3604,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 		$fbal = $data['budget']-$data['spent'];
 		$fcolor = "green";
 		if ($fbal<0) $fcolor="red";
-		$fgrossmargin = $data['orders']-$data['spent'];
+		$fgrossmargin = (float) price2num($data['orders']-$data['spent'], 'MT');
 		$fgrosscolor = "green";
 		if ($fgrossmargin<0) $fgrosscolor="red";
 		$projectstatic = new Project($db);
@@ -3608,14 +3620,14 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			<td align="right"><?php echo lmdbadvancedproject_get_customer_invoice_summary_html($formBudgetReport, $data['project_ref'], $data['invoiced'], $data['orders'], $data['invoice_details'], $filters); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['budget']); ?></td>
 			<td align="right"><?php echo lmdbadvancedproject_format_price($data['spent']); ?></td>
-			<td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td>
+			<?php if ($user->hasRight('margins', 'liretous')) { ?><td align="right" style='color:<?php echo $fgrosscolor; ?>'><?php echo lmdbadvancedproject_format_margin($fgrossmargin, $data['orders']); ?></td><?php } ?>
 			<td align="right" style='color:<?php echo $fcolor; ?>'><?php echo lmdbadvancedproject_format_price($fbal); ?></td>
 		</tr>
 
 		<?php } ?>
 
 		<?php
-		$totalgrossmargin = $totalorders-$totalspent;
+		$totalgrossmargin = (float) price2num($totalorders-$totalspent, 'MT');
 		$totalgrosscolor = "green";
 		if ($totalgrossmargin<0) $totalgrosscolor="red";
 		?>
@@ -3625,7 +3637,7 @@ if (!function_exists('lmdbadvancedproject_render_budget_report')) {
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalcustomerinvoices).' ('.($totalorders > 0 ? lmdbadvancedproject_format_percentage($totalcustomerinvoices, $totalorders) : '—').')'; ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($budget); ?></b></td>
 			<td align="right"><b><?php echo lmdbadvancedproject_format_price($totalspent); ?></b></td>
-			<td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td>
+			<?php if ($user->hasRight('margins', 'liretous')) { ?><td align="right" style='color:<?php echo $totalgrosscolor; ?>'><b><?php echo lmdbadvancedproject_format_margin($totalgrossmargin, $totalorders); ?></b></td><?php } ?>
 			<td align="right" style='color:<?php echo $blncolor; ?>'><b><?php echo lmdbadvancedproject_format_price($balance); ?></b></td>
 		</tr>
 	</table>

@@ -863,9 +863,51 @@ div.mainmenu.budgetreport {
 	font-size: 1.5em;
 }
 .lmdbap-summary-compact .budgetreport-summary-breakdown { max-width: none; }
+/* The optional sixth tile shares a row with spent; its breakdown spans below. */
+.lmdbap-summary-with-margin:not(.lmdbap-summary-compact) .budgetreport-summary-cell {
+	width: 16.6667%;
+	max-width: 16.6667%;
+}
+.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-cell:nth-child(4) { display: contents; }
+.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-spent-heading {
+	grid-column: 1; grid-row: 3;
+	padding: 10px 6px 12px;
+	border-right: solid 2px rgba(0,0,0,0.2);
+	border-bottom: solid 2px rgba(0,0,0,0.2);
+}
+.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-cell:nth-child(6) { grid-column: 2; grid-row: 3; }
+.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-breakdown {
+	grid-column: 1 / -1; grid-row: 4;
+	margin: 0; padding: 8px 6px;
+	border-bottom: solid 2px rgba(0,0,0,0.2);
+}
+@media (max-width: 980px) {
+	.lmdbap-summary-with-margin:not(.lmdbap-summary-compact) .budgetreport-summary-cell { width: auto; max-width: none; }
+	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(4) { display: contents; }
+	.lmdbap-summary-with-margin .budgetreport-spent-heading {
+		grid-column: 1; grid-row: 3; padding: 16px 10px;
+		border-right: solid 2px rgba(0,0,0,0.2);
+		border-bottom: solid 2px rgba(0,0,0,0.2);
+	}
+	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(6) { grid-column: 2; grid-row: 3; }
+	.lmdbap-summary-with-margin .budgetreport-summary-breakdown {
+		grid-column: 1 / -1; grid-row: 4; margin: 0; padding: 8px 10px;
+		border-bottom: solid 2px rgba(0,0,0,0.2);
+	}
+}
 @media (max-width: 359px) {
 	.dashboard_budget tr,
 	.lmdbap-summary-compact .dashboard_budget tr { grid-template-columns: minmax(0, 1fr); }
-	.dashboard_budget .budgetreport-summary-cell,
-	.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell { grid-column: auto; grid-row: auto; border-right: 0; }
+	.dashboard_budget .budgetreport-summary-cell:nth-child(n),
+	.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell:nth-child(n),
+	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(n),
+	.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-cell:nth-child(n) {
+		grid-column: auto; grid-row: auto; width: auto; max-width: none; border-right: 0;
+	}
+	.lmdbap-summary-with-margin .dashboard_budget .budgetreport-summary-cell:nth-child(4),
+	.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-cell:nth-child(4) { display: block; }
+	.lmdbap-summary-with-margin .budgetreport-spent-heading,
+	.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-spent-heading { padding: 0; border: 0; }
+	.lmdbap-summary-with-margin .budgetreport-summary-breakdown,
+	.lmdbap-summary-compact.lmdbap-summary-with-margin .budgetreport-summary-breakdown { padding: 0; border: 0; }
 }
