@@ -67,3 +67,9 @@ Contrôles du tableau natif : suite de marge 870 assertions sur core20/core24 so
 À la demande de l’utilisateur, la fiche affiche désormais ses cinq ou six indicateurs dans une seule ligne d’en-têtes, suivie d’une ligne de valeurs, comme le rapport. L’ordre propre à la fiche reste Commandes, Facturé, Budget, Budget Restant, Dépensé, Marge brute. Sans permission, la colonne Marge brute est omise. Le conteneur natif conserve le défilement horizontal sur mobile, sans réduction des caractères ni conversion des lignes du tableau en grille.
 
 Vérification de cet ajustement : 870 assertions avec core24, lint et diff réussis. DOM Edge à 1600/760/390/320 px : une seule ligne d’en-têtes (six colonnes avec droit, cinq sans), `colspan` cohérents, aucun débordement de page et défilement interne à 390/320 px. PHPStan n’est pas relancé pour cette substitution de l’entier du nombre de colonnes ; le contrôle niveau 5 de la structure native précédente reste pertinent. Pas de déploiement.
+
+## Coin supérieur gauche
+
+Le CSS Eldy local applique l’arrondi gauche de `tagtable liste` au premier `td`, mais ne couvre pas son premier `th`. Une règle limitée à la synthèse transmet le rayon natif du tableau au `thead`, à sa première ligne et à son premier `th` avec `border-top-left-radius: inherit`. Aucun rayon fixe, découpage `overflow: hidden`, réglage ou fichier core modifié ; les infobulles et le défilement natif restent disponibles.
+
+Contrôles du 6 octobre 2026 : 870 assertions core24, lint CSS/PHP et diff réussis. Edge local avec CSS Eldy core24 et valeurs de contexte simulées : rayons du tableau et de ses deux cellules de coin identiques pour 0/6/12 px, avec/sans marge, sur 1600/760/390/320 px ; défilement interne conservé sur mobile. Aperçu visuel relu. PHPStan non relancé : seul le CSS de production change. Le rendu exact de l’instance v25-alpha reste à confirmer après déploiement.

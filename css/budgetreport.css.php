@@ -707,3 +707,10 @@ div.mainmenu.budgetreport {
 
 /* Keep the native summary table below the project description. */
 #lmdbap-project-summary { margin-top: 16px; }
+
+/* Eldy omits the first th of tagtable/liste: inherit the native table radius. */
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead,
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead > tr:first-child,
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead > tr:first-child > th:first-child {
+	border-top-left-radius: inherit;
+}
