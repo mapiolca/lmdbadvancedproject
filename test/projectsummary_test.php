@@ -237,7 +237,7 @@ foreach (array('classic', 'phone') as $layout) {
 	$hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
 	$rendered = (string) ob_get_clean();
 	check(substr_count($rendered,'id="lmdbap-project-summary"'),1,'Page emits exactly one section: '.$layout);
-	check(substr_count($rendered,'class="center valignmiddle budgetreport-summary-cell"'),5,'Page emits five tiles: '.$layout);
+	check(substr_count($rendered,'class="center amount budgetreport-summary-cell"'),6,'Page emits six tiles: '.$layout);
 	check($hookmanager->resPrint,'','Card output does not remain in unused hook buffer: '.$layout);
 }
 $conf->browser->layout = 'classic';

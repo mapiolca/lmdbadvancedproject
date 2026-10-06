@@ -1,5 +1,12 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.6.0 — preparation
+
+- Show gross margin and its percentage after remaining budget on the project card and budget-report summary, using the same filtered orders and retained expenses as the global report.
+- Apply the native View margins permission to every explicit margin in screens and PDF/XLSX/ODS exports, including existing global columns; retain the other authorized budget figures.
+- Export numeric margin amounts and percentages, and adapt compact/mobile layouts to the optional sixth tile. Non-positive orders show an undefined percentage; no database migration is required. Regenerate existing reports as needed.
+- Render budget summaries in native tagtable/liste tables with five or six indicators on one header row, amount cells and expense rows; use native responsive table scrolling and inherit the native radius at the first header corner.
+
 ## 1.5.0 — preparation
 
 - Add the native project-list column “Progressions facturation”, with numeric percentage, native progress bar, sorting, filtering and column selection. Customer invoice allocations replace their source lines and credit notes retain their sign; a non-positive order total produces an explained dash. Align native total rows when Multicompany adds an uncounted environment cell, without changing amounts or duplicating an already-counted cell.

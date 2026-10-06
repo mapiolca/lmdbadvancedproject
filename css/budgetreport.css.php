@@ -347,91 +347,7 @@ div.mainmenu.budgetreport {
 	white-space: nowrap;
 }
 
-.budgetreport-summary-fullwidth {
-	display: block;
-	max-width: none;
-	margin-bottom: 30px;
-	margin-left: 0;
-	margin-right: 0;
-}
 
-.dashboard_budget {
-	table-layout: fixed;
-	width: 100%;
-	max-width: none;
-	margin: 0;
-	border-spacing: 0;
-}
-
-.dashboard_budget .budgetreport-summary-cell {
-	box-sizing: border-box;
-	/* Eldy gives native table cells a fixed height, unsuitable for stacked tiles. */
-	height: auto;
-	min-width: 0;
-	margin: 0;
-	width: 20%;
-	max-width: 20%;
-	padding: 10px 6px 12px;
-	border-right: solid 2px rgba(0,0,0,0.2);
-	border-bottom: solid 2px rgba(0,0,0,0.2);
-}
-
-.dashboard_budget .budgetreport-summary-cell:last-child {
-	border-right: 0;
-}
-
-.budgetreport-summary-label {
-	font-size: 110%;
-	line-height: 1.2;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-amount {
-	display: block;
-	font-size: 2em;
-	line-height: 1.1;
-	color: #333;
-	white-space: normal;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-rate {
-	display: block;
-	font-size: 0.65em;
-	line-height: 1.5;
-}
-
-.budgetreport-summary-breakdown {
-	max-width: 320px;
-	margin: 10px auto 0;
-	padding-top: 8px;
-	border-top: 1px solid rgba(0,0,0,0.14);
-	font-size: 88%;
-	line-height: 1.25;
-	text-align: left;
-	color: #444;
-}
-
-.budgetreport-summary-breakdown div {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	gap: 10px;
-	margin-top: 4px;
-}
-
-.budgetreport-summary-breakdown span {
-	flex: 1 1 140px;
-	overflow-wrap: anywhere;
-}
-
-.budgetreport-summary-breakdown strong {
-	margin-left: auto;
-	max-width: 100%;
-	white-space: normal;
-	overflow-wrap: anywhere;
-	font-weight: 600;
-}
 
 .budgetreport-charts-row {
 	display: grid;
@@ -719,59 +635,9 @@ div.mainmenu.budgetreport {
 	padding: 16px;
 }
 
-@media only screen and (max-width: 1400px) {
-	.budgetreport-summary-amount {
-		font-size: 1.8em;
-	}
-}
-
-@media only screen and (max-width: 1180px) {
-	.dashboard_budget .budgetreport-summary-cell {
-		padding-left: 4px;
-		padding-right: 4px;
-	}
-
-	.budgetreport-summary-label {
-		font-size: 100%;
-	}
-
-	.budgetreport-summary-amount {
-		font-size: 1.6em;
-	}
-}
-
 @media only screen and (max-width: 980px) {
 	.budgetreport-charts-row {
 		grid-template-columns: 1fr !important;
-	}
-
-	.dashboard_budget,
-	.dashboard_budget tbody {
-		display: block;
-		width: 100%;
-	}
-	.dashboard_budget tr {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-
-	.dashboard_budget .budgetreport-summary-cell {
-		display: block;
-		width: auto;
-		max-width: none;
-		padding: 16px 10px;
-	}
-	.dashboard_budget .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; border-right: 0; }
-	.dashboard_budget .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
-	.dashboard_budget .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
-	.budgetreport-summary-breakdown { max-width: none; }
-
-	.budgetreport-summary-label {
-		font-size: 110%;
-	}
-
-	.budgetreport-summary-amount {
-		font-size: 1.5em;
 	}
 }
 
@@ -822,9 +688,6 @@ div.mainmenu.budgetreport {
 		text-align: center;
 	}
 
-	.budgetreport-summary-amount {
-		font-size: 1.4em;
-	}
 	.budgetreport-charts-row { gap: 12px; }
 	.budgetchart { height: 400px; max-height: none; margin-bottom: 12px; }
 	.budgetchart canvas { max-height: none; }
@@ -842,30 +705,12 @@ div.mainmenu.budgetreport {
 	.budgetreport-modal-body { padding: 10px; }
 }
 
-/* Compact variant only: never change the native pagination or project columns. */
+/* Keep the native summary table below the project description. */
 #lmdbap-project-summary { margin-top: 16px; }
-.lmdbap-summary-compact .dashboard_budget,
-.lmdbap-summary-compact .dashboard_budget tbody { display: block; }
-.lmdbap-summary-compact .dashboard_budget tr {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell {
-	display: block;
-	width: auto;
-	max-width: none;
-	min-width: 0;
-}
-.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(4) { grid-column: 1 / -1; grid-row: 3; }
-.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(5) { grid-column: 2; grid-row: 2; }
-.lmdbap-summary-compact .budgetreport-summary-cell:nth-child(even) { border-right: 0; }
-.lmdbap-summary-compact .budgetreport-summary-amount {
-	font-size: 1.5em;
-}
-.lmdbap-summary-compact .budgetreport-summary-breakdown { max-width: none; }
-@media (max-width: 359px) {
-	.dashboard_budget tr,
-	.lmdbap-summary-compact .dashboard_budget tr { grid-template-columns: minmax(0, 1fr); }
-	.dashboard_budget .budgetreport-summary-cell,
-	.lmdbap-summary-compact .dashboard_budget .budgetreport-summary-cell { grid-column: auto; grid-row: auto; border-right: 0; }
+
+/* Eldy omits the first th of tagtable/liste: inherit the native table radius. */
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead,
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead > tr:first-child,
+.budgetreport-summary-fullwidth > table.tagtable.liste > thead > tr:first-child > th:first-child {
+	border-top-left-radius: inherit;
 }
