@@ -63,6 +63,8 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 require_once __DIR__.'/../lib/lmdbadvancedproject.lib.php';
 require_once __DIR__.'/../class/lmdbadvancedprojectcompatibility.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
+require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
 
 $langs->loadLangs(array('admin', 'lmdbadvancedproject@lmdbadvancedproject'));
 
@@ -98,7 +100,7 @@ foreach ($switchConstants as $constantName => $enabled) {
 	}
 }
 
-if ($switchConstant !== '' || $action === 'save_shipment_method') {
+if ($switchConstant !== '' || $action === 'save_shipment_method' || $action === 'save_project_autoclose') {
 	$token = GETPOST('token', 'alpha');
 	$expectedToken = currentToken();
 	if ($expectedToken === '' || !hash_equals($expectedToken, $token)) {
@@ -129,6 +131,40 @@ if ($action === 'save_shipment_method') {
 		exit;
 	}
 	setEventMessages($langs->trans('Error'), null, 'errors');
+}
+
+if ($action === 'save_project_autoclose') {
+	$rule = GETPOST('project_autoclose_rule', 'aZ09');
+	$actorId = GETPOSTINT('project_autoclose_user');
+	if ($actorId === -1) { $actorId = 0; } // Native empty user option.
+	$inactivityDays = GETPOSTINT('project_autoclose_days');
+	$actor = new User($db);
+	$valid = isset(LmdbAdvancedProjectCompatibility::projectAutocloseRules()[$rule]) && $actorId >= 0;
+	if ($valid && $actorId > 0) {
+		$valid = $actor->fetch($actorId) > 0 && $actor->statut && !$actor->socid
+			&& checkUserAccessToObject($user, array('user'), $actor, 'user')
+			&& checkUserAccessToObject($actor, array('user'), $actor, 'user');
+	}
+	if ($inactivityDays < 1 || $inactivityDays > 36500) {
+		setEventMessages($langs->trans('ProjectAutoCloseDaysInvalid'), null, 'errors');
+	} elseif (!$valid || ($rule !== 'disabled' && $actorId === 0)) {
+		setEventMessages($langs->trans('ProjectAutoCloseUserRequired'), null, 'errors');
+	} elseif ($rule !== 'disabled' && !LmdbAdvancedProjectCompatibility::projectAutocloseAvailable($rule, $inactivityDays)) {
+		setEventMessages($langs->trans('ProjectAutoCloseUnavailable'), null, 'errors');
+	} elseif (!$db->begin()) {
+		setEventMessages($langs->trans('Error'), null, 'errors');
+	} else {
+		$saved = dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', $rule, 'chaine', 0, '', (int) $conf->entity) > 0
+			&& dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_AUTO_CLOSE_USER', (string) $actorId, 'chaine', 0, '', (int) $conf->entity) > 0
+			&& dolibarr_set_const($db, 'LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', (string) $inactivityDays, 'chaine', 0, '', (int) $conf->entity) > 0;
+		if ($saved && $db->commit()) {
+			setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+			header('Location: '.$_SERVER['PHP_SELF']);
+			exit;
+		}
+		$db->rollback();
+		setEventMessages($langs->trans('Error'), null, 'errors');
+	}
 }
 
 llxHeader('', $langs->trans($page_name), $help_url);
@@ -179,6 +215,37 @@ if (isModEnabled('multicompany')) {
 print '</table>';
 
 $form = new Form($db);
+$autocloseRule = $action === 'save_project_autoclose' ? GETPOST('project_autoclose_rule', 'aZ09') : getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
+$autocloseDays = $action === 'save_project_autoclose' ? GETPOSTINT('project_autoclose_days') : getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30);
+$autocloseUser = $action === 'save_project_autoclose' ? GETPOSTINT('project_autoclose_user') : getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_USER');
+$autocloseRules = array();
+foreach (LmdbAdvancedProjectCompatibility::projectAutocloseRules() as $rule => $label) {
+	if ($rule === 'disabled' || LmdbAdvancedProjectCompatibility::projectAutocloseAvailable($rule) || $rule === $autocloseRule) {
+		$autocloseRules[$rule] = $langs->trans($label)
+			.($rule !== 'disabled' && !LmdbAdvancedProjectCompatibility::projectAutocloseAvailable($rule) ? ' ('.$langs->trans('Unavailable').')' : '');
+	}
+}
+print '<br><form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'"><input type="hidden" name="action" value="save_project_autoclose">';
+print '<div class="div-table-responsive-no-min"><table class="noborder centpercent">';
+print '<tr class="liste_titre"><th colspan="2">'.$langs->trans('ProjectAutoClose').'</th></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('ProjectAutoCloseRule').'</td><td class="right">';
+print $form->selectarray('project_autoclose_rule', $autocloseRules, $autocloseRule, 0);
+print ajax_combobox('project_autoclose_rule');
+print '</td></tr><tr class="oddeven"><td><label for="project_autoclose_days">'.$langs->trans('ProjectAutoCloseDays').'</label></td><td class="right">';
+print '<input type="number" class="width75" min="1" max="36500" id="project_autoclose_days" name="project_autoclose_days" value="'.$autocloseDays.'">';
+print '</td></tr><tr class="oddeven"><td>'.$langs->trans('ProjectAutoCloseUser').'</td><td class="right">';
+print $form->select_dolusers($autocloseUser > 0 ? $autocloseUser : -1, 'project_autoclose_user', 1, null, 0, '', '', '', 0, 0, LmdbAdvancedProjectCompatibility::projectAutocloseUserFilter(), 0, '', '', 0, 0, false, 1);
+print '</td></tr></table></div><div class="center"><input class="button" type="submit" value="'.$langs->trans('Save').'"></div></form>';
+print '<div class="info">'.$langs->trans('ProjectAutoCloseDescription').'<br>'.$langs->trans('ProjectAutoCloseSemantics')
+	.'<br>'.$langs->trans('ProjectAutoCloseInactivityHelp').'<br>'.$langs->trans('ProjectAutoCloseUserHelp').'<br>'.$langs->trans('ProjectAutoCloseJobHelp').'</div>';
+if (!LmdbAdvancedProjectCompatibility::projectAutocloseAvailable()) {
+	print '<div class="warning">'.$langs->trans('ProjectAutoCloseUnavailable').'</div>';
+}
+if (isModEnabled('cron')) {
+	print '<div class="right"><a href="'.DOL_URL_ROOT.'/cron/list.php">'.$langs->trans('ProjectAutoCloseJob').'</a></div>';
+}
+
 print '<br><table class="noborder centpercent">';
 print '<tr class="liste_titre"><th>'.$langs->trans('BudgetCostFeature').'</th><th class="right">'.$langs->trans('Value').'</th></tr>';
 print '<tr class="oddeven"><td>'.$form->textwithtooltip($langs->trans('BudgetCostFeature'), $langs->trans('BudgetCostFormulaHelp')).'<br><span class="opacitymedium">'.$langs->trans('BudgetCostFeatureDescription').'</span></td><td class="right">';

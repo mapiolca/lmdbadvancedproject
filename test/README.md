@@ -1,5 +1,13 @@
 # Vérifications des coûts d’expédition
 
+## Clôture automatique des projets (proposition non publiée)
+
+`php test/projectautoclose_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION`, l’extension SQLite3 et les classes natives Project/User/Interfaces avec les transactions natives. Le listener de preuve et les sources temporaires restent dans `test/.cache/`. Les événements, refus, modes, inactivité Agenda, paiements/livraisons, ventilations, échecs transactionnels, rejeux et pagination sont observés dans une base en mémoire. Les verrous MySQL et les périmètres Multicompany réels ne sont pas simulés comme des essais d’instance.
+
+`python test/check_projectautoclose_contracts.py --repository /chemin/vers/dolibarr --development-ref <SHA-v25>` vérifie les contrats des tags 20 à 24 et de la révision v25 demandée. Les scénarios, résultats datés et essais d’instance restant à réaliser sont décrits dans [la validation de clôture](../doc/AUTOMATIC_PROJECT_CLOSURE.md). `costsettings_test.php` ajoute l’enregistrement et la conservation du travail planifié natif.
+
+## Tests des coûts
+
 Ces tests CLI utilisent les classes natives d’un checkout Dolibarr, les arrondis natifs et une base relationnelle SQLite en mémoire. L’adaptateur traduit uniquement les différences SQL de syntaxe nécessaires aux fixtures. Il ne simule pas une installation opérationnelle de Dolibarr ou du module Multicompany.
 
 Prérequis : PHP CLI 8.0+, PDO SQLite, ZipArchive, bibliothèques PhpSpreadsheet/TCPDF incluses dans le core. `DOLIBARR_ROOT` désigne son répertoire `htdocs`. Aucun accès à une base ERP existante. Les fichiers temporaires restent dans `test/.cache/`, ignoré par Git. Les anciennes dépendances natives peuvent émettre des dépréciations sur PHP 8.5 ; les tests d’exports masquent ces seules dépréciations, pas les avertissements ni les erreurs.

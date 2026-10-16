@@ -7,6 +7,34 @@ class LmdbAdvancedProjectCompatibility
 {
 	public const MIN_DOLIBARR_VERSION = '20.0.0';
 	public const MIN_PHP_VERSION = '8.0.0';
+	/** @return array<string,string> Rule labels for the native settings selector */
+	public static function projectAutocloseRules(): array
+	{
+		return array('disabled' => 'ProjectAutoCloseDisabled', 'invoices' => 'ProjectAutoCloseInvoices',
+			'orders' => 'ProjectAutoCloseOrders', 'both' => 'ProjectAutoCloseBoth', 'either' => 'ProjectAutoCloseEither');
+	}
+
+	/** Native user selector accepts raw SQL in v20 and USF from v21. */
+	public static function projectAutocloseUserFilter(): string
+	{
+		return version_compare(DOL_VERSION, '21.0.0', '>=')
+			? '(u.statut:=:1) AND ((u.fk_soc:is:NULL) OR (u.fk_soc:=:0))'
+			: 'AND u.statut = 1 AND (u.fk_soc IS NULL OR u.fk_soc = 0)';
+	}
+
+	/** Availability is independent of the switch and actor's functional permissions. */
+	public static function projectAutocloseAvailable(?string $rule = null, ?int $days = null): bool
+	{
+		$rule = $rule ?? getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
+		$days = $days ?? getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30);
+		return defined('DOL_VERSION') && version_compare(DOL_VERSION, self::MIN_DOLIBARR_VERSION, '>=')
+			&& version_compare(PHP_VERSION, self::MIN_PHP_VERSION, '>=')
+			&& isModEnabled('lmdbadvancedproject') && isModEnabled('projet') && isModEnabled('cron') && isModEnabled('agenda')
+			&& isset(self::projectAutocloseRules()[$rule])
+			&& $days >= 1 && $days <= 36500
+			&& ($rule === 'disabled' || $rule === 'orders' || isModEnabled('facture'))
+			&& ($rule === 'disabled' || $rule === 'invoices' || isModEnabled('commande'));
+	}
 	/** Tables added in 1.4.1; old reporting remains available before reactivation. */
 	public static function costValuationAvailable(): bool
 	{
@@ -92,6 +120,13 @@ class LmdbAdvancedProjectCompatibility
 		$spreadsheetAvailable = is_readable(DOL_DOCUMENT_ROOT.'/includes/phpoffice/phpspreadsheet/src/autoloader.php');
 
 		$features = array(
+			'project_autoclose' => array(
+				'label' => 'ProjectAutoClose', 'description' => 'ProjectAutoCloseDescription',
+				'available' => self::projectAutocloseAvailable(), 'reason' => 'ProjectAutoCloseUnavailable',
+				'details' => array('BudgetCompatibilityModuleProject' => isModEnabled('projet'), 'Cron' => isModEnabled('cron'), 'Agenda' => isModEnabled('agenda')),
+				'core_contract' => 'ProjectAutoCloseCore',
+				'compatibility_check' => 'LmdbAdvancedProjectCompatibility::projectAutocloseAvailable()',
+			),
 			'cost_valuation' => array(
 				'label' => 'BudgetCostValuation', 'description' => 'BudgetCostValuationDescription',
 				'available' => self::costValuationAvailable(), 'reason' => 'BudgetCostValuationUnavailable',
