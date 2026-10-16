@@ -2,9 +2,9 @@
 
 ## Unreleased — proposed automatic project closure
 
-- Add optional periodic closure after a configurable period without project Agenda activity, combined with paid customer invoices, delivered customer orders, both conditions or either condition. Empty document sets, recent/ongoing/future events, unknown activity dates and inaccessible data prevent closure.
+- Add optional periodic closure after a configurable period without project/task Agenda activity, combined with paid customer invoices, delivered customer orders, both conditions or either condition. Count event edits and project changes/reopening; outstanding actions, ongoing recurrences, unknown dates and inaccessible data prevent premature closure. Require the complete inactivity period and serialize each scheduled decision.
 - Configure the rule, inactivity days and execution user per entity, with a disabled-by-default native scheduled job, preserved scheduling and the additional `autoclose.run` permission. Reactivate after updating, assign the required native permissions, then explicitly enable the job.
-- Close through the native project method and event, retaining private-project, document/third-party and entity restrictions. Include enabled customer invoice allocations; never automatically reopen a project. No new table, dependency or published-version change. Validation and remaining instance checks are recorded separately.
+- Close through the native project method and event, retaining private-project, document/third-party and entity restrictions. Include persisted customer invoice allocations even with their editor disabled, and refuse broken links; never automatically reopen a project. No new table, dependency or published-version change. Validation and remaining instance checks are recorded separately.
 
 ## 1.5.0 — preparation
 

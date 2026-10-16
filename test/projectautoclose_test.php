@@ -22,15 +22,22 @@ require_once __DIR__.'/../class/lmdbadvancedprojectautoclose.class.php';
 class AutocloseDB extends DoliDBSqlite3
 {
 	public $failSql = '';
+	public $afterDocumentRead = null;
 	public function __construct($type, $host, $user, $pass, $name = '', $port = 0) {
 		$this->db = new SQLite3(':memory:'); $this->transaction_opened = 0;
 		$this->db->createFunction('GREATEST', static function (...$values) { return in_array(null, $values, true) ? null : max($values); });
 	}
 	public function query($sql, $usesavepoint = 0, $type = 'auto', $result_mode = 0) {
 		if ($this->failSql !== '' && strpos($sql, $this->failSql) !== false) { $this->failSql = ''; $this->error = 'injected failure'; return false; }
+		// SQLite has one serializable writer. MySQL's per-transaction SET is
+		// acknowledged here; its locking semantics are not exercised by this fixture.
+		if ($sql === 'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE') { $sql = 'SELECT 1'; }
 		$result = parent::query(str_replace(' FOR UPDATE', '', $sql), $usesavepoint, $type, $result_mode);
 		if (!$result) { throw new RuntimeException($this->error.' SQL: '.$sql); }
 		if (is_object($result)) { $result->queryString = str_replace(' FOR UPDATE', '', $sql); }
+		if ($this->afterDocumentRead !== null && strpos($sql, 'FROM '.MAIN_DB_PREFIX.'commande d ') !== false && strpos($sql, 'FOR UPDATE') !== false) {
+			$callback = $this->afterDocumentRead; $this->afterDocumentRead = null; $callback();
+		}
 		return $result;
 	}
 }
@@ -70,7 +77,7 @@ function fixtureValue(string $column, string $table, int $id) {
 	return $row->value;
 }
 // Use column names from the exact native schemas, replacing only fixture DDL types.
-foreach (array('projet','user','user_extrafields','c_country','c_departements','establishment','user_param','rights_def','user_rights','usergroup_rights','usergroup_user','societe','socpeople','societe_commerciaux','facture','facturedet','commande','actioncomm','actioncomm_resources','c_actioncomm','element_contact','c_type_contact','extrafields','ecm_files') as $table) {
+foreach (array('projet','projet_task','user','user_extrafields','c_country','c_departements','establishment','user_param','rights_def','user_rights','usergroup_rights','usergroup_user','societe','socpeople','societe_commerciaux','facture','facturedet','commande','actioncomm','actioncomm_resources','c_actioncomm','element_contact','c_type_contact','extrafields','ecm_files') as $table) {
 	$schema = file_get_contents(DOL_DOCUMENT_ROOT.'/install/mysql/tables/llx_'.$table.'.sql');
 	preg_match_all('/^\s*`?([a-z][a-z0-9_]*)`?\s+(integer|int|smallint|tinyint|bigint|varchar|char|text|mediumtext|longtext|datetime|date|timestamp|double|real|float|decimal|boolean)\b/im', $schema, $matches, PREG_SET_ORDER);
 	$columns = array();
@@ -117,12 +124,13 @@ PHP
 $closureTriggerFails = false;
 function resetClosure(string $rule = 'both'): void {
 	global $db, $conf, $actor, $old, $closureTriggerFails, $mc;
-	foreach (array('closure_events','actioncomm','lmdbadvancedproject_customer_invoice_parts','facturedet','facture','commande','projet') as $table) { $db->query('DELETE FROM '.MAIN_DB_PREFIX.$table); }
+	foreach (array('closure_events','actioncomm','lmdbadvancedproject_customer_invoice_parts','facturedet','facture','commande','projet_task','projet') as $table) { $db->query('DELETE FROM '.MAIN_DB_PREFIX.$table); }
 	$conf->global->LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE = $rule;
 	$conf->global->LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS = 30;
 	$conf->global->LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT = 0;
 	$actor->denied = array(); $actor->socid = 0; $actor->statut = 1; $actor->admin = 0;
 	$closureTriggerFails = false; $mc->scopes = array();
+	$db->afterDocumentRead = null;
 	fixtureInsert('projet', array('rowid' => 1, 'entity' => 1, 'fk_statut' => 1, 'public' => 1, 'datec' => $old, 'dateo' => $old, 'ref' => 'TEST1'));
 	fixtureInsert('facture', array('rowid' => 1, 'entity' => 1, 'fk_projet' => 1, 'fk_soc' => 1, 'fk_statut' => 2, 'paye' => 1));
 	fixtureInsert('commande', array('rowid' => 1, 'entity' => 1, 'fk_projet' => 1, 'fk_soc' => 1, 'fk_statut' => 3));
@@ -130,7 +138,7 @@ function resetClosure(string $rule = 'both'): void {
 function addActivity(?string $start, ?string $end = null, ?string $recorded = null, int $entity = 1, bool $elementLink = false): void {
 	fixtureInsert('actioncomm', array('id' => 1, 'entity' => $entity, 'fk_project' => $elementLink ? null : 1,
 		'elementtype' => $elementLink ? 'project' : null, 'fk_element' => $elementLink ? 1 : null,
-		'datep' => $start, 'datep2' => $end, 'datec' => $recorded));
+		'datep' => $start, 'datep2' => $end, 'datec' => $recorded, 'percent' => -1));
 }
 
 resetClosure();
@@ -195,7 +203,7 @@ assertClosure($job->closeProject(1, $actor), 0, 'Old unassigned Agenda event is 
 resetClosure(); $actor->socid = 1;
 assertClosure($job->closeProject(1, $actor), 0, 'External actor refused');
 resetClosure(); $db->query('UPDATE '.MAIN_DB_PREFIX.'projet SET public=0');
-assertClosure($job->closeProject(1, $actor), 1, 'Native write-all allows private project');
+assertClosure($job->closeProject(1, $actor), 1, 'Native read-all and write-all allow private project');
 resetClosure(); $db->query('UPDATE '.MAIN_DB_PREFIX.'projet SET public=0'); $actor->denied = array('projet.all.creer');
 assertClosure($job->closeProject(1, $actor), 0, 'Unassigned private project refused');
 resetClosure(); $db->query('UPDATE '.MAIN_DB_PREFIX.'facture SET fk_soc=999');

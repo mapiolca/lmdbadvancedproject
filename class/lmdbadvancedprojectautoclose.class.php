@@ -73,9 +73,16 @@ class LmdbAdvancedProjectAutoclose
 
 		$cursor = $scanned = $closed = 0;
 		try {
+			$projectScope = new Project($this->db);
+			$authorized = $projectScope->getProjectsAuthorizedForUser($actor, $actor->hasRight('projet', 'all', 'lire') ? 2 : 0, 1);
+			if ($authorized === '') { $authorized = '0'; }
+			if (!is_string($authorized) || !preg_match('/^[0-9]+(?:,[0-9]+)*$/D', $authorized)) {
+				throw new RuntimeException('Invalid native project access scope');
+			}
 			do {
 				// Keyset pagination remains stable as projects leave the open set.
 				$sql = 'SELECT rowid FROM '.MAIN_DB_PREFIX.'projet WHERE entity = '.((int) $conf->entity)
+					.' AND rowid IN ('.$this->db->sanitize($authorized).')'
 					.' AND fk_statut = '.Project::STATUS_VALIDATED.' AND rowid > '.$cursor.' ORDER BY rowid ASC'.$this->db->plimit(100);
 				$result = $this->db->query($sql);
 				if (!$result) { throw new RuntimeException($this->db->lasterror()); }
@@ -85,7 +92,19 @@ class LmdbAdvancedProjectAutoclose
 				foreach ($ids as $id) {
 					$cursor = $id;
 					$scanned++;
-					$closed += $this->closeProject($id, $actor);
+					// Only this transaction: protect empty Agenda/document ranges too,
+					// including installations whose session default is READ COMMITTED.
+					if (!$this->db->query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE') || !$this->db->begin()) {
+						throw new RuntimeException($this->db->lasterror());
+					}
+					try {
+						$changed = $this->closeProject($id, $actor);
+						if (!$this->db->commit()) { throw new RuntimeException($this->db->lasterror()); }
+					} catch (RuntimeException $exception) {
+						if (!$this->db->rollback()) { dol_syslog(__METHOD__.': rollback failed', LOG_ERR); }
+						throw $exception;
+					}
+					$closed += $changed;
 				}
 			} while (count($ids) === 100);
 		} catch (RuntimeException $exception) {
@@ -100,16 +119,20 @@ class LmdbAdvancedProjectAutoclose
 
 	/**
 	 * Recheck under a project row lock, shared by concurrent job executions.
+	 * The scheduled entry point owns the serializable outer transaction; other
+	 * internal callers must provide their transaction's isolation guarantees.
 	 * An inaccessible document makes the selected rule unknown, never complete.
 	 *
 	 * @param int $id Project ID
 	 * @param User $actor Explicit actor in the current entity
+	 * @param int|null $referenceTime UTC decision time; null uses the native clock
 	 * @return int 1 if closed, 0 if ineligible or inaccessible
 	 * @throws RuntimeException Database or native closure failure
 	 */
-	public function closeProject(int $id, User $actor): int
+	public function closeProject(int $id, User $actor, ?int $referenceTime = null): int
 	{
 		global $conf;
+		$referenceTime = $referenceTime ?? dol_now();
 		$rule = getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
 		if ($id <= 0 || $rule === 'disabled' || !LmdbAdvancedProjectCompatibility::projectAutocloseAvailable()
 			|| ($this->entity > 0 && (int) $this->entity !== (int) $conf->entity)
@@ -136,11 +159,8 @@ class LmdbAdvancedProjectAutoclose
 			}
 			$project = new Project($this->db);
 			if ($project->fetch($id) <= 0) { throw new RuntimeException($project->error); }
-			if ((int) $project->entity !== (int) $conf->entity || $project->restrictedProjectArea($actor, 'write') <= 0) {
-				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
-				return 0;
-			}
-			if (!$this->isInactive($project, $actor)) {
+			if ((int) $project->entity !== (int) $conf->entity
+				|| $project->restrictedProjectArea($actor, 'read') <= 0 || $project->restrictedProjectArea($actor, 'write') <= 0) {
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
 				return 0;
 			}
@@ -151,12 +171,17 @@ class LmdbAdvancedProjectAutoclose
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
 				return 0;
 			}
+			// Inspect current Agenda rows last, after any wait for document locks.
+			if (!$this->isInactive($project, $actor, $referenceTime)) {
+				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
+				return 0;
+			}
 			$project->oldcopy = clone $project;
 			$project->context['trigger_reason'] = 'lmdbadvancedproject_auto_close';
 			$project->context['auto_close_rule'] = $rule;
 			// Native PROJECT_CLOSE owns its Agenda/notification effects. No custom trigger.
 			if ($project->setClose($actor) < 0) { throw new RuntimeException($project->error); }
-			// The native close is nested; this outer commit checks actual persistence.
+			// Preserve native nesting; run() also checks its final persistence commit.
 			if (!$this->db->commit()) { throw new RuntimeException($this->db->lasterror()); }
 			return 1;
 		} catch (RuntimeException $exception) {
@@ -166,21 +191,29 @@ class LmdbAdvancedProjectAutoclose
 	}
 
 	/**
-	 * Agenda occurrence/end and recording dates prevent closure of recent,
-	 * ongoing or future activity. Unknown dates or hidden events fail closed.
-	 * Without an event, creation/start provides the minimum observation period.
+	 * Agenda occurrence/end and recording/modification dates prevent premature
+	 * closure. Outstanding actions and active recurrences are still activity.
+	 * Project edits/reopening also start a complete observation period.
 	 *
 	 * @param Project $project Loaded owner project
 	 * @param User $actor Explicit actor
+	 * @param int $referenceTime UTC decision time
 	 * @return bool Whether the complete project Agenda has been inactive long enough
 	 * @throws RuntimeException Database failure
 	 */
-	private function isInactive(Project $project, User $actor): bool
+	private function isInactive(Project $project, User $actor, int $referenceTime): bool
 	{
-		$cutoff = dol_time_plus_duree(dol_now(), -getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30), 'd');
-		$last = max((int) $project->date_c, (int) $project->date_start);
+		// An inactivity day is 24 elapsed hours, including across DST changes.
+		$cutoff = dol_time_plus_duree($referenceTime, -24 * getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30), 'h');
+		$last = max((int) $project->date_c, (int) $project->date_start, (int) $project->date_m);
+		$taskLink = "(a.elementtype IN ('project_task', 'project_task@projet') AND a.fk_element = t.rowid)";
+		if (version_compare(DOL_VERSION, '21.0.0', '>=')) {
+			$taskLink .= ' OR a.fk_task = t.rowid';
+		}
 		$link = '(a.fk_project = '.((int) $project->id)
-			." OR (a.elementtype IN ('project', 'project@projet') AND a.fk_element = ".((int) $project->id).'))';
+			." OR (a.elementtype IN ('project', 'project@projet') AND a.fk_element = ".((int) $project->id).')'
+			.' OR EXISTS (SELECT 1 FROM '.MAIN_DB_PREFIX.'projet_task t WHERE t.fk_projet = '.((int) $project->id)
+			.' AND ('.$taskLink.')))';
 		$entities = $this->db->sanitize(getEntity('agenda'));
 		$result = $this->db->query('SELECT a.id FROM '.MAIN_DB_PREFIX.'actioncomm a WHERE '.$link
 			.' AND a.entity NOT IN ('.$entities.')'.$this->db->plimit(1));
@@ -188,15 +221,27 @@ class LmdbAdvancedProjectAutoclose
 		$hidden = is_object($this->db->fetch_object($result));
 		$this->db->free($result);
 		if ($hidden) { return false; }
-		$result = $this->db->query('SELECT a.id, a.datep, a.datep2, a.datec FROM '.MAIN_DB_PREFIX.'actioncomm a WHERE '
+		$result = $this->db->query('SELECT a.id, a.datep, a.datep2, a.datec, a.tms, a.percent, a.fulldayevent, a.recurrule, a.recurdateend'
+			.' FROM '.MAIN_DB_PREFIX.'actioncomm a WHERE '
 			.$link.' AND a.entity IN ('.$entities.') ORDER BY a.id FOR UPDATE');
 		if (!$result) { throw new RuntimeException($this->db->lasterror()); }
 		while (is_object($row = $this->db->fetch_object($result))) {
 			if (!checkUserAccessToObject($actor, array('agenda'), (int) $row->id, 'actioncomm&societe', '', 'fk_soc', 'id')) {
 				$this->db->free($result); return false;
 			}
-			$eventDate = max((int) $this->db->jdate($row->datep), (int) $this->db->jdate($row->datep2), (int) $this->db->jdate($row->datec));
-			if ($eventDate <= 0) { $this->db->free($result); return false; }
+			$start = (int) $this->db->jdate($row->datep);
+			$end = (int) $this->db->jdate($row->datep2);
+			// -1 = native automatic/history event, 100 = completed action.
+			if ($start <= 0 || $row->percent === null || !in_array((int) $row->percent, array(-1, 100), true)
+				|| ($end > 0 && $end < $start) || ($row->fulldayevent && $end <= 0)) {
+				$this->db->free($result); return false;
+			}
+			$recurrenceEnd = 0;
+			if (trim((string) $row->recurrule) !== '') {
+				$recurrenceEnd = (int) $this->db->jdate($row->recurdateend);
+				if ($recurrenceEnd <= 0) { $this->db->free($result); return false; }
+			}
+			$eventDate = max($start, $end, $recurrenceEnd, (int) $this->db->jdate($row->datec), (int) $this->db->jdate($row->tms));
 			$last = max($last, $eventDate);
 		}
 		$this->db->free($result);
@@ -204,7 +249,7 @@ class LmdbAdvancedProjectAutoclose
 	}
 
 	/**
-	 * Inspect all links, including draft documents and enabled invoice allocations.
+	 * Inspect all persisted links, including drafts and historical allocations.
 	 * Never drop an out-of-scope pending document from the completeness test.
 	 *
 	 * @param Project $project Loaded owner project
@@ -217,8 +262,24 @@ class LmdbAdvancedProjectAutoclose
 	{
 		$invoice = $kind === 'invoices';
 		$table = $invoice ? 'facture' : 'commande';
+		$entities = $this->db->sanitize(getEntity($table));
 		$link = 'd.fk_projet = '.((int) $project->id);
-		if ($invoice && getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT')) {
+		if ($invoice) {
+			// The editing switch does not erase persisted debts or repair broken links.
+			$parts = $this->db->query('SELECT cip.rowid, f.rowid AS invoice_id, fd.rowid AS line_id,'
+				.' CASE WHEN cip.entity = f.entity AND cip.entity IN ('.$entities.') THEN 1 ELSE 0 END AS visible_entity'
+				.' FROM '.MAIN_DB_PREFIX.'lmdbadvancedproject_customer_invoice_parts cip'
+				.' LEFT JOIN '.MAIN_DB_PREFIX.'facture f ON f.rowid = cip.fk_facture'
+				.' LEFT JOIN '.MAIN_DB_PREFIX.'facturedet fd ON fd.rowid = cip.fk_facture_det AND fd.fk_facture = cip.fk_facture'
+				.' WHERE cip.fk_projet = '.((int) $project->id).' AND (cip.total_ht <> 0 OR cip.total_ttc <> 0 OR cip.qty <> 0)'
+				.' ORDER BY cip.rowid FOR UPDATE');
+			if (!$parts) { throw new RuntimeException($this->db->lasterror()); }
+			while (is_object($part = $this->db->fetch_object($parts))) {
+				if (!$actor->hasRight('lmdbadvancedproject', 'split', 'read') || !$part->invoice_id || !$part->line_id || !$part->visible_entity) {
+					$this->db->free($parts); return null;
+				}
+			}
+			$this->db->free($parts);
 			$link = '('.$link.' OR EXISTS (SELECT 1 FROM '.MAIN_DB_PREFIX.'lmdbadvancedproject_customer_invoice_parts cip'
 				.' INNER JOIN '.MAIN_DB_PREFIX.'facturedet fd ON fd.rowid = cip.fk_facture_det AND fd.fk_facture = cip.fk_facture'
 				.' WHERE cip.fk_facture = d.rowid AND cip.fk_projet = '.((int) $project->id)
@@ -227,7 +288,6 @@ class LmdbAdvancedProjectAutoclose
 		// Replaced invoices are superseded; other abandoned unpaid invoices still block.
 		$active = $invoice ? "NOT (d.fk_statut = ".Facture::STATUS_ABANDONED." AND COALESCE(d.close_code, '') = '".Facture::CLOSECODE_REPLACED."')"
 			: 'd.fk_statut <> '.Commande::STATUS_CANCELED;
-		$entities = $this->db->sanitize(getEntity($table));
 		$result = $this->db->query('SELECT d.rowid FROM '.MAIN_DB_PREFIX.$table.' d WHERE '.$link.' AND '.$active
 			.' AND d.entity NOT IN ('.$entities.')'.$this->db->plimit(1));
 		if (!$result) { throw new RuntimeException($this->db->lasterror()); }

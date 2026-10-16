@@ -23,7 +23,7 @@ for ref in refs:
         ["git", "-C", args.repository, "rev-parse", ref + "^{commit}"], text=True
     ).strip()
     project = read(ref, "projet/class/project.class.php")
-    for symbol in ("function setClose(", "function restrictedProjectArea(", "PROJECT_CLOSE", "STATUS_VALIDATED", "STATUS_CLOSED"):
+    for symbol in ("function setClose(", "function restrictedProjectArea(", "function getProjectsAuthorizedForUser(", "PROJECT_CLOSE", "STATUS_VALIDATED", "STATUS_CLOSED"):
         assert symbol in project, (ref, symbol)
     invoice = read(ref, "compta/facture/class/facture.class.php")
     for symbol in ("STATUS_CLOSED", "STATUS_ABANDONED", "CLOSECODE_REPLACED"):
@@ -32,14 +32,20 @@ for ref in refs:
     for symbol in ("STATUS_CLOSED", "STATUS_CANCELED"):
         assert symbol in order, (ref, symbol)
     for table, columns in {
-        "projet": ("entity", "fk_statut", "datec", "dateo", "fk_user_close", "date_close"),
+        "projet": ("entity", "fk_statut", "datec", "dateo", "tms", "fk_user_close", "date_close"),
+        "projet_task": ("entity", "fk_projet"),
         "facture": ("fk_projet", "paye", "fk_statut", "entity", "close_code"),
         "commande": ("fk_projet", "fk_statut", "entity"),
-        "actioncomm": ("entity", "datep", "datep2", "datec", "fk_project", "fk_element", "elementtype"),
+        "actioncomm": ("entity", "datep", "datep2", "datec", "tms", "percent", "fulldayevent", "recurrule", "recurdateend", "fk_project", "fk_element", "elementtype"),
     }.items():
         schema = read(ref, f"install/mysql/tables/llx_{table}.sql")
         for column in columns:
             assert column in schema, (ref, table, column)
+    agenda_schema = read(ref, "install/mysql/tables/llx_actioncomm.sql")
+    assert ("fk_task" in agenda_schema) == (ref != "20.0.0"), (ref, "native Agenda task link from v21")
+    assert "public $element = 'project_task'" in read(ref, "projet/class/task.class.php")
+    action = read(ref, "comm/action/class/actioncomm.class.php")
+    assert "percent >= 0" in action and "percent < 100" in action, (ref, "native unfinished action range")
     modules = read(ref, "core/modules/DolibarrModules.class.php")
     assert "function insert_cronjobs(" in modules and "function delete_cronjobs(" in modules
     assert "AND test = '1'" in modules, (ref, "native conditional-job retention")

@@ -4,6 +4,8 @@
 
 `php test/projectautoclose_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION`, l’extension SQLite3 et les classes natives Project/User/Interfaces avec les transactions natives. Le listener de preuve et les sources temporaires restent dans `test/.cache/`. Les événements, refus, modes, inactivité Agenda, paiements/livraisons, ventilations, échecs transactionnels, rejeux et pagination sont observés dans une base en mémoire. Les verrous MySQL et les périmètres Multicompany réels ne sont pas simulés comme des essais d’instance.
 
+`php test/projectautoclose_review_test.php` inclut les 89 contrôles précédents puis les reproductions de clôture prématurée de la revue : jour complet au changement d’heure, seuil à la seconde dans trois fuseaux, modifications/réouverture, tâches, actions inachevées, récurrences, dates incohérentes et ventilations historiques/orphelines. L’isolation MySQL est acquittée dans l’adaptateur SQLite ; les refus d’isolation et commits externes sont testés, mais les verrous concurrentiels restent une recette d’instance.
+
 `python test/check_projectautoclose_contracts.py --repository /chemin/vers/dolibarr --development-ref <SHA-v25>` vérifie les contrats des tags 20 à 24 et de la révision v25 demandée. Les scénarios, résultats datés et essais d’instance restant à réaliser sont décrits dans [la validation de clôture](../doc/AUTOMATIC_PROJECT_CLOSURE.md). `costsettings_test.php` ajoute l’enregistrement et la conservation du travail planifié natif.
 
 ## Tests des coûts
