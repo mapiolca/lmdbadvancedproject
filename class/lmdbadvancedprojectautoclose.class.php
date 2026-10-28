@@ -146,6 +146,7 @@ class LmdbAdvancedProjectAutoclose
 			|| !checkUserAccessToObject($actor, array('user'), $actor, 'user')) {
 			return 0;
 		}
+		$savepoint = '';
 		if (!$this->db->begin()) { throw new RuntimeException($this->db->lasterror()); }
 		try {
 			$result = $this->db->query('SELECT rowid FROM '.MAIN_DB_PREFIX.'projet WHERE rowid = '.$id
@@ -179,13 +180,32 @@ class LmdbAdvancedProjectAutoclose
 			$project->oldcopy = clone $project;
 			$project->context['trigger_reason'] = 'lmdbadvancedproject_auto_close';
 			$project->context['auto_close_rule'] = $rule;
+			// Native nested rollback only changes its counter. Isolate native writes
+			// so a caller can catch a trigger failure and still commit its own work.
+			$closureSavepoint = 'lmdbap_close_'.bin2hex(random_bytes(8));
+			if (!$this->db->query('SAVEPOINT '.$closureSavepoint)) { throw new RuntimeException($this->db->lasterror()); }
+			$savepoint = $closureSavepoint;
 			// Native PROJECT_CLOSE owns its Agenda/notification effects. No custom trigger.
 			if ($project->setClose($actor) < 0) { throw new RuntimeException($project->error); }
+			if (!$this->db->query('RELEASE SAVEPOINT '.$savepoint)) { throw new RuntimeException($this->db->lasterror()); }
+			$savepoint = '';
 			// Preserve native nesting; run() also checks its final persistence commit.
 			if (!$this->db->commit()) { throw new RuntimeException($this->db->lasterror()); }
 			return 1;
 		} catch (RuntimeException $exception) {
+			$savepointRollbackFailed = false;
+			if ($savepoint !== '') {
+				if (!$this->db->query('ROLLBACK TO SAVEPOINT '.$savepoint)) {
+					$savepointRollbackFailed = true;
+					dol_syslog(__METHOD__.': savepoint rollback failed', LOG_ERR);
+				} elseif (!$this->db->query('RELEASE SAVEPOINT '.$savepoint)) {
+					dol_syslog(__METHOD__.': savepoint release failed', LOG_ERR);
+				}
+			}
 			if (!$this->db->rollback()) { dol_syslog(__METHOD__.': rollback failed', LOG_ERR); }
+			if ($savepointRollbackFailed) {
+				throw new RuntimeException('Automatic closure rollback failed; caller must abort its transaction', 0, $exception);
+			}
 			throw $exception;
 		}
 	}

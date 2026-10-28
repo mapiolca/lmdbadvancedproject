@@ -168,6 +168,25 @@ reviewClosure('Scheduled outer commit failure', static function () use ($job,$db
 	assertClosure((int)fixtureValue('fk_statut','projet',1),1,'Final commit failure rolls back the native closure');
 	assertClosure($db->transaction_opened,0,'Scheduled transaction balance restored');
 });
+foreach (array('trigger', 'SAVEPOINT', 'RELEASE SAVEPOINT') as $failure) {
+	reviewClosure('Caller commits after closure failure: '.$failure, static function () use ($job,$actor,$db,$failure) {
+		global $closureTriggerFails;
+		resetClosure();
+		$db->begin();
+		$db->query("UPDATE ".MAIN_DB_PREFIX."societe SET nom='Caller work' WHERE rowid=1");
+		$closureTriggerFails = $failure === 'trigger';
+		$db->failSql = $failure === 'trigger' ? '' : $failure;
+		try {
+			try { $job->closeProject(1,$actor); throw new LogicException('Expected closure failure'); }
+			catch (RuntimeException $exception) { }
+			$db->commit();
+		} finally { $closureTriggerFails = false; $db->failSql = ''; }
+		assertClosure((int)fixtureValue('fk_statut','projet',1),1,'Caller commit must not persist the failed closure');
+		assertClosure((int)$db->fetch_object($db->query('SELECT COUNT(*) AS n FROM '.MAIN_DB_PREFIX.'closure_events'))->n,0,'Caller commit must not persist failed trigger writes');
+		assertClosure(fixtureValue('nom','societe',1),'Caller work','Caller can commit its independent work');
+		assertClosure($db->transaction_opened,0,'Nested failure preserves native transaction depth');
+	});
+}
 if ($reviewFailures) {
 	fwrite(STDERR, implode(PHP_EOL,$reviewFailures).PHP_EOL);
 	exit(1);

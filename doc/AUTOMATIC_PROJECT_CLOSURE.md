@@ -76,3 +76,15 @@ PHPStan : niveau 5, cible PHP 8.0, configuration `phpstan.neon` existante avec l
 5. Contrôler désactivation/réactivation avec règle, délai, utilisateur et fréquence personnalisés. Tester un compte désactivé ou privé de droits et une erreur au milieu d’un lot. Confirmer le résultat des projets déjà validés et celui du projet annulé.
 
 Aucun déploiement ni test navigateur sur une instance exécutant ces fichiers n’a été réalisé. PHP 8.0 réel, MySQL/MariaDB, concurrence et effets externes configurés restent à valider avant activation en production.
+
+## Revue du 28 octobre 2026 — transaction appelante
+
+La remarque P2 de la PR #10 est reproduite sur `ece0f93` : l’appelant ouvre une transaction et écrit une donnée indépendante, `PROJECT_CLOSE` écrit puis échoue, l’appelant intercepte l’exception et commit. Le projet reste alors clôturé (statut 2 au lieu de 1) car les rollbacks imbriqués natifs ne font que décrémenter leur compteur.
+
+La clôture native est maintenant encadrée par un point de sauvegarde SQL au nom interne unique. En cas d’échec, `ROLLBACK TO SAVEPOINT` annule la clôture et les écritures transactionnelles du trigger avant l’équilibrage natif. Les écritures antérieures de l’appelant peuvent encore être validées. Le point de sauvegarde est libéré en cas de succès. Aucun accès ni modification du compteur transactionnel dans le code métier ; les requêtes passent par l’abstraction Dolibarr. Si le rollback au point de sauvegarde échoue lui-même, l’exception exige explicitement l’abandon de la transaction appelante. Les effets externes déjà émis par un trigger ne sont pas annulés par un rollback SQL.
+
+Régression ajoutée dans `projectautoclose_review_test.php` : erreur du trigger, échec de création du point de sauvegarde et échec de sa libération, suivis d’un commit de l’appelant. Vérifier projet ouvert, aucune écriture du trigger conservée, travail antérieur préservé et profondeur native équilibrée.
+
+Tests exécutés sous PHP 8.4.22 : 144 assertions cumulées avec core20 et 145 avec core24 ; les 89 assertions de base sont incluses. Même adaptateur SQLite et mêmes limites que ci-dessus : ce contrôle exécute les méthodes natives et les savepoints SQL SQLite, sans certifier MySQL/MariaDB, DebugBar, les verrous concurrentiels ou une instance Multicompany réelle. Syntaxe PHP et `git diff --check` réussis. Aucun déploiement ni donnée ERP modifiée.
+
+Analyse statique après correctif : `python test/run_phpstan.py --core test/.cache/core24/htdocs --format table`, niveau 5, cible PHP 8.0, aucune erreur ; configuration, baseline et suppressions inchangés.
