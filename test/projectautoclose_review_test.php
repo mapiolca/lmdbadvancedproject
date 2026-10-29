@@ -187,6 +187,81 @@ foreach (array('trigger', 'SAVEPOINT', 'RELEASE SAVEPOINT') as $failure) {
 		assertClosure($db->transaction_opened,0,'Nested failure preserves native transaction depth');
 	});
 }
+reviewClosure('Caller commits after savepoint rollback failure', static function () use ($job,$actor,$db) {
+	global $closureTriggerFails;
+	resetClosure();
+	$db->query("UPDATE ".MAIN_DB_PREFIX."societe SET nom='Before caller' WHERE rowid=1");
+	$db->begin();
+	$db->query("UPDATE ".MAIN_DB_PREFIX."societe SET nom='Pending caller' WHERE rowid=1");
+	$closureTriggerFails=true; $db->failSql='ROLLBACK TO SAVEPOINT'; $caught=false;
+	try {
+		try { $job->closeProject(1,$actor); }
+		catch (RuntimeException $exception) { $caught=true; }
+		$db->commit();
+	} finally { $closureTriggerFails=false; $db->failSql=''; }
+	assertClosure($caught,true,'Savepoint rollback failure is reported');
+	assertClosure((int)fixtureValue('fk_statut','projet',1),1,'Caller commit cannot persist a closure whose savepoint rollback failed');
+	assertClosure((int)$db->fetch_object($db->query('SELECT COUNT(*) AS n FROM '.MAIN_DB_PREFIX.'closure_events'))->n,0,'Failed savepoint cleanup never preserves trigger writes');
+	assertClosure(fixtureValue('nom','societe',1),'Before caller','Unsafe transaction is fully aborted, including pending caller work');
+	assertClosure($db->transaction_opened,0,'Caller transaction levels remain balanced after a complete abort');
+});
+if (is_file(DOL_DOCUMENT_ROOT.'/debugbar/class/TraceableDB.php')) {
+	require_once DOL_DOCUMENT_ROOT.'/debugbar/class/TraceableDB.php';
+	foreach (array('success','trigger','savepoint rollback') as $failure) {
+		reviewClosure('Native DebugBar with two caller levels: '.$failure, static function () use ($actor,$db,$failure) {
+			global $closureTriggerFails;
+			resetClosure();
+			$before=fixtureValue('nom','societe',1);
+			$wrapped=new TraceableDB($db); $wrappedJob=new LmdbAdvancedProjectAutoclose($wrapped);
+			$wrapped->begin(); $wrapped->begin();
+			$wrapped->query("UPDATE ".MAIN_DB_PREFIX."societe SET nom='DebugBar caller' WHERE rowid=1");
+			$closureTriggerFails=$failure !== 'success';
+			$db->failSql=$failure === 'savepoint rollback' ? 'ROLLBACK TO SAVEPOINT' : '';
+			$caught=false; $result=0;
+			try {
+				try { $result=$wrappedJob->closeProject(1,$actor); } catch (RuntimeException $exception) { $caught=true; }
+				if ($failure === 'success') { $wrapped->rollback(); $wrapped->rollback(); }
+				else { $wrapped->commit(); $wrapped->commit(); }
+			} finally { $closureTriggerFails=false; $db->failSql=''; }
+			assertClosure($failure === 'success' ? $result : (int)$caught,1,'Native DebugBar preserves the closure result/exception');
+			assertClosure((int)fixtureValue('fk_statut','projet',1),1,'Native DebugBar never commits a failed or caller-cancelled closure');
+			assertClosure((int)$db->fetch_object($db->query('SELECT COUNT(*) AS n FROM '.MAIN_DB_PREFIX.'closure_events'))->n,0,'Native DebugBar leaves no cancelled trigger writes');
+			assertClosure(fixtureValue('nom','societe',1),$failure === 'trigger' ? 'DebugBar caller' : $before,'Local recovery preserves caller work; complete abort/caller rollback cancels it');
+			assertClosure($db->transaction_opened,0,'Native backend transaction levels remain balanced through DebugBar');
+		});
+	}
+}
+foreach (array('direct','scheduled') as $entry) {
+	reviewClosure('Unrecoverable transaction closes connection: '.$entry, static function () use ($job,$actor,$db,$entry) {
+		global $closureTriggerFails;
+		resetClosure();
+		$path=tempnam(__DIR__.'/.cache','autoclose-rollback-');
+		if ($path === false) { throw new RuntimeException('Cannot create the temporary transaction fixture'); }
+		$original=$db->db; $disk=new SQLite3($path); $probe=null;
+		$disk->createFunction('GREATEST', static function (...$values) { return in_array(null,$values,true) ? null : max($values); });
+		try {
+			if (!$original->backup($disk)) { throw new RuntimeException('Cannot copy the transaction fixture'); }
+			$db->db=$disk;
+			$closureTriggerFails=true;
+			$db->failSqlQueue=array('ROLLBACK TO SAVEPOINT','ROLLBACK');
+			if ($entry === 'direct') {
+				$db->begin(); $caught=false;
+				try { $job->closeProject(1,$actor); }
+				catch (RuntimeException $exception) { $caught=strpos($exception->getMessage(),'connection closed') !== false; }
+				assertClosure($caught,true,'Unrecoverable direct closure reports the discarded connection');
+			} else { assertClosure($job->run(),-1,'Unrecoverable scheduled closure returns failure'); }
+			assertClosure(isset($db->db),false,'No caller can commit on the discarded connection');
+			$probe=new SQLite3($path);
+			assertClosure((int)$probe->querySingle('SELECT fk_statut FROM '.MAIN_DB_PREFIX.'projet WHERE rowid=1'),1,'Reopening the database confirms that closure was not persisted');
+			assertClosure((int)$probe->querySingle('SELECT COUNT(*) FROM '.MAIN_DB_PREFIX.'closure_events'),0,'Reopening the database confirms that trigger writes were not persisted');
+		} finally {
+			if (isset($db->db) && $db->db === $disk) { $disk->close(); }
+			if ($probe !== null) { $probe->close(); }
+			$db->db=$original; $db->transaction_opened=0; $db->failSqlQueue=array(); $closureTriggerFails=false;
+			if (!unlink($path)) { throw new RuntimeException('Cannot remove the temporary transaction fixture'); }
+		}
+	});
+}
 if ($reviewFailures) {
 	fwrite(STDERR, implode(PHP_EOL,$reviewFailures).PHP_EOL);
 	exit(1);
