@@ -6,6 +6,8 @@
 
 `php test/projectautoclose_review_test.php` inclut les 89 contrôles précédents puis les reproductions de clôture prématurée de la revue : jour complet au changement d’heure, seuil à la seconde dans trois fuseaux, modifications/réouverture, tâches, actions inachevées, récurrences, dates incohérentes et ventilations historiques/orphelines. L’isolation MySQL est acquittée dans l’adaptateur SQLite ; les refus d’isolation et commits externes sont testés, mais les verrous concurrentiels restent une recette d’instance.
 
+La suite vérifie aussi le commit de l’appelant après échec du trigger ou du rollback au savepoint, puis l’abandon de connexion si le rollback complet échoue. La réouverture d’une base SQLite temporaire contrôle l’absence d’écritures persistées ; les fichiers restent dans `test/.cache/` et sont supprimés après le scénario. Si le core fourni contient `debugbar/class/TraceableDB.php`, ses méthodes natives sont exécutées avec deux niveaux de transaction appelante. L’adaptateur traduit uniquement l’erreur SQLite explicite de COMMIT/ROLLBACK sans transaction, acceptés sans erreur par MySQL/MariaDB ; les échecs injectés restent bloquants. Aucun mécanisme de verrou MySQL n’est simulé comme une preuve d’instance.
+
 `python test/check_projectautoclose_contracts.py --repository /chemin/vers/dolibarr --development-ref <SHA-v25>` vérifie les contrats des tags 20 à 24 et de la révision v25 demandée. Les scénarios, résultats datés et essais d’instance restant à réaliser sont décrits dans [la validation de clôture](../doc/AUTOMATIC_PROJECT_CLOSURE.md). `costsettings_test.php` ajoute l’enregistrement et la conservation du travail planifié natif.
 
 ## Tests des coûts

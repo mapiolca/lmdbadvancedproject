@@ -88,3 +88,31 @@ Régression ajoutée dans `projectautoclose_review_test.php` : erreur du trigger
 Tests exécutés sous PHP 8.4.22 : 144 assertions cumulées avec core20 et 145 avec core24 ; les 89 assertions de base sont incluses. Même adaptateur SQLite et mêmes limites que ci-dessus : ce contrôle exécute les méthodes natives et les savepoints SQL SQLite, sans certifier MySQL/MariaDB, DebugBar, les verrous concurrentiels ou une instance Multicompany réelle. Syntaxe PHP et `git diff --check` réussis. Aucun déploiement ni donnée ERP modifiée.
 
 Analyse statique après correctif : `python test/run_phpstan.py --core test/.cache/core24/htdocs --format table`, niveau 5, cible PHP 8.0, aucune erreur ; configuration, baseline et suppressions inchangés.
+
+## Complément du 29 octobre 2026 — échec de l’annulation locale
+
+La PR #10 a été fusionnée dans `dd2c00b0b6fd01b374746d83f4cf73b7e99d1744`. Sur cette base, un autre scénario reproduit une clôture persistée après erreur : le trigger échoue, `ROLLBACK TO SAVEPOINT` échoue aussi, puis l’appelant intercepte l’exception et commit. Le projet passe au statut 2 au lieu de rester au statut 1. Le message exigeant l’abandon de la transaction ne suffisait donc pas à garantir l’annulation.
+
+Le traitement tente désormais un `ROLLBACK` SQL complet lorsque l’annulation locale échoue. Cette instruction passe par l’abstraction Dolibarr, sans lecture ni modification de son compteur transactionnel et sans accès direct à la connexion sous-jacente. Dans ce cas exceptionnel, les écritures antérieures de l’appelant sont également annulées : celui-ci doit abandonner cette unité de travail. Quand l’annulation locale réussit, leur conservation reste inchangée. Si la base refuse aussi le rollback complet, sa connexion est fermée et l’erreur reste bloquante. Aucun succès de clôture n’est comptabilisé. Les erreurs de connexion peuvent aussi empêcher le moteur cron de persister son résultat ; vérifier alors les journaux et l’état du travail avant de le relancer.
+
+Le contrat SQL de l’annulation complète et de COMMIT/ROLLBACK sans transaction est décrit par [MariaDB — SAVEPOINT](https://mariadb.com/docs/server/reference/sql-statements/transactions/savepoint). La fixture traduit seulement l’erreur SQLite « no transaction is active » pour ces deux dernières instructions, sans acquitter les erreurs injectées. Elle ne prouve pas le comportement d’une connexion MySQL réelle.
+
+Régressions exécutées avec PHP CLI **8.4.22**, classes et transactions natives :
+
+| Sources core | Révision | Assertions cumulées |
+|---|---|---|
+| 20.0.0 | `697bf01970740a3339cd99cf055b4428fc5e051c` | 172 |
+| 21.0.0 | `fd970b582a4d8c5779a2958a4e9f4fce225cf085` | 173 |
+| 22.0.0 | `49b9a6d19f3deb6d410c0e9b3310e95be4ea7710` | 173 |
+| 23.0.0 | `57a1f05d490a7a80944a8232e9c613e6556d2704` | 173 |
+| 24.0.0 | `769c7db907099643558e77d7002c109cfda919e5` | 173 |
+| 24.0.3 | `4fc03dc81f44fcc20e8c5a86647d67f99378e80b` | 173 |
+| 25.0.0-alpha, développement | `6805f682cb72a0a7e519e0c79f0de5f667eb45e4` | 173 ; aucune validation d’une future version finale |
+
+Ces comptes incluent les 89 assertions initiales. Le décorateur natif `TraceableDB` est exécuté sur chaque jeu de sources, avec deux niveaux appelants : succès suivi d’un rollback de l’appelant, échec du trigger suivi d’un commit, puis échec du rollback local suivi d’un commit. Les compteurs contrôlés par les tests sont ceux du backend de fixture ; le code métier ne suppose pas leur identité avec ceux du décorateur.
+
+Deux scénarios supplémentaires refusent successivement le rollback local et complet, en appel direct puis via `run()`. Après fermeture de la connexion, une connexion distincte rouvre la base SQLite temporaire et constate le projet ouvert et aucune écriture de trigger conservée. Le scénario planifié retourne un échec ; il ne certifie pas l’enregistrement de ce résultat par un moteur cron privé de sa connexion.
+
+PHPStan : `python test/run_phpstan.py --core test/.cache/core20/htdocs --phar test/.cache/phpstan.phar`, **niveau 5, cible PHP 8.0, aucune erreur**. Syntaxe des trois PHP modifiés, contrats de sources et `git diff --check` vérifiés. Aucun niveau, baseline ou filtre d’erreur affaibli. Les résultats portent sur le patch complémentaire ; son SHA final figure dans la nouvelle PR.
+
+Cette correction ne change ni le délai Agenda, ni les règles factures/commandes, ni les permissions et filtres d’entité, ni les paramètres administrateur. Elle conserve `Project::setClose()` et son unique trigger natif. Aucun déploiement, changement de configuration ou essai sur une base ERP n’a été effectué. Sur une instance de test MySQL/MariaDB, confirmer les trois niveaux de récupération, les effets transactionnels des triggers, le traitement d’une connexion devenue inutilisable et le résultat du travail planifié. Les effets externes déjà produits par un trigger restent irréversibles par SQL.
