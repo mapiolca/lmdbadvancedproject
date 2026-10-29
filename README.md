@@ -6,6 +6,12 @@ Current version: **1.5.0**
 
 Advanced Project extends project budget analysis in Dolibarr.
 
+### Automatic project closure (unreleased)
+
+An optional native scheduled job closes open projects after a configurable period of **Agenda inactivity** (30 completed days by default), provided that all customer invoices are paid, all customer orders are delivered, both conditions hold, or either condition holds, according to the selected rule. Each condition requires a nonempty document set. Project/task events, their latest edits, unfinished actions, future events and ongoing recurrences prevent premature closure. Project creation, start and latest modification/reopening also start the observation period. Persisted invoice allocations remain relevant when their editor is disabled; broken links prevent closure. Projects remain in their owner entity, with native project, Agenda, commercial and document access checks. Each scheduled decision uses a serializable transaction and rechecks Agenda after reading the documents.
+
+Reactivate the module after updating to register the new permission and scheduled job. In module settings, choose the rule, inactivity period and an authorized execution user. Then enable and schedule **Automatic project closure — Advanced Project** in native Scheduled Jobs (initial frequency: hourly). Both the feature and job default to disabled. Existing eligible projects are included; projects are never automatically reopened. This is a proposed feature, with no release or deployment performed. See [rules, validation evidence and instance acceptance](doc/AUTOMATIC_PROJECT_CLOSURE.md).
+
 The Budget Report page tracks project budgets, time spent on tasks, vendor invoices, staff expenses, and remaining balances with Dolibarr's configured currency. You can access this feature from the Project module.
 
 The global report and each individual project report can restrict dated project content to an inclusive observation period. The project itself remains visible: customer orders and budgets, customer and supplier invoices, supplier orders, expense reports, and time entries outside the period are excluded from screen totals, forecasts, category summaries, monthly charts, and matrices only when content exclusion is enabled.
