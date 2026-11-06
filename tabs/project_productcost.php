@@ -21,11 +21,17 @@ if (!$res && $i > 0 && file_exists(substr($tmp, 0, ($i + 1)).'/main.inc.php')) {
 if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php')) {
 	$res = @include dirname(substr($tmp, 0, ($i + 1))).'/main.inc.php';
 }
-foreach (array('../main.inc.php', '../../main.inc.php', '../../../main.inc.php', '../../../../main.inc.php') as $mainFile) {
-	$resolvedMainFile = realpath(__DIR__.'/'.$mainFile);
-	if (!$res && $resolvedMainFile !== false) {
-		$res = @include $resolvedMainFile;
-	}
+if (!$res && file_exists(__DIR__.'/../main.inc.php')) {
+	$res = @include __DIR__.'/../main.inc.php';
+}
+if (!$res && file_exists(__DIR__.'/../../main.inc.php')) {
+	$res = @include __DIR__.'/../../main.inc.php';
+}
+if (!$res && file_exists(__DIR__.'/../../../main.inc.php')) {
+	$res = @include __DIR__.'/../../../main.inc.php';
+}
+if (!$res && file_exists(__DIR__.'/../../../../main.inc.php')) {
+	$res = @include __DIR__.'/../../../../main.inc.php';
 }
 if (!$res) {
 	die('Include of main fails');

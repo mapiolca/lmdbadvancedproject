@@ -22,17 +22,28 @@ require_once __DIR__.'/../class/lmdbadvancedprojectautoclose.class.php';
 class AutocloseDB extends DoliDBSqlite3
 {
 	public $failSql = '';
+	/** @var list<string> One-shot SQL failure patterns, matched in order. */
+	public $failSqlQueue = array();
 	public $afterDocumentRead = null;
 	public function __construct($type, $host, $user, $pass, $name = '', $port = 0) {
 		$this->db = new SQLite3(':memory:'); $this->transaction_opened = 0;
 		$this->db->createFunction('GREATEST', static function (...$values) { return in_array(null, $values, true) ? null : max($values); });
 	}
 	public function query($sql, $usesavepoint = 0, $type = 'auto', $result_mode = 0) {
+		if ($this->failSqlQueue && strpos($sql, $this->failSqlQueue[0]) !== false) { array_shift($this->failSqlQueue); $this->error = 'injected failure'; return false; }
 		if ($this->failSql !== '' && strpos($sql, $this->failSql) !== false) { $this->failSql = ''; $this->error = 'injected failure'; return false; }
 		// SQLite has one serializable writer. MySQL's per-transaction SET is
 		// acknowledged here; its locking semantics are not exercised by this fixture.
 		if ($sql === 'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE') { $sql = 'SELECT 1'; }
-		$result = parent::query(str_replace(' FOR UPDATE', '', $sql), $usesavepoint, $type, $result_mode);
+		$nativeSql = str_replace(' FOR UPDATE', '', $sql);
+		$transactionEnd = in_array($sql, array('COMMIT', 'ROLLBACK'), true);
+		$result = $transactionEnd ? @parent::query($nativeSql, $usesavepoint, $type, $result_mode)
+			: parent::query($nativeSql, $usesavepoint, $type, $result_mode);
+		// MySQL/MariaDB accept COMMIT/ROLLBACK after a complete transaction abort.
+		// Translate only SQLite's explicit no-transaction error, not injected failures.
+		if (!$result && $transactionEnd && strpos($this->db->lastErrorMsg(), 'no transaction is active') !== false) {
+			$result = parent::query('SELECT 1');
+		}
 		if (!$result) { throw new RuntimeException($this->error.' SQL: '.$sql); }
 		if (is_object($result)) { $result->queryString = str_replace(' FOR UPDATE', '', $sql); }
 		if ($this->afterDocumentRead !== null && strpos($sql, 'FROM '.MAIN_DB_PREFIX.'commande d ') !== false && strpos($sql, 'FOR UPDATE') !== false) {
@@ -131,6 +142,7 @@ function resetClosure(string $rule = 'both'): void {
 	$actor->denied = array(); $actor->socid = 0; $actor->statut = 1; $actor->admin = 0;
 	$closureTriggerFails = false; $mc->scopes = array();
 	$db->afterDocumentRead = null;
+	$db->failSqlQueue = array();
 	fixtureInsert('projet', array('rowid' => 1, 'entity' => 1, 'fk_statut' => 1, 'public' => 1, 'datec' => $old, 'dateo' => $old, 'ref' => 'TEST1'));
 	fixtureInsert('facture', array('rowid' => 1, 'entity' => 1, 'fk_projet' => 1, 'fk_soc' => 1, 'fk_statut' => 2, 'paye' => 1));
 	fixtureInsert('commande', array('rowid' => 1, 'entity' => 1, 'fk_projet' => 1, 'fk_soc' => 1, 'fk_statut' => 3));

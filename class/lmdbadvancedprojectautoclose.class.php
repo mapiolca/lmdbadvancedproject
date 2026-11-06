@@ -202,9 +202,15 @@ class LmdbAdvancedProjectAutoclose
 					dol_syslog(__METHOD__.': savepoint release failed', LOG_ERR);
 				}
 			}
+			// A nested native rollback cannot abort the caller's transaction.
+			// If local recovery fails, abort all SQL writes before control returns.
+			if ($savepointRollbackFailed && !$this->db->query('ROLLBACK')) {
+				$connectionClosed = $this->db->close();
+				throw new RuntimeException('Automatic closure rollback failed; database connection '.($connectionClosed ? 'closed' : 'unusable'), 0, $exception);
+			}
 			if (!$this->db->rollback()) { dol_syslog(__METHOD__.': rollback failed', LOG_ERR); }
 			if ($savepointRollbackFailed) {
-				throw new RuntimeException('Automatic closure rollback failed; caller must abort its transaction', 0, $exception);
+				throw new RuntimeException('Automatic closure rollback failed; entire caller transaction rolled back', 0, $exception);
 			}
 			throw $exception;
 		}
