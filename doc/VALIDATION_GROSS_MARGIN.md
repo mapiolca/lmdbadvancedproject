@@ -73,3 +73,29 @@ Vérification de cet ajustement : 870 assertions avec core24, lint et diff réus
 Le CSS Eldy local applique l’arrondi gauche de `tagtable liste` au premier `td`, mais ne couvre pas son premier `th`. Une règle limitée à la synthèse transmet le rayon natif du tableau au `thead`, à sa première ligne et à son premier `th` avec `border-top-left-radius: inherit`. Aucun rayon fixe, découpage `overflow: hidden`, réglage ou fichier core modifié ; les infobulles et le défilement natif restent disponibles.
 
 Contrôles du 6 octobre 2026 : 870 assertions core24, lint CSS/PHP et diff réussis. Edge local avec CSS Eldy core24 et valeurs de contexte simulées : rayons du tableau et de ses deux cellules de coin identiques pour 0/6/12 px, avec/sans marge, sur 1600/760/390/320 px ; défilement interne conservé sur mobile. Aperçu visuel relu. PHPStan non relancé : seul le CSS de production change. Le rendu exact de l’instance v25-alpha reste à confirmer après déploiement.
+
+## Recette de la PR #9 — 6 novembre 2026
+
+Les paragraphes précédents décrivent les validations historiques. Cette recette porte sur la branche intégrant `main` au commit `43321d8d95d592c3741fdb6f847f46900cbb74d2`, puis sur le correctif de cache CSS `360ee78e4d1549a274ec71370c5a10b823d869a8`. Déploiement effectué par Git Version Control dans cPanel et recette dans le navigateur intégré, sur develop, Dolibarr 25.0.0-alpha avec Multicompany. La révision exacte du core et le PHP web n'ont pas été établis : ne pas confondre cette instance avec le checkout de fixtures.
+
+### Essais réels
+
+- TEST 1, administrateur : concordance fiche, rapport individuel et ligne globale pour PJ2602-0008 (commandes 1 000 €, dépenses 175 €, marge 825 €, 83 %) et P26001 (commandes nulles, dépenses 10 432 €, marge −10 432 €, taux indéfini). Total global : commandes 1 000 €, dépenses 10 607 €, marge −9 607 €, −961 %, calculé depuis les totaux. Avertissement de coûts incomplets conservé.
+- Période du 1er au 31 janvier 2027, exclusion activée, PJ2602-0008 : indicateurs nuls et taux indéfini ; fiche toutes dates inchangée. Sélection effectuée avec les calendriers natifs.
+- PDF réel de P26001 : quatre pages, six indicateurs, marge négative et taux indéfini visibles sur la première page ; pied sans chevauchement observé sur cette page. Le contrôle exhaustif des bornes et des cas de montants longs reste celui des PDF de fixtures.
+- XLSX et ODS réels, globaux et P26001 : archives relues, marges numériques −9 607 et −10 432 ; ratio global −9,607 (format pourcentage), tiret pour les commandes nulles.
+- `utilisateur.test` : seuls les droits natifs de lecture des projets accessibles et du rapport ont été temporairement ajoutés, sans droit de marge. Fiche et rapports à cinq indicateurs, colonne globale de marge absente. Projet autorisé PJ2510-0003 : dépenses 945 €, restant −945 €. Projet hors périmètre refusé par URL directe. Quatre fichiers XLSX/ODS réels relus (individuel et global) : aucune marge explicite dans les parties XML, feuilles et formules ; les cellules suivant les cinq indicateurs portent les autres données autorisées. Le bouton PDF est absent sans droit de génération : absence de marge dans un PDF généré par ce profil non testée en réel, couverte par fixtures.
+- Les deux droits ajoutés à `utilisateur.test` ont ensuite été retirés depuis la session administrateur ; leur état initial désactivé et l'absence des droits de marge ont été vérifiés.
+- À 390 px : six titres sur une ligne, défilement horizontal interne permettant d'atteindre la marge, sans débordement horizontal de page. Après correction du cache CSS, rayon natif du premier titre identique à celui du tableau (8 px sur cette instance).
+- TEST 2 : accès au rapport refusé avec la configuration existante, sans activation de module ni élargissement des droits. Contexte TEST 1 restauré. Deuxième entité et projet partagé non validés en réel ; leurs restrictions restent couvertes par les fixtures.
+
+### Contrôles locaux complémentaires
+
+- Après le correctif CSS : 873 assertions cumulées de `margin_test.php` sur core20, core24 et checkout core25-alpha `6805f682cb72a0a7e519e0c79f0de5f667eb45e4`, sous PHP CLI 8.4.22. Les simulations SQLite ne constituent pas des essais ERP complets. Les caches v21–v23 incomplets ne permettent pas cette exécution ; contrats natifs lus, parcours complets non exécutés.
+- `costpdf_test.php` core24 : 774 assertions cumulées ; `margin_pdf_test.py` réussi, cinq cas de marge, absence sans droit et bornes des tuiles. PDF de fixtures rendus et relus visuellement, notamment grands montants et rapport multipage.
+- PHPStan niveau 5, cible PHP 8.0, core24 : aucune erreur. Lint et contrôle du diff réussis.
+- Paquet de recette du commit `360ee78` : `module_lmdbadvancedproject-1.6.0.zip`, SHA-256 `4ebf05361709b0675932c32d62f9d396fb146faa547f2932501be15b9ad8ae9b`. Contrôle du contenu et 30 essais bootstrap (htdocs/custom/environnement absent) réussis ; validateur ZIP natif core24 réussi. Installation interactive de ce ZIP non exécutée. Ce paquet de recette n'a pas remplacé la release publiée.
+
+La recette ne vaut pas validation réelle de toutes les versions v20–v25, d'un administrateur dont `hasRight()` retourne faux, d'un utilisateur externe, ni d'une génération PDF sans droit de marge. Ces derniers refus sont vérifiés par tests automatisés. Aucun objet métier ou réglage Multicompany n'a été modifié pour fabriquer un scénario.
+
+Après recette, cPanel a été replacé sur sa branche initiale `main`, commit `52fc13811ddf953bcec80aff923bfa32841b7532`. La PR #9 et la release existante n'ont pas été fusionnée ou remplacée par cette restitution. Les documents générés pendant les essais restent des effets de recette, sans suppression de documents préexistants.
