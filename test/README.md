@@ -1,5 +1,17 @@
 # Vérifications des coûts d’expédition
 
+## Clôture automatique des projets — 1.6.0
+
+`php test/projectautoclose_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION`, l’extension SQLite3 et les classes natives Project/User/Interfaces avec les transactions natives. Le listener de preuve et les sources temporaires restent dans `test/.cache/`. Les événements, refus, modes, inactivité Agenda, paiements/livraisons, ventilations, échecs transactionnels, rejeux et pagination sont observés dans une base en mémoire. Les verrous MySQL et les périmètres Multicompany réels ne sont pas simulés comme des essais d’instance.
+
+`php test/projectautoclose_review_test.php` inclut les 89 contrôles précédents puis les reproductions de clôture prématurée de la revue : jour complet au changement d’heure, seuil à la seconde dans trois fuseaux, modifications/réouverture, tâches, actions inachevées, récurrences, dates incohérentes et ventilations historiques/orphelines. L’isolation MySQL est acquittée dans l’adaptateur SQLite ; les refus d’isolation et commits externes sont testés, mais les verrous concurrentiels restent une recette d’instance.
+
+La suite vérifie aussi le commit de l’appelant après échec du trigger ou du rollback au savepoint, puis l’abandon de connexion si le rollback complet échoue. La réouverture d’une base SQLite temporaire contrôle l’absence d’écritures persistées ; les fichiers restent dans `test/.cache/` et sont supprimés après le scénario. Si le core fourni contient `debugbar/class/TraceableDB.php`, ses méthodes natives sont exécutées avec deux niveaux de transaction appelante. L’adaptateur traduit uniquement l’erreur SQLite explicite de COMMIT/ROLLBACK sans transaction, acceptés sans erreur par MySQL/MariaDB ; les échecs injectés restent bloquants. Aucun mécanisme de verrou MySQL n’est simulé comme une preuve d’instance.
+
+`python test/check_projectautoclose_contracts.py --repository /chemin/vers/dolibarr --development-ref <SHA-v25>` vérifie les contrats des tags 20 à 24 et de la révision v25 demandée. Les scénarios, résultats datés et essais d’instance restant à réaliser sont décrits dans [la validation de clôture](../doc/AUTOMATIC_PROJECT_CLOSURE.md). `costsettings_test.php` ajoute l’enregistrement et la conservation du travail planifié natif.
+
+## Tests des coûts
+
 Ces tests CLI utilisent les classes natives d’un checkout Dolibarr, les arrondis natifs et une base relationnelle SQLite en mémoire. L’adaptateur traduit uniquement les différences SQL de syntaxe nécessaires aux fixtures. Il ne simule pas une installation opérationnelle de Dolibarr ou du module Multicompany.
 
 Prérequis : PHP CLI 8.0+, PDO SQLite, ZipArchive, bibliothèques PhpSpreadsheet/TCPDF incluses dans le core. `DOLIBARR_ROOT` désigne son répertoire `htdocs`. Aucun accès à une base ERP existante. Les fichiers temporaires restent dans `test/.cache/`, ignoré par Git. Les anciennes dépendances natives peuvent émettre des dépréciations sur PHP 8.5 ; les tests d’exports masquent ces seules dépréciations, pas les avertissements ni les erreurs.
@@ -65,7 +77,7 @@ cmp test/.cache/legacy-new.json test/.cache/legacy-base.json
 10. Tester deux projets avec le même produit, propagation avec filtres/pagination, projet créé après ouverture, futures expéditions et absence d’écrasement. Modifier une source ou facturer pendant que la modale est ouverte : conflit explicite, aucun enregistrement partiel. Tester deux sessions simultanées et un double envoi.
 11. Activer/désactiver les fournisseurs de prix, refuser leurs droits, changer unité/devise/ciblage/palier, comparer historiques antérieurs/postérieurs et DynamicPrices calculé avant/après expédition. Confirmer qu’une consultation ne déclenche aucun recalcul et que les consignes/instantanés persistent après réactivation.
 
-Agenda, Notifications, nouveaux objets CRUD, numérotation, import et cron : non applicables, aucun mécanisme supplémentaire ajouté. Les listeners consomment les événements natifs sans les réémettre. Aucun nouveau partage indépendant n’est déclaré : les tables d’instantanés suivent les objets natifs propriétaires.
+Pour les évolutions de coûts ci-dessus, Agenda, Notifications, nouveaux objets CRUD, numérotation, import et cron sont non applicables. La clôture automatique 1.6.0 utilise le cron natif et le trigger natif `PROJECT_CLOSE`, décrits en début de document. Les listeners de coûts consomment les événements natifs sans les réémettre. Aucun nouveau partage indépendant n’est déclaré : les tables d’instantanés suivent les objets natifs propriétaires.
 
 Une première recette navigateur a été exécutée sur Dolibarr 24.0.1/PHP 8.3.33 avec une version intermédiaire de la branche ; aucun fichier serveur n’a été déployé par l’agent. La lecture des tags v20–v24 et l’exécution de fixtures sous PHP 8.4.22 ne constituent pas une certification de toutes les combinaisons ERP/PHP/Multicompany. Les résultats datés et les contrôles distants restant à effectuer figurent dans [le compte rendu 1.4.1](../doc/VALIDATION_COST_VALUATION.md).
 
@@ -84,3 +96,11 @@ Voir [les preuves et la recette restant à réaliser](../doc/VALIDATION_PROJECT_
 Après les prérequis ci-dessus, exécuter `php test/margin_test.php`, `php test/costpdf_test.php`, puis `python test/margin_pdf_test.py` avec un Python disposant de pypdf et pdfplumber. Le premier couvre les marges positives/négatives/nulles, les commandes non positives, les droits natifs refusés même à un administrateur, les totaux pondérés et la relecture XLSX/ODS avec/sans colonnes de marge. Le second génère aussi cinq variantes de tuiles PDF ; le contrôle Python vérifie le contenu, l'absence de marge sans permission et les bornes de ces tuiles. `LMDBAP_MARGIN_HTML` permet de produire une fixture locale pour la recette responsive.
 
 La compatibilité native de `margins.liretous` est vérifiée par `check_native_contracts.py` dans les tags v20 à v24. Résultats, limites v25 et recette d'instance : [validation 1.6.0](../doc/VALIDATION_GROSS_MARGIN.md).
+
+## Paquet installable
+
+`python build/package.py --ref <SHA-ou-tag>` construit `test/.cache/releases/module_lmdbadvancedproject-X.Y.Z.zip` depuis les seuls fichiers commités, avec une racine `lmdbadvancedproject/`, des métadonnées ZIP stables et une empreinte `.zip.sha256`. Les outils de construction, tests, caches et fichiers temporaires sont exclus du paquet.
+
+`python test/check_package.py <ZIP>` contrôle le contenu, la cohérence de version et l’empreinte, puis exécute les dix points d’entrée livrés sous `htdocs`, sous `custom` et sans environnement. Un `main.inc.php` de fixture arrête le traitement au chargement : ces contrôles valident les chemins et l’arrêt propre, sans simuler une instance ERP.
+
+`DOLIBARR_ROOT=<core-24-ou-25>/htdocs php test/validate_package.php <ZIP>` appelle le validateur natif `validateZipFile()` sans modification, avec `ZipArchive` chargé. Sous Windows, utiliser `-d extension_dir=.../ext -d extension=zip`. Définir `-d sys_temp_dir=<chemin-absolu>/test/.cache/package-native` pour conserver l’extraction du validateur dans le cache du module. Le helper est absent des sources v20 à v23 examinées : aucun clone local n’est fourni. Cette validation du ZIP ne remplace ni le déploiement via l’installateur natif, ni la recette de l’instance.

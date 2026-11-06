@@ -99,6 +99,9 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->warnings_activation = array();
 		$this->warnings_activation_ext = array();
 		$this->const = array(
+			array('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'chaine', 'disabled', 'Automatic project closure rule', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_AUTO_CLOSE_USER', 'chaine', 0, 'Explicit automatic project closure actor', 0, 'current', 0),
+			array('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 'chaine', 30, 'Minimum project Agenda inactivity in days', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_ENABLE_SHIPMENT_COST', 'chaine', 0, 'Enable analytical shipment costs', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_SHIPMENT_COST_METHOD', 'chaine', 'supplier_tariff', 'Historical supplier_tariff or pmp', 0, 'current', 0),
 			array('LMDBADVANCEDPROJECT_ENABLE_SUPPLIER_INVOICE_SPLIT', 'chaine', 0, 'Enable project breakdown on supplier invoice lines', 0, 'current', 0),
@@ -153,7 +156,20 @@ class modLmdbAdvancedProject extends DolibarrModules
 			);
 		}
 		$this->boxes = array();
-		$this->cronjobs = array();
+		$this->cronjobs = array(array(
+			'label' => 'ProjectAutoCloseJob',
+			'jobtype' => 'method',
+			'class' => '/lmdbadvancedproject/class/lmdbadvancedprojectautoclose.class.php',
+			'objectname' => 'LmdbAdvancedProjectAutoclose',
+			'method' => 'run',
+			'parameters' => '',
+			'comment' => 'ProjectAutoCloseJobHelp',
+			'frequency' => 1,
+			'unitfrequency' => 3600,
+			'status' => 0,
+			'test' => 'isModEnabled("lmdbadvancedproject")',
+			'priority' => 50,
+		));
 
 		$this->rights = array();
 		$r = 0;
@@ -172,6 +188,11 @@ class modLmdbAdvancedProject extends DolibarrModules
 		$this->rights[$r][1] = 'WriteInvoiceBreakdown';
 		$this->rights[$r][4] = 'split';
 		$this->rights[$r][5] = 'write';
+		$r++;
+		$this->rights[$r][0] = $this->numero * 100 + $r;
+		$this->rights[$r][1] = 'ProjectAutoClosePermission';
+		$this->rights[$r][4] = 'autoclose';
+		$this->rights[$r][5] = 'run';
 
 		$this->menu = array();
 		$r = 0;

@@ -10,6 +10,7 @@ parameters:
     bootstrapFiles:
         - test/phpstan-bootstrap.php
     paths:
+        - class/lmdbadvancedprojectautoclose.class.php
         - class/lmdbadvancedprojectcostledger.class.php
         - class/lmdbadvancedprojectproductcost.class.php
         - class/lmdbadvancedprojectcostvaluation.class.php
