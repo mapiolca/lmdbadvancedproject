@@ -276,5 +276,14 @@ $hookmanager->initHooks(array('projectcard','globalcard'));
 ob_start();
 $hookmanager->executeHooks('mainCardTabAddMore',array(),$object,$action);
 check(substr_count((string) ob_get_clean(),'id="lmdbap-project-summary"'),1,'Project-first native initialization also emits exactly one section');
+$hookmanager->executeHooks('addHtmlHeader', array(), $object, $action);
+check(strpos($hookmanager->resPrint, '?revision='.(string) filemtime(__DIR__.'/../css/budgetreport.css.php')) !== false, true, 'Native card header invalidates cached module stylesheet');
+$user->denied = array('lmdbadvancedproject.budgetreport.read');
+$hookmanager->executeHooks('addHtmlHeader', array(), $object, $action);
+check($hookmanager->resPrint, '', 'Denied header clears previous stylesheet output');
+$user->denied = array();
+$hookmanager->contextarray = array('globalcard');
+$hookmanager->executeHooks('addHtmlHeader', array(), $object, $action);
+check($hookmanager->resPrint, '', 'Other cards do not load project summary stylesheet');
 if (getenv('LMDBAP_SUMMARY_HTML')) { file_put_contents(getenv('LMDBAP_SUMMARY_HTML'),$rendered); }
 echo $checks." assertions passed including billing list, compact report parity and native card hooks.\n";

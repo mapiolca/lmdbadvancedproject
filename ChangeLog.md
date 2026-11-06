@@ -11,6 +11,7 @@
 - Apply the native View margins permission to every explicit margin in screens and PDF/XLSX/ODS exports, including existing global columns; retain the other authorized budget figures.
 - Export numeric margin amounts and percentages, and adapt compact/mobile layouts to the optional sixth tile. Non-positive orders show an undefined percentage; no database migration is required. Regenerate existing reports as needed.
 - Render budget summaries in native tagtable/liste tables with five or six indicators on one header row, amount cells and expense rows; use native responsive table scrolling and inherit the native radius at the first header corner.
+- Refresh the project-card stylesheet after module updates so cached styles do not retain the previous summary layout or square header corner.
 
 ## 1.5.0 — preparation
 

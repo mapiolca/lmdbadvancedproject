@@ -84,7 +84,7 @@ class ActionsLmdbadvancedproject
 	}
 
 	/**
-	 * Inject the inline split button on invoice line tables.
+	 * Load current card styles and inject invoice-line split controls.
 	 *
 	 * @param  array<string,mixed> $parameters Hook parameters
 	 * @param  CommonObject        $object     Current object
@@ -95,6 +95,17 @@ class ActionsLmdbadvancedproject
 	public function addHtmlHeader($parameters, $object, $action, $hookmanager)
 	{
 		global $langs, $user;
+		$this->resprints = '';
+		// Match report pages: a module update must invalidate cached card styles too.
+		if (in_array('projectcard', explode(':', $parameters['context'] ?? ''), true)) {
+			if (isModEnabled('lmdbadvancedproject') && $user->hasRight('projet', 'lire')
+				&& $user->hasRight('lmdbadvancedproject', 'budgetreport', 'read')) {
+				$this->resprints = '<link rel="stylesheet" type="text/css" href="'
+					.dol_buildpath('/lmdbadvancedproject/css/budgetreport.css.php', 1)
+					.'?revision='.(string) filemtime(__DIR__.'/../css/budgetreport.css.php').'">';
+			}
+			return 0;
+		}
 
 		$context = $this->getInvoiceContext($parameters);
 		if ($context === '' || !$this->isFeatureEnabled($context) || !$user->hasRight('lmdbadvancedproject', 'split', 'write') || !$user->hasRight('projet', 'lire')
