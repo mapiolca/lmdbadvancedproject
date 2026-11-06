@@ -1,6 +1,6 @@
-# Clôture automatique des projets — proposition non publiée
+# Clôture automatique des projets — 1.6.0
 
-Cette évolution est préparée depuis `main` (`b226642f817adc8b081bd782cb90f998fca59428`), indépendamment de la PR de marge brute. Le descripteur reste en version `1.5.0` : aucune release, fusion, activation sur instance ni modification de la configuration réelle n’est réalisée.
+Cette évolution prolonge la version stable 1.5.0 (`b226642f817adc8b081bd782cb90f998fca59428`) dans la version 1.6.0. La PR #10 apporte le contrôle périodique et la PR #11 sécurise l’annulation des échecs transactionnels. Les résultats datés ci-dessous restent des preuves locales ; aucune activation sur instance ni modification de sa configuration réelle n’a été réalisée.
 
 ## Règles et activation
 
@@ -116,3 +116,13 @@ Deux scénarios supplémentaires refusent successivement le rollback local et co
 PHPStan : `python test/run_phpstan.py --core test/.cache/core20/htdocs --phar test/.cache/phpstan.phar`, **niveau 5, cible PHP 8.0, aucune erreur**. Syntaxe des trois PHP modifiés, contrats de sources et `git diff --check` vérifiés. Aucun niveau, baseline ou filtre d’erreur affaibli. Les résultats portent sur le patch complémentaire ; son SHA final figure dans la nouvelle PR.
 
 Cette correction ne change ni le délai Agenda, ni les règles factures/commandes, ni les permissions et filtres d’entité, ni les paramètres administrateur. Elle conserve `Project::setClose()` et son unique trigger natif. Aucun déploiement, changement de configuration ou essai sur une base ERP n’a été effectué. Sur une instance de test MySQL/MariaDB, confirmer les trois niveaux de récupération, les effets transactionnels des triggers, le traitement d’une connexion devenue inutilisable et le résultat du travail planifié. Les effets externes déjà produits par un trigger restent irréversibles par SQL.
+
+## Préparation de la release 1.6.0 — 6 novembre 2026
+
+La release stable 1.5.0 existe sur GitHub et son tag pointe sur `b226642f817adc8b081bd782cb90f998fca59428`, avant la fonctionnalité de clôture. Son tag et sa release sont conservés. Le descripteur, le README, la configuration de construction et la découverte du module sont alignés sur 1.6.0 ; À propos reprend directement la version du descripteur.
+
+Les régressions sont réexécutées sous PHP CLI 8.4.22 avec les sept jeux de sources du tableau précédent : **172 assertions sous v20**, **173 sous chacun des six autres environnements**. Les **710 assertions** de conservation des constantes et du cron, les trois modes de découverte du descripteur, les contrats de sources et PHPStan **niveau 5 / cible PHP 8.0** passent également. Les limites SQLite, PHP 8.0 non exécuté et Multicompany simulé restent applicables.
+
+Le ZIP candidat porte la racine `lmdbadvancedproject/` et le nom `module_lmdbadvancedproject-1.6.0.zip`. Le validateur natif `validateZipFile()` passe avec les sources 24.0.0, 24.0.3 et 25.0.0-alpha précitées. Ce helper est absent des sources v20 à v23 examinées. Les dix points d’entrée livrés passent **30 contrôles de bootstrap** : installations sous `htdocs`, sous `custom` et environnement absent. Le `main.inc.php` de fixture s’arrête au chargement ; il ne valide pas l’interface ni l’activation ERP. Les tentatives auparavant exprimées en boucle sont désormais des inclusions littérales distinctes.
+
+La construction reproductible depuis un commit et les commandes de contrôle du paquet sont décrites dans `test/README.md`. Le paquet définitif et son empreinte doivent être reconstruits depuis le commit fusionné, contrôlés puis joints à la release. Aucun déploiement par l’installateur natif, aucune soumission Dolistore, recette navigateur ou activation du job sur une instance ERP n’est réalisé par cette préparation.
