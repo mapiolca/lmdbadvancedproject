@@ -4,7 +4,7 @@ require __DIR__.'/costcategories_test.php';
 if (!defined('DOL_DATA_ROOT')) { define('DOL_DATA_ROOT', __DIR__.'/.cache'); }
 $conf->file=(object)array('dol_document_root'=>array(DOL_DOCUMENT_ROOT),'instance_unique_id'=>'fixture');
 require_once __DIR__.'/../core/modules/project/doc/pdf_budgetreport.modules.php';
-$user = new class($db) extends User { public $allowed=true; public function hasRight($module,$permlevel1,$permlevel2='') { return $this->allowed; } };
+$user = new class($db) extends User { public $allowed=true; public $marginAllowed=true; public function hasRight($module,$permlevel1,$permlevel2='') { return $this->allowed && ($module !== 'margins' || $this->marginAllowed); } };
 $user->id=1; $user->firstname='Test'; $user->lastname='User';
 foreach (array(DOL_DOCUMENT_ROOT.'/langs/fr_FR/main.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/projects.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/products.lang',DOL_DOCUMENT_ROOT.'/langs/fr_FR/companies.lang',__DIR__.'/../langs/fr_FR/lmdbadvancedproject.lang') as $file) {
 	foreach (file($file,FILE_IGNORE_NEW_LINES) as $entry) { if (strpos($entry,'=') !== false && substr($entry,0,1)!=='#') { [$key,$value]=explode('=',$entry,2); $langs->translations[trim($key)]=trim($value); } }
@@ -29,6 +29,11 @@ check($model->write_file($project,$langs),1,'Native PDF generation');
 check(is_file($model->result['fullpath']),true,'PDF file exists in owner directory');
 check($model->result['fullpath'], $conf->project->multidir_output[1].'/P1/'.lmdbadvancedproject_budget_report_filename('P1', $langs), 'PDF path matches native project document download');
 copy($model->result['fullpath'],__DIR__.'/.cache/cost-report.pdf');
+$user->marginAllowed=false; $user->admin=1;
+check($model->write_file($project,$langs),1,'Admin without margin right may still generate budget PDF');
+copy($model->result['fullpath'],__DIR__.'/.cache/cost-report-no-margin.pdf');
+$user->marginAllowed=true;
+
 // Make a negative correction explicit in the graphic as well as in totals.
 $db->query('UPDATE '.MAIN_DB_PREFIX.'lmdbadvancedproject_supplier_invoice_parts SET total_ht=32 WHERE rowid=1');
 check($model->write_file($project,$langs),1,'Negative regularization PDF generation');
@@ -77,4 +82,20 @@ check($model->write_file($sharedProject,$langs),-1,'Shared project refuses missi
 $mc->scope = '1';
 unset($conf->project->multidir_output[1]);
 check($model->write_file($project,$langs),-1,'PDF generation refuses missing owner directory');
+
+// Exercise signed, undefined and large margin tiles with the actual TCPDF renderer.
+$tileData = lmdbadvancedproject_load_budget_report_data(1, $filters);
+$drawSummary = new ReflectionMethod($model, 'drawSummary');
+foreach (array('positive'=>array(9000, 1000), 'negative'=>array(9000, 10000), 'zero'=>array(9000, 9000), 'undefined'=>array(-100, 50), 'large'=>array(1234567890.12, 300000000.01)) as $name => $amounts) {
+	$tileData['totalorders'] = $amounts[0]; $tileData['totalspent'] = $amounts[1];
+	$pdf = pdf_getInstance(array(297, 210));
+	$pdf->setPrintHeader(false); $pdf->setPrintFooter(false);
+	$pdf->SetMargins(10,10,10); $pdf->AddPage('L');
+	$args = array(&$pdf, $project, $tileData, $langs);
+	$drawSummary->invokeArgs($model, $args);
+	$file = __DIR__.'/.cache/margin-pdf-'.$name.'.pdf';
+	$pdf->Output($file, 'F');
+	check(is_file($file), true, 'Native margin tile render: '.$name);
+}
+
 echo $checks." assertions passed including native PDF serialization and access guards.\n";

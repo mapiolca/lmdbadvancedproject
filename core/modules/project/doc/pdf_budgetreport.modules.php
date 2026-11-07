@@ -219,10 +219,16 @@ class pdf_budgetreport extends ModelePDFProjects
 	/** @param TCPDF $pdf @param Project $object @param array<string,mixed> $data @param Translate $outputlangs @return void */
 	private function drawSummary(&$pdf, $object, $data, $outputlangs)
 	{
+		global $user;
+		$showMargin = $user->hasRight('margins', 'liretous');
 		$left = $this->marge_gauche;
 		$usable = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 		$labels = array('BudgetReportMarket', 'BudgetReportInvoiced', 'BudgetReportBudget', 'BudgetReportSpent', 'BudgetReportLeftToSpend');
 		$values = array($data['totalorders'], $data['totalcustomerinvoices'], $data['budget'], $data['totalspent'], $data['balance']);
+		if ($showMargin) {
+			$labels[] = 'BudgetReportGrossMargin';
+			$values[] = (float) price2num($data['totalorders'] - $data['totalspent'], 'MT');
+		}
 		$tileWidth = $usable / count($labels);
 		$pdf->SetFont('', '', 7);
 		foreach ($labels as $index => $label) {
@@ -234,8 +240,14 @@ class pdf_budgetreport extends ModelePDFProjects
 			$pdf->SetFont('', 'B', 7);
 			$pdf->MultiCell($tileWidth - 6, 3, $outputlangs->convToOutputCharset($outputlangs->transnoentities($label)), 0, 'C');
 			$pdf->SetXY($x + 2, 45);
-			$pdf->SetFont('', '', 9);
+			$pdf->SetFont('', '', $showMargin ? 8 : 9);
 			$pdf->MultiCell($tileWidth - 6, 4, $outputlangs->convToOutputCharset(lmdbadvancedproject_format_price($values[$index], $outputlangs)), 0, 'C');
+			if ($label === 'BudgetReportGrossMargin') {
+				$pdf->SetXY($x + 2, 49);
+				$pdf->SetFont('', '', 7);
+				$rate = $data['totalorders'] > 0 ? round($values[$index] / $data['totalorders'] * 100).'%' : '-';
+				$pdf->MultiCell($tileWidth - 6, 3, '('.$rate.')', 0, 'C');
+			}
 		}
 		$pdf->SetFont('', '', 7);
 		$pdf->SetXY($left, 55);

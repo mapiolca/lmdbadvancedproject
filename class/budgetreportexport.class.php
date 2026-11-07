@@ -349,12 +349,14 @@ class LmdbAdvancedProjectBudgetReportExport
 	 */
 	private function fillReportSheet($sheet, $withCharts)
 	{
-		global $conf;
+		global $conf, $user;
+		$showMargin = $user->hasRight('margins', 'liretous');
 
 		$numberFormat = $this->getTotalNumberFormat();
 		$currencyFormat = $numberFormat.' "'.(empty($conf->currency) ? '' : $conf->currency).'"';
 		$sheet->setCellValue('A1', $this->outputlangs->transnoentities('BudgetReportArea'));
-		$titleRange = empty($this->data['budgetReportProjectId']) ? 'A1:H1' : 'A1:F1';
+		$lastColumn = $showMargin && empty($this->data['budgetReportProjectId']) ? 'I' : ($showMargin ? 'H' : (empty($this->data['budgetReportProjectId']) ? 'G' : 'F'));
+		$titleRange = 'A1:'.$lastColumn.'1';
 		$sheet->mergeCells($titleRange);
 		$this->styleTitle($sheet, $titleRange);
 
@@ -423,8 +425,13 @@ class LmdbAdvancedProjectBudgetReportExport
 			array('BudgetReportBudget', (float) $this->data['budget']),
 			array('BudgetReportSpent', (float) $this->data['totalspent']),
 			array('BudgetReportLeftToSpend', (float) $this->data['balance']),
-			array('BudgetReportTimeSpentHours', (float) $this->data['totalTimeHours']),
 		);
+		if ($showMargin) {
+			$margin = (float) price2num($this->data['totalorders'] - $this->data['totalspent'], 'MT');
+			$kpis[] = array('BudgetReportGrossMargin', $margin);
+			$kpis[] = array('BudgetReportGrossMarginRate', $this->data['totalorders'] > 0 ? $margin / $this->data['totalorders'] : '-');
+		}
+		$kpis[] = array('BudgetReportTimeSpentHours', (float) $this->data['totalTimeHours']);
 		$column = 1;
 		foreach ($kpis as $kpi) {
 			$coordinate = Coordinate::stringFromColumnIndex($column).$kpiRow;
@@ -433,7 +440,7 @@ class LmdbAdvancedProjectBudgetReportExport
 			$sheet->getStyle($coordinate)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F81BD');
 			$valueCoordinate = Coordinate::stringFromColumnIndex($column).($kpiRow + 1);
 			$sheet->setCellValue($valueCoordinate, $kpi[1]);
-			$sheet->getStyle($valueCoordinate)->getNumberFormat()->setFormatCode($kpi[0] === 'BudgetReportTimeSpentHours' ? $numberFormat : $currencyFormat);
+			$sheet->getStyle($valueCoordinate)->getNumberFormat()->setFormatCode($kpi[0] === 'BudgetReportGrossMarginRate' ? '0%' : ($kpi[0] === 'BudgetReportTimeSpentHours' ? $numberFormat : $currencyFormat));
 			$column++;
 		}
 
@@ -457,29 +464,38 @@ class LmdbAdvancedProjectBudgetReportExport
 	/** @param mixed $sheet @param int $row @param string $currencyFormat @return void */
 	private function writeGlobalSummary($sheet, $row, $currencyFormat)
 	{
-		$headers = array('BudgetReportProject', 'BudgetReportMarket', 'BudgetReportInvoices', 'BudgetReportInvoicedRate', 'BudgetReportBudget', 'BudgetReportSpent', 'BudgetReportGrossMargin', 'BudgetReportBalance');
+		global $user;
+		$showMargin = $user->hasRight('margins', 'liretous');
+		$headers = array('BudgetReportProject', 'BudgetReportMarket', 'BudgetReportInvoices', 'BudgetReportInvoicedRate', 'BudgetReportBudget', 'BudgetReportSpent');
+		if ($showMargin) {
+			$headers[] = 'BudgetReportGrossMargin';
+			$headers[] = 'BudgetReportGrossMarginRate';
+		}
+		$headers[] = 'BudgetReportBalance';
 		$this->writeHeaderRow($sheet, $row, $headers);
 		$row++;
-		foreach ($this->data['projects'] as $project) {
-			$this->setText($sheet, 'A'.$row, $project['project_ref'].' - '.$project['title']);
-			$invoicedRate = (float) $project['orders'] > 0 ? (float) $project['invoiced'] / (float) $project['orders'] : 0.0;
-			$values = array((float) $project['orders'], (float) $project['invoiced'], $invoicedRate, (float) $project['budget'], (float) $project['spent'], (float) $project['orders'] - (float) $project['spent'], (float) $project['budget'] - (float) $project['spent']);
+		$rows = array_values($this->data['projects']);
+		$rows[] = array('project_ref' => '', 'title' => $this->outputlangs->transnoentities('BudgetReportTotal'), 'orders' => $this->data['totalorders'], 'invoiced' => $this->data['totalcustomerinvoices'], 'budget' => $this->data['budget'], 'spent' => $this->data['totalspent']);
+		foreach ($rows as $project) {
+			$this->setText($sheet, 'A'.$row, $project['project_ref'] !== '' ? $project['project_ref'].' - '.$project['title'] : $project['title']);
+			$invoicedRate = $project['orders'] > 0 ? $project['invoiced'] / $project['orders'] : 0.0;
+			$values = array($project['orders'], $project['invoiced'], $invoicedRate, $project['budget'], $project['spent']);
+			if ($showMargin) {
+				$margin = (float) price2num($project['orders'] - $project['spent'], 'MT');
+				$values[] = $margin;
+				$values[] = $project['orders'] > 0 ? $margin / $project['orders'] : '-';
+			}
+			$values[] = (float) price2num($project['budget'] - $project['spent'], 'MT');
 			foreach ($values as $index => $value) {
 				$cell = Coordinate::stringFromColumnIndex($index + 2).$row;
 				$sheet->setCellValue($cell, $value);
-				$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($index === 2 ? '0%' : $currencyFormat);
+				$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($index === 2 || ($showMargin && $index === 6) ? '0%' : $currencyFormat);
 			}
 			$row++;
 		}
-		$this->setText($sheet, 'A'.$row, $this->outputlangs->transnoentities('BudgetReportTotal'));
-		$totalInvoicedRate = (float) $this->data['totalorders'] > 0 ? (float) $this->data['totalcustomerinvoices'] / (float) $this->data['totalorders'] : 0.0;
-		$totals = array($this->data['totalorders'], $this->data['totalcustomerinvoices'], $totalInvoicedRate, $this->data['budget'], $this->data['totalspent'], $this->data['totalorders'] - $this->data['totalspent'], $this->data['balance']);
-		foreach ($totals as $index => $value) {
-			$cell = Coordinate::stringFromColumnIndex($index + 2).$row;
-			$sheet->setCellValue($cell, (float) $value);
-			$sheet->getStyle($cell)->getNumberFormat()->setFormatCode($index === 2 ? '0%' : $currencyFormat);
-		}
-		$sheet->getStyle('A'.$row.':H'.$row)->getFont()->setBold(true);
+		$lastColumn = Coordinate::stringFromColumnIndex(count($headers));
+		$sheet->getStyle('A'.($row - 1).':'.$lastColumn.($row - 1))->getFont()->setBold(true);
+		$sheet->getColumnDimension($lastColumn)->setWidth(18);
 	}
 
 	/** @param mixed $sheet @param int $row @param string $currencyFormat @return void */

@@ -7,6 +7,12 @@
 - Close through the native project method and event, retaining private-project, document/third-party and entity restrictions. Include persisted customer invoice allocations even with their editor disabled, and refuse broken links; never automatically reopen a project. A failed native closure also rolls back its writes inside an existing caller transaction, while preserving prior caller work. If local rollback fails, abort the entire caller transaction; discard an unrecoverable database connection. No new table or dependency. Validate MySQL/MariaDB concurrency, native cron execution and Multicompany on a test instance before enabling the job in production.
 - Provide a reproducible installable ZIP from the tagged commit, with explicit environment-loading paths for installations under both `htdocs` and `custom`. Keep test fixtures and build tools outside the installable package; validate the final ZIP with the native Dolibarr validator.
 
+- Show gross margin and its percentage after remaining budget on the project card and budget-report summary, using the same filtered orders and retained expenses as the global report.
+- Apply the native View margins permission to every explicit margin in screens and PDF/XLSX/ODS exports, including existing global columns; retain the other authorized budget figures.
+- Export numeric margin amounts and percentages, and adapt compact/mobile layouts to the optional sixth tile. Non-positive orders show an undefined percentage; no database migration is required. Regenerate existing reports as needed.
+- Render budget summaries in native tagtable/liste tables with five or six indicators on one header row, amount cells and expense rows; use native responsive table scrolling and inherit the native radius at the first header corner.
+- Refresh the project-card stylesheet after module updates so cached styles do not retain the previous summary layout or square header corner.
+
 ## 1.5.0 — preparation
 
 - Add the native project-list column “Progressions facturation”, with numeric percentage, native progress bar, sorting, filtering and column selection. Customer invoice allocations replace their source lines and credit notes retain their sign; a non-positive order total produces an explained dash. Align native total rows when Multicompany adds an uncounted environment cell, without changing amounts or duplicating an already-counted cell.
