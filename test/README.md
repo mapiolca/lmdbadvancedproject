@@ -1,6 +1,8 @@
 # Vérifications des coûts d’expédition
 
-## Clôture automatique des projets — 1.6.0
+## Clôture automatique des projets — 1.6.2 (préparation)
+
+`php test/projectautoclose_diagnostic_test.php` reprend les suites existantes puis vérifie les motifs documentaires et Agenda, les données inaccessibles, la réinitialisation des motifs, les erreurs techniques, l’échappement HTML et 270 exclusions paginées en français et en anglais. La suite couvre aussi la clôture des projets sans document dans les quatre modes après inactivité, la présence de documents masqués ou dans l’autre famille, les ventilations historiques, les erreurs SQL et 270 clôtures sans document paginées. Les diagnostics et le lancement manuel sont observés dans la fixture locale ; une recette du travail natif déployé reste nécessaire.
 
 `php test/projectautoclose_test.php` utilise `DOLIBARR_ROOT` et `DOLIBARR_VERSION`, l’extension SQLite3 et les classes natives Project/User/Interfaces avec les transactions natives. Le listener de preuve et les sources temporaires restent dans `test/.cache/`. Les événements, refus, modes, inactivité Agenda, paiements/livraisons, ventilations, échecs transactionnels, rejeux et pagination sont observés dans une base en mémoire. Les verrous MySQL et les périmètres Multicompany réels ne sont pas simulés comme des essais d’instance.
 
