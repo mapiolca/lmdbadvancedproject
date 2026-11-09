@@ -36,4 +36,5 @@ for version in range(20,25):
     modules=read(tag,'core/modules/DolibarrModules.class.php')
     assert "isset($value['data']) && is_array($value['data'])" in modules
     assert 'new TCPDF($pagetype, $metric, $format' in read(tag,'core/lib/pdf.lib.php')
+    assert "$this->rights[$r][4] = 'liretous'" in read(tag,'core/modules/modMargin.class.php'), (tag, 'native View margins permission')
     print(tag,sha,'native event, schema and UI contracts present')

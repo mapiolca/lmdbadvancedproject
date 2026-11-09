@@ -2,6 +2,8 @@
 
 Current version: **1.6.0**
 
+Version 1.6.0 adds gross margin (orders HT minus retained expenses) and its percentage of orders after remaining budget on the project card and budget report, with matching PDF/XLSX/ODS output. The native **View margins** permission (`margins.liretous`) controls every explicit margin, including the global report and its exports. Without it, other authorized budget figures remain available. A non-positive order total has no margin percentage. Existing generated documents are not rewritten; regenerate them with the intended permissions.
+
 Download the installable `module_lmdbadvancedproject-1.6.0.zip` asset and its SHA-256 checksum from [GitHub Releases](https://github.com/mapiolca/lmdbadvancedproject/releases). Install it through Dolibarr's native external-module installer, then reactivate Advanced Project after updating all files. Instance acceptance remains necessary before enabling automatic closure.
 
 ## Features
