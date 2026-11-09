@@ -13,7 +13,7 @@
 - Render budget summaries in native tagtable/liste tables with five or six indicators on one header row, amount cells and expense rows; use native responsive table scrolling and inherit the native radius at the first header corner.
 - Refresh the project-card stylesheet after module updates so cached styles do not retain the previous summary layout or square header corner.
 
-## 1.5.0 — preparation
+## 1.5.0 — 2026-09-25
 
 - Add the native project-list column “Progressions facturation”, with numeric percentage, native progress bar, sorting, filtering and column selection. Customer invoice allocations replace their source lines and credit notes retain their sign; a non-positive order total produces an explained dash. Align native total rows when Multicompany adds an uncounted environment cell, without changing amounts or duplicating an already-counted cell.
 - Show the five main budget tiles and complete expense breakdown below the project-card description in the native right half, with a compact responsive layout and a visible fallback when JavaScript or the expected container is unavailable. Emit the card hook output directly and accept the native project context regardless of which context another module initialized first.
@@ -21,7 +21,7 @@
 - Improve the mobile card and report: prevent overlapping tiles caused by native table-cell heights, arrange indicators in two columns with full-width expense details, fit charts and native legends to the screen, and keep tables and detail dialogs scrollable. Very narrow screens use one column; filters and export buttons wrap to the available width.
 - Retain Dolibarr 20 / PHP 8.0 minimums and module ID 450021. Reactivate after updating all files to register the additional native hook context, then refresh the browser cache; no new table or data migration. CLI/source/browser-fixture evidence and operational limits are documented separately.
 
-## 1.4.1 — preparation
+## 1.4.1 — 2026-09-22
 
 - Complete missing shipment costs with applicable recorded PriceList history and successful dated DynamicPrices costs, without recalculating optional providers; preserve known zero prices and validation snapshots.
 - Add the native Refresh dialog with free, Dolibarr, PMP, optional-provider and net supplier prices. Freeze instructions per project/product, with an explicit opt-in for eligible existing projects and no rule for new projects.
