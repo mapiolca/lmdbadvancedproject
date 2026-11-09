@@ -1,16 +1,18 @@
 # ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-Current version: **1.6.0**
+Current version: **1.6.2** (in preparation)
+
+Version 1.6.2 adds a per-project exclusion diagnostic to the native scheduled-job result, with entity, actor, rule and inactivity threshold. Manual execution from the native job card/list uses the launching user as the closure actor; automatic execution keeps the configured account. Permissions and eligibility rules remain mandatory.
 
 Version 1.6.0 adds gross margin (orders HT minus retained expenses) and its percentage of orders after remaining budget on the project card and budget report, with matching PDF/XLSX/ODS output. The native **View margins** permission (`margins.liretous`) controls every explicit margin, including the global report and its exports. Without it, other authorized budget figures remain available. A non-positive order total has no margin percentage. Existing generated documents are not rewritten; regenerate them with the intended permissions.
 
-Download the installable `module_lmdbadvancedproject-1.6.0.zip` asset and its SHA-256 checksum from [GitHub Releases](https://github.com/mapiolca/lmdbadvancedproject/releases). Install it through Dolibarr's native external-module installer, then reactivate Advanced Project after updating all files. Instance acceptance remains necessary before enabling automatic closure.
+When 1.6.2 is published, download the installable `module_lmdbadvancedproject-1.6.2.zip` asset and its SHA-256 checksum from [GitHub Releases](https://github.com/mapiolca/lmdbadvancedproject/releases). Install it through Dolibarr's native external-module installer, then reactivate Advanced Project after updating all files. Instance acceptance remains necessary before enabling automatic closure.
 
 ## Features
 
 Advanced Project extends project budget analysis in Dolibarr.
 
-### Automatic project closure (1.6.0)
+### Automatic project closure
 
 An optional native scheduled job closes open projects after a configurable period of **Agenda inactivity** (30 completed days by default), provided that all customer invoices are paid, all customer orders are delivered, both conditions hold, or either condition holds, according to the selected rule. Each condition requires a nonempty document set. Project/task events, their latest edits, unfinished actions, future events and ongoing recurrences prevent premature closure. Project creation, start and latest modification/reopening also start the observation period. Persisted invoice allocations remain relevant when their editor is disabled; broken links prevent closure. Projects remain in their owner entity, with native project, Agenda, commercial and document access checks. Each scheduled decision uses a serializable transaction and rechecks Agenda after reading the documents.
 

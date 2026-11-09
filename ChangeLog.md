@@ -1,5 +1,11 @@
 # CHANGELOG ADVANCED PROJECT FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.6.2 — In preparation
+
+- Explain each examined project's exclusion in the native scheduled-job result: invoice/order completion or absence, inaccessible data, invalid allocations, unfinished or recurring Agenda events, invalid dates and insufficient inactivity. Include entity, execution user, rule and delay; preserve native permissions and avoid disclosing inaccessible document identifiers. Diagnostics stop at the blocking stage; they do not claim to list every possible blocker.
+- Record exclusion reason codes with project, entity and actor IDs in the native Dolibarr log at NOTICE level, including when the native cron output reaches its storage limit. No new table or configuration is required.
+- Use the authenticated launching user for manual execution from the native scheduled-job card/list and record that actor through native project closure. Keep the configured actor for automatic runs. No automatic permission grants or eligibility bypass.
+
 ## 1.6.0 — 2026-11-06
 
 - Add optional periodic closure after a configurable period without project/task Agenda activity, combined with paid customer invoices, delivered customer orders, both conditions or either condition. Count event edits and project changes/reopening; outstanding actions, ongoing recurrences, unknown dates and inaccessible data prevent premature closure. Require the complete inactivity period and serialize each scheduled decision.
