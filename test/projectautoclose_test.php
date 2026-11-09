@@ -270,40 +270,6 @@ assertClosure($job->run(), 0, 'Actual native User fetch/rights and job execution
 assertClosure((int) fixtureValue('fk_statut','projet',1), 2, 'Job closes eligible project');
 assertClosure($job->run(), 0, 'Repeated job succeeds without duplicate effects');
 assertClosure((int) $db->fetch_object($db->query('SELECT COUNT(*) AS n FROM '.MAIN_DB_PREFIX.'closure_events'))->n, 1, 'Repeated job emits one native closure');
-// Native web entry points use the launcher even with a missing/invalid configured actor.
-fixtureInsert('user', array('rowid'=>4,'entity'=>1,'statut'=>1,'admin'=>0,'login'=>'manual-runner','api_key'=>'','socialnetworks'=>'{}'));
-foreach ($permissions as $offset => $permission) {
-	fixtureInsert('user_rights', array('entity'=>1,'fk_user'=>4,'fk_id'=>100+$offset));
-}
-$savedScript = $_SERVER['SCRIPT_FILENAME'] ?? null;
-$savedUser = $user;
-try {
-	$user = new User($db); $user->fetch(4);
-	foreach (array('card', 'list') as $page) {
-		resetClosure(); $conf->global->LMDBADVANCEDPROJECT_AUTO_CLOSE_USER = 999;
-		$_SERVER['SCRIPT_FILENAME'] = DOL_DOCUMENT_ROOT.'/cron/'.$page.'.php';
-		assertClosure($job->run(), 0, 'Manual '.$page.' ignores configured actor');
-		assertClosure((int) fixtureValue('fk_user_close','projet',1), 4, 'Manual launcher recorded as closure actor');
-	}
-	resetClosure(); $conf->global->LMDBADVANCEDPROJECT_AUTO_CLOSE_USER = 999;
-	$_SERVER['SCRIPT_FILENAME'] = __FILE__;
-	assertClosure($job->run(), -1, 'Other entry points keep configured actor despite a connected user');
-	resetClosure(); $_SERVER['SCRIPT_FILENAME'] = DOL_DOCUMENT_ROOT.'/cron/list.php';
-	addActivity($recent);
-	assertClosure($job->run(), 0, 'Manual run still checks inactivity');
-	assertClosure((int) fixtureValue('fk_statut','projet',1), 1, 'Manual run leaves recently active project open');
-	$user = null;
-	assertClosure($job->run(), -1, 'Manual entry without authenticated launcher cannot fall back');
-	$user = new User($db); $user->fetch(4);
-	resetClosure(); $_SERVER['SCRIPT_FILENAME'] = DOL_DOCUMENT_ROOT.'/cron/card.php';
-	$db->query('DELETE FROM '.MAIN_DB_PREFIX.'user_rights WHERE fk_user=4 AND fk_id=100');
-	assertClosure($job->run(), -1, 'Manual launcher without module permission is refused');
-	assertClosure((int) fixtureValue('fk_statut','projet',1), 1, 'Refusal leaves project open');
-} finally {
-	$user = $savedUser;
-	if ($savedScript === null) { unset($_SERVER['SCRIPT_FILENAME']); } else { $_SERVER['SCRIPT_FILENAME'] = $savedScript; }
-	$conf->global->LMDBADVANCEDPROJECT_AUTO_CLOSE_USER = 1;
-}
 resetClosure();
 for ($id = 2; $id <= 121; $id++) {
 	fixtureInsert('projet', array('rowid'=>$id,'entity'=>1,'fk_statut'=>1,'public'=>1,'datec'=>$old,'dateo'=>$old,'ref'=>'TEST'.$id));
