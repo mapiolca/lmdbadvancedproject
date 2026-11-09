@@ -23,10 +23,6 @@ class LmdbAdvancedProjectAutoclose
 	public $errors = array();
 	/** @var string Native scheduled-job result. */
 	public $output = '';
-	/** @var array<string,string> Blocking checks for the last examined project. */
-	public $diagnosticReasons = array();
-	/** @var string Accessible project reference for the last decision. */
-	private $diagnosticReference = '';
 
 	/** @param DoliDB $db Database handler */
 	public function __construct($db)
@@ -35,18 +31,16 @@ class LmdbAdvancedProjectAutoclose
 	}
 
 	/**
-	 * Native cron card/list executions use the authenticated launching user.
-	 * Background executions use the configured actor, with entity rights reloaded.
+	 * Run with the explicitly configured actor, whose rights are loaded in this
+	 * entity. The scheduler's web session or CLI login never supplies authority.
 	 *
 	 * @return int 0 on success (native cron contract), -1 on failure
 	 */
 	public function run()
 	{
-		global $conf, $langs, $user;
+		global $conf, $langs;
 		$this->error = $this->output = '';
 		$this->errors = array();
-		$this->diagnosticReasons = array();
-		$this->diagnosticReference = '';
 		$langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 		$rule = getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
 		if ($rule === 'disabled' || !isModEnabled('lmdbadvancedproject')) {
@@ -60,16 +54,7 @@ class LmdbAdvancedProjectAutoclose
 		}
 
 		$actor = new User($this->db);
-		// Identify the actual native entry point, never a request parameter or URL.
-		// The public cron endpoint and CLI must keep the configured background actor.
-		$entryPoint = isset($_SERVER['SCRIPT_FILENAME']) && is_string($_SERVER['SCRIPT_FILENAME'])
-			? realpath($_SERVER['SCRIPT_FILENAME']) : false;
-		$manual = $entryPoint !== false && in_array($entryPoint, array(
-			realpath(DOL_DOCUMENT_ROOT.'/cron/card.php'),
-			realpath(DOL_DOCUMENT_ROOT.'/cron/list.php'),
-		), true);
-		$actorId = $manual ? ($user instanceof User ? (int) $user->id : 0)
-			: getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_USER');
+		$actorId = getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_USER');
 		if ($actorId <= 0 || $actor->fetch($actorId) <= 0 || !$actor->statut || $actor->socid > 0
 			|| !checkUserAccessToObject($actor, array('user'), $actor, 'user')) {
 			$this->error = $langs->trans('ProjectAutoCloseUserRequired');
@@ -87,8 +72,6 @@ class LmdbAdvancedProjectAutoclose
 		}
 
 		$cursor = $scanned = $closed = 0;
-		$diagnostics = '';
-		$context = $langs->transnoentities('ProjectAutoCloseDiagnosticContext', (int) $conf->entity, $actorId, $rule, getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30));
 		try {
 			$projectScope = new Project($this->db);
 			$authorized = $projectScope->getProjectsAuthorizedForUser($actor, $actor->hasRight('projet', 'all', 'lire') ? 2 : 0, 1);
@@ -119,30 +102,18 @@ class LmdbAdvancedProjectAutoclose
 						if (!$this->db->commit()) { throw new RuntimeException($this->db->lasterror()); }
 					} catch (RuntimeException $exception) {
 						if (!$this->db->rollback()) { dol_syslog(__METHOD__.': rollback failed', LOG_ERR); }
-						$diagnostics .= "\n".dol_escape_htmltag($langs->transnoentities('ProjectAutoCloseDiagnosticFailure', $id));
 						throw $exception;
 					}
 					$closed += $changed;
-					if (!$changed) {
-						$line = $langs->transnoentities('ProjectAutoCloseDiagnosticProject', $id, $this->diagnosticReference,
-							implode('; ', $this->diagnosticReasons));
-						// Native cron persists output, but may truncate it at 65535 characters.
-						// Keep every decision in the native log too, without inaccessible identifiers.
-						dol_syslog(__METHOD__.' entity='.(int) $conf->entity.' actor='.$actorId.' project='.$id
-							.' rule='.$rule.' reasons='.implode(',', array_keys($this->diagnosticReasons)), LOG_NOTICE);
-						$diagnostics .= "\n".dol_escape_htmltag($line);
-					}
 				}
 			} while (count($ids) === 100);
 		} catch (RuntimeException $exception) {
 			dol_syslog(__METHOD__.': '.$exception->getMessage(), LOG_ERR);
 			$this->error = $langs->trans('ProjectAutoCloseFailed');
-			$this->output = $langs->trans('ProjectAutoCloseResult', $scanned, $closed)
-				.($diagnostics !== '' ? "\n".dol_escape_htmltag($context).$diagnostics : '');
+			$this->output = $langs->trans('ProjectAutoCloseResult', $scanned, $closed);
 			return -1;
 		}
-		$this->output = $langs->trans('ProjectAutoCloseResult', $scanned, $closed)
-			.($diagnostics !== '' ? "\n".dol_escape_htmltag($context).$diagnostics : '');
+		$this->output = $langs->trans('ProjectAutoCloseResult', $scanned, $closed);
 		return 0;
 	}
 
@@ -160,9 +131,7 @@ class LmdbAdvancedProjectAutoclose
 	 */
 	public function closeProject(int $id, User $actor, ?int $referenceTime = null): int
 	{
-		global $conf, $langs;
-		$this->diagnosticReasons = array();
-		$this->diagnosticReference = '';
+		global $conf;
 		$referenceTime = $referenceTime ?? dol_now();
 		$rule = getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
 		if ($id <= 0 || $rule === 'disabled' || !LmdbAdvancedProjectCompatibility::projectAutocloseAvailable()
@@ -175,7 +144,6 @@ class LmdbAdvancedProjectAutoclose
 				|| (getDolGlobalInt('LMDBADVANCEDPROJECT_ENABLE_CUSTOMER_INVOICE_SPLIT') && !$actor->hasRight('lmdbadvancedproject', 'split', 'read'))))
 			|| ($rule !== 'invoices' && !$actor->hasRight('commande', 'lire'))
 			|| !checkUserAccessToObject($actor, array('user'), $actor, 'user')) {
-			$this->diagnosticReasons['execution_unavailable'] = $langs->transnoentities('ProjectAutoCloseDiagnosticExecution');
 			return 0;
 		}
 		$savepoint = '';
@@ -187,7 +155,6 @@ class LmdbAdvancedProjectAutoclose
 			$found = is_object($this->db->fetch_object($result));
 			$this->db->free($result);
 			if (!$found) {
-				$this->diagnosticReasons['project_not_open'] = $langs->transnoentities('ProjectAutoCloseDiagnosticNotOpen');
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
 				return 0;
 			}
@@ -196,10 +163,8 @@ class LmdbAdvancedProjectAutoclose
 			if ((int) $project->entity !== (int) $conf->entity
 				|| $project->restrictedProjectArea($actor, 'read') <= 0 || $project->restrictedProjectArea($actor, 'write') <= 0) {
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
-				$this->diagnosticReasons['project_access'] = $langs->transnoentities('ProjectAutoCloseDiagnosticProjectAccess');
 				return 0;
 			}
-			$this->diagnosticReference = (string) $project->ref;
 			$invoices = $rule === 'orders' ? false : $this->documentsComplete($project, $actor, 'invoices');
 			$orders = $rule === 'invoices' ? false : $this->documentsComplete($project, $actor, 'orders');
 			$eligible = $rule === 'both' ? ($invoices && $orders) : ($invoices || $orders);
@@ -207,8 +172,6 @@ class LmdbAdvancedProjectAutoclose
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
 				return 0;
 			}
-			// A failed optional branch does not block a satisfied OR rule.
-			$this->diagnosticReasons = array();
 			// Inspect current Agenda rows last, after any wait for document locks.
 			if (!$this->isInactive($project, $actor, $referenceTime)) {
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
@@ -266,7 +229,6 @@ class LmdbAdvancedProjectAutoclose
 	 */
 	private function isInactive(Project $project, User $actor, int $referenceTime): bool
 	{
-		global $langs;
 		// An inactivity day is 24 elapsed hours, including across DST changes.
 		$cutoff = dol_time_plus_duree($referenceTime, -24 * getDolGlobalInt('LMDBADVANCEDPROJECT_AUTO_CLOSE_DAYS', 30), 'h');
 		$last = max((int) $project->date_c, (int) $project->date_start, (int) $project->date_m);
@@ -284,17 +246,13 @@ class LmdbAdvancedProjectAutoclose
 		if (!$result) { throw new RuntimeException($this->db->lasterror()); }
 		$hidden = is_object($this->db->fetch_object($result));
 		$this->db->free($result);
-		if ($hidden) {
-			$this->diagnosticReasons['agenda_access'] = $langs->transnoentities('ProjectAutoCloseDiagnosticAgendaAccess');
-			return false;
-		}
+		if ($hidden) { return false; }
 		$result = $this->db->query('SELECT a.id, a.datep, a.datep2, a.datec, a.tms, a.percent, a.fulldayevent, a.recurrule, a.recurdateend'
 			.' FROM '.MAIN_DB_PREFIX.'actioncomm a WHERE '
 			.$link.' AND a.entity IN ('.$entities.') ORDER BY a.id FOR UPDATE');
 		if (!$result) { throw new RuntimeException($this->db->lasterror()); }
 		while (is_object($row = $this->db->fetch_object($result))) {
 			if (!checkUserAccessToObject($actor, array('agenda'), (int) $row->id, 'actioncomm&societe', '', 'fk_soc', 'id')) {
-				$this->diagnosticReasons['agenda_access'] = $langs->transnoentities('ProjectAutoCloseDiagnosticAgendaAccess');
 				$this->db->free($result); return false;
 			}
 			$start = (int) $this->db->jdate($row->datep);
@@ -302,34 +260,18 @@ class LmdbAdvancedProjectAutoclose
 			// -1 = native automatic/history event, 100 = completed action.
 			if ($start <= 0 || $row->percent === null || !in_array((int) $row->percent, array(-1, 100), true)
 				|| ($end > 0 && $end < $start) || ($row->fulldayevent && $end <= 0)) {
-				$reason = $row->percent !== null && !in_array((int) $row->percent, array(-1, 100), true)
-					? 'agenda_unfinished' : 'agenda_invalid_dates';
-				$this->diagnosticReasons[$reason] = $langs->transnoentities($reason === 'agenda_unfinished'
-					? 'ProjectAutoCloseDiagnosticAgendaUnfinished' : 'ProjectAutoCloseDiagnosticAgendaDates', (int) $row->id);
 				$this->db->free($result); return false;
 			}
 			$recurrenceEnd = 0;
 			if (trim((string) $row->recurrule) !== '') {
 				$recurrenceEnd = (int) $this->db->jdate($row->recurdateend);
-				if ($recurrenceEnd <= 0) {
-					$this->diagnosticReasons['agenda_recurrence'] = $langs->transnoentities('ProjectAutoCloseDiagnosticAgendaRecurrence', (int) $row->id);
-					$this->db->free($result); return false;
-				}
+				if ($recurrenceEnd <= 0) { $this->db->free($result); return false; }
 			}
 			$eventDate = max($start, $end, $recurrenceEnd, (int) $this->db->jdate($row->datec), (int) $this->db->jdate($row->tms));
 			$last = max($last, $eventDate);
 		}
 		$this->db->free($result);
-		if ($last <= 0) {
-			$this->diagnosticReasons['activity_unknown'] = $langs->transnoentities('ProjectAutoCloseDiagnosticActivityUnknown');
-			return false;
-		}
-		if ($last > $cutoff) {
-			$this->diagnosticReasons['activity_recent'] = $langs->transnoentities('ProjectAutoCloseDiagnosticActivityRecent',
-				dol_print_date($last, 'dayhour'), dol_print_date($cutoff, 'dayhour'));
-			return false;
-		}
-		return true;
+		return $last > 0 && $last <= $cutoff;
 	}
 
 	/**
@@ -344,7 +286,6 @@ class LmdbAdvancedProjectAutoclose
 	 */
 	private function documentsComplete(Project $project, User $actor, string $kind): ?bool
 	{
-		global $langs;
 		$invoice = $kind === 'invoices';
 		$table = $invoice ? 'facture' : 'commande';
 		$entities = $this->db->sanitize(getEntity($table));
@@ -361,7 +302,6 @@ class LmdbAdvancedProjectAutoclose
 			if (!$parts) { throw new RuntimeException($this->db->lasterror()); }
 			while (is_object($part = $this->db->fetch_object($parts))) {
 				if (!$actor->hasRight('lmdbadvancedproject', 'split', 'read') || !$part->invoice_id || !$part->line_id || !$part->visible_entity) {
-					$this->diagnosticReasons['invoice_allocation'] = $langs->transnoentities('ProjectAutoCloseDiagnosticAllocation');
 					$this->db->free($parts); return null;
 				}
 			}
@@ -379,10 +319,7 @@ class LmdbAdvancedProjectAutoclose
 		if (!$result) { throw new RuntimeException($this->db->lasterror()); }
 		$hidden = is_object($this->db->fetch_object($result));
 		$this->db->free($result);
-		if ($hidden) {
-			$this->diagnosticReasons[$kind.'_access'] = $langs->transnoentities($invoice ? 'ProjectAutoCloseDiagnosticInvoicesAccess' : 'ProjectAutoCloseDiagnosticOrdersAccess');
-			return null;
-		}
+		if ($hidden) { return null; }
 		$sql = 'SELECT d.rowid, d.fk_soc, d.fk_statut, s.rowid AS parent_id'.($invoice ? ', d.paye' : '')
 			.' FROM '.MAIN_DB_PREFIX.$table.' d LEFT JOIN '.MAIN_DB_PREFIX.'societe s ON s.rowid = d.fk_soc'
 			.' AND s.entity IN ('.$this->db->sanitize(getEntity('societe')).')'
@@ -397,22 +334,14 @@ class LmdbAdvancedProjectAutoclose
 				|| !checkUserAccessToObject($actor, array($table), (int) $row->rowid, $table, '', 'fk_soc')
 				|| ((int) $row->fk_soc > 0 && !checkUserAccessToObject($actor, array('societe'), (int) $row->fk_soc, 'societe'))) {
 				$this->db->free($result);
-				$this->diagnosticReasons[$kind.'_access'] = $langs->transnoentities($invoice ? 'ProjectAutoCloseDiagnosticInvoicesAccess' : 'ProjectAutoCloseDiagnosticOrdersAccess');
 				return null;
 			}
 			if ($invoice ? ((int) $row->paye !== 1 || (int) $row->fk_statut !== Facture::STATUS_CLOSED)
 				: (int) $row->fk_statut !== Commande::STATUS_CLOSED) {
 				$complete = false;
-				if (!isset($this->diagnosticReasons[$kind.'_incomplete'])) {
-					$this->diagnosticReasons[$kind.'_incomplete'] = $langs->transnoentities($invoice
-						? 'ProjectAutoCloseDiagnosticInvoiceUnpaid' : 'ProjectAutoCloseDiagnosticOrderUndelivered', (int) $row->rowid);
-				}
 			}
 		}
 		$this->db->free($result);
-		if ($count === 0) {
-			$this->diagnosticReasons[$kind.'_empty'] = $langs->transnoentities($invoice ? 'ProjectAutoCloseDiagnosticInvoicesEmpty' : 'ProjectAutoCloseDiagnosticOrdersEmpty');
-		}
 		return $count > 0 && $complete;
 	}
 }

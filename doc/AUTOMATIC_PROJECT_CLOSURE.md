@@ -1,4 +1,4 @@
-# Clôture automatique des projets — 1.6.2 (préparation)
+# Clôture automatique des projets — 1.6.0
 
 Cette évolution prolonge la version stable 1.5.0 (`b226642f817adc8b081bd782cb90f998fca59428`) dans la version 1.6.0. La PR #10 apporte le contrôle périodique et la PR #11 sécurise l’annulation des échecs transactionnels. Les résultats datés ci-dessous restent des preuves locales ; aucune activation sur instance ni modification de sa configuration réelle n’a été réalisée.
 
@@ -30,7 +30,7 @@ Après installation de tous les fichiers, réactiver Advanced Project pour enreg
 - lecture Agenda, avec accès effectif à chaque événement examiné ;
 - lecture des factures et/ou commandes selon le mode ; lecture des ventilations lorsqu’elles sont activées ou qu’une ventilation enregistrée concerne le projet.
 
-Activer ensuite **Clôture automatique des projets — Advanced Project** dans les Travaux planifiés et adapter la fréquence, initialement une heure. Le compte d’exécution explicite est rechargé avec ses droits de l’entité à chaque passage automatique. Depuis la fiche ou la liste native des travaux planifiés, le lancement manuel utilise à la place le compte connecté, même si le compte désigné est absent ou invalide. Ce compte connecté est enregistré par `Project::setClose()` comme responsable de la clôture. Les droits, le périmètre et les conditions métier restent obligatoires ; lancer manuellement ne force pas la clôture des projets inéligibles. Le résultat natif indique le nombre de projets examinés et clôturés ; un utilisateur absent ou insuffisamment autorisé, une dépendance désactivée ou une erreur SQL produit un échec visible. Le contrôle ne dépend pas d’une consultation de fiche. Il traite aussi les projets déjà éligibles. Un projet fermé ne sera jamais rouvert automatiquement.
+Activer ensuite **Clôture automatique des projets — Advanced Project** dans les Travaux planifiés et adapter la fréquence, initialement une heure. Le compte d’exécution explicite est rechargé avec ses droits de l’entité à chaque passage. Le résultat natif indique le nombre de projets examinés et clôturés ; un utilisateur absent ou insuffisamment autorisé, une dépendance désactivée ou une erreur SQL produit un échec visible. Le contrôle ne dépend pas d’une consultation de fiche. Il traite aussi les projets déjà éligibles. Un projet fermé ne sera jamais rouvert automatiquement.
 
 ## Mécanismes natifs et intégrité
 
@@ -126,23 +126,3 @@ Les régressions sont réexécutées sous PHP CLI 8.4.22 avec les sept jeux de s
 Le ZIP candidat porte la racine `lmdbadvancedproject/` et le nom `module_lmdbadvancedproject-1.6.0.zip`. Le validateur natif `validateZipFile()` passe avec les sources 24.0.0, 24.0.3 et 25.0.0-alpha précitées. Ce helper est absent des sources v20 à v23 examinées. Les dix points d’entrée livrés passent **30 contrôles de bootstrap** : installations sous `htdocs`, sous `custom` et environnement absent. Le `main.inc.php` de fixture s’arrête au chargement ; il ne valide pas l’interface ni l’activation ERP. Les tentatives auparavant exprimées en boucle sont désormais des inclusions littérales distinctes.
 
 La construction reproductible depuis un commit et les commandes de contrôle du paquet sont décrites dans `test/README.md`. Le paquet définitif et son empreinte doivent être reconstruits depuis le commit fusionné, contrôlés puis joints à la release. Aucun déploiement par l’installateur natif, aucune soumission Dolistore, recette navigateur ou activation du job sur une instance ERP n’est réalisé par cette préparation.
-
-## Correctif local du 9 novembre 2026 — acteur du lancement manuel
-
-La fiche et la liste natives des travaux planifiés sont identifiées par leur fichier PHP exécuté (`SCRIPT_FILENAME` résolu par `realpath`), sans paramètre utilisateur ni lecture de session dans la classe métier. Les appels automatiques/publics/CLI conservent le compte configuré. Le compte retenu est rechargé avec ses droits dans l’entité ; aucun droit fonctionnel implicite n’est ajouté.
-
-Les tests SQLite avec classes natives couvrent les deux écrans, un compte désigné inexistant, l’attribution `fk_user_close` à un autre lanceur, le refus sans lanceur ou sans permission, le maintien du délai d’inactivité et le compte configuré hors de ces écrans. Les essais sont locaux sous PHP 8.4 ; ils ne constituent pas une recette web ni un essai de verrouillage MySQL. La cause du refus sur le projet de la capture utilisateur reste à confirmer avec la règle, le résultat du travail et l’Agenda réellement déployés.
-
-## Diagnostic des exclusions — préparation 1.6.2
-
-Dans **Travaux planifiés**, ouvrir la fiche du travail **Clôture automatique des projets — Advanced Project**, puis lire sa dernière sortie après exécution. Le bilan des projets examinés/clôturés reste en tête. Chaque projet examiné puis écarté a sa ligne avec identifiant, référence accessible et motif traduit. Le contexte précise l’entité, l’acteur effectif, la règle et le délai. Un échec technique est distingué d’une exclusion métier ; les clôtures antérieures confirmées restent comptées.
-
-Le diagnostic décrit le contrôle bloquant effectivement rencontré : factures et commandes selon la règle, puis Agenda si les documents permettent de poursuivre. Il ne prétend pas recenser tous les blocages simultanés. Le premier document incomplet ou événement bloquant est identifié uniquement après contrôle d’accès ; un élément inaccessible produit un motif générique. Les projets hors du périmètre natif de lecture restent exclus de la sélection et du diagnostic. Les projets brouillons ou déjà fermés ne font pas partie des candidats ouverts. Le traitement garde ses effets habituels : lancer le diagnostic exécute aussi les clôtures éligibles.
-
-Le moteur cron natif limite sa dernière sortie à 65 535 caractères dans les sources v20/v24 examinées. Les codes de raisons de chaque exclusion sont aussi écrits par `dol_syslog()` au niveau NOTICE, avec entité, acteur, projet et règle, sans référence de document inaccessible. Activer la journalisation native à ce niveau pour conserver la trace complète des grands lots ; la taille maximale ne doit pas être contournée dans le core. Les textes et références sont échappés pour le rendu de la sortie native.
-
-La version précédente publiée vérifiée est 1.6.0, release stable du 6 novembre 2026, tag `1.6.0` au commit `a20d68d8bd147417a3a90388f0c8a69135abffdc`. Aucune 1.6.1 publiée observée ; la numérotation 1.6.2 suit la demande utilisateur. À propos lit directement le descripteur et reflète donc cette version sans valeur dupliquée. Cette préparation ne publie ni tag ni release et ne déploie aucun code sur l’entité 3.
-
-### Vérifications locales de la préparation 1.6.2
-
-Sous PHP 8.4, `projectautoclose_diagnostic_test.php` passe 224 assertions sur les sources 20.0.0 et 225 sur 21.0.0, 22.0.0, 23.0.0, 24.0.0 et la révision 25.0.0-alpha `6805f682cb72a0a7e519e0c79f0de5f667eb45e4`. Ces totaux incluent les tests de clôture et les régressions de transaction précédents. Les 270 exclusions tiennent dans la sortie native en français et en anglais ; l’échappement des références et le maintien des autres entités hors du diagnostic sont vérifiés. Les trois modes de découverte du descripteur passent sur les sources v20. Le lint des classes modifiées et le contrôle du diff passent. Aucune recette web, activation du travail réel, écriture métier sur l’entité 3 ou validation de paquet installable n’a été effectuée pour cette préparation.
