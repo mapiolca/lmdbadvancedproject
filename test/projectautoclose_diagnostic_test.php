@@ -88,4 +88,69 @@ resetClosure(); $db->failSql = 'SAVEPOINT lmdbap_close_';
 assertClosure($job->run(), -1, 'Technical failure remains an error');
 assertClosure(strpos($job->output, dol_escape_htmltag($langs->transnoentities('ProjectAutoCloseDiagnosticFailure',1))) !== false, true, 'Technical failure identifies affected project');
 assertClosure((int) fixtureValue('fk_statut','projet',1), 1, 'Technical failure does not announce a closure');
+// Truly document-free projects use inactivity in all four active modes.
+foreach (array('invoices','orders','both','either') as $mode) {
+	foreach (array('recent','pending','unknown','old') as $activity) {
+		resetClosure($mode);
+		$db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture');
+		$db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+		if ($activity === 'recent') { addActivity($recent); }
+		if ($activity === 'pending') { addActivity($old); $db->query('UPDATE '.MAIN_DB_PREFIX.'actioncomm SET percent=50'); }
+		if ($activity === 'unknown') { addActivity(null); }
+		assertClosure($job->closeProject(1,$actor), $activity === 'old' ? 1 : 0, 'Document-free '.$mode.' with '.$activity.' activity');
+		assertClosure(isset($job->diagnosticReasons['invoices_empty']) || isset($job->diagnosticReasons['orders_empty']), false, 'Document absence is not a blocker for empty projects');
+	}
+}
+foreach (array('invoices','orders') as $mode) {
+	resetClosure($mode);
+	$db->query('DELETE FROM '.MAIN_DB_PREFIX.($mode === 'invoices' ? 'facture' : 'commande'));
+	assertClosure($job->closeProject(1,$actor),0,'Missing selected family does not bypass the rule when another family exists: '.$mode);
+	$db->query('UPDATE '.MAIN_DB_PREFIX.($mode === 'invoices' ? 'commande' : 'facture').' SET entity=2');
+	assertClosure($job->closeProject(1,$actor),0,'Hidden opposite family is not absence: '.$mode);
+}
+resetClosure('invoices');
+$db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commande SET fk_statut=0');
+assertClosure($job->closeProject(1,$actor),0,'Opposite draft is not absence');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'commande SET fk_statut=-1');
+assertClosure($job->closeProject(1,$actor),0,'Opposite canceled order is not absence');
+resetClosure('orders');
+$db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+$db->query("UPDATE ".MAIN_DB_PREFIX."facture SET fk_statut=3,close_code='replaced'");
+assertClosure($job->closeProject(1,$actor),0,'Opposite replaced invoice is not absence');
+foreach (array(0,1) as $quantity) {
+	resetClosure('orders');
+	$db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+	fixtureInsert('lmdbadvancedproject_customer_invoice_parts',array('rowid'=>1,'entity'=>1,'fk_projet'=>1,'fk_facture'=>999,'fk_facture_det'=>999,'qty'=>$quantity));
+	assertClosure($job->closeProject(1,$actor),$quantity ? 0 : 1,'Only nonzero orphan allocations prevent document-free closure');
+}
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+$actor->denied=array('projet.creer');
+assertClosure($job->closeProject(1,$actor),0,'Empty project still requires native write permission');
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+$db->query('UPDATE '.MAIN_DB_PREFIX.'projet SET entity=2');
+assertClosure($job->closeProject(1,$actor),0,'Empty project in another entity remains inaccessible');
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+$db->failSql='SELECT rowid FROM '.MAIN_DB_PREFIX.'commande WHERE fk_projet';
+assertClosure($job->run(),-1,'Failure to prove absence is a technical error');
+assertClosure((int)fixtureValue('fk_statut','projet',1),1,'Presence-check SQL failure leaves project open');
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+addActivity($recent);
+assertClosure($job->run(),0,'Empty recent project is skipped successfully');
+assertClosure(strpos($job->output,dol_escape_htmltag($langs->transnoentities('ProjectAutoCloseDiagnosticEmptyProject',1,'TEST1',implode('; ',$job->diagnosticReasons)))) !== false,true,'Empty project diagnostic identifies inactivity as the blocker');
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+assertClosure($job->run(),0,'Empty old project closes through native job');
+assertClosure(strpos($job->output,dol_escape_htmltag($langs->transnoentities('ProjectAutoCloseDiagnosticEmptyClosed',1,'TEST1'))) !== false,true,'Empty closure has an explicit diagnostic');
+assertClosure((int)fixtureValue('fk_user_close','projet',1),1,'Empty closure records execution actor');
+assertClosure($job->run(),0,'Empty closure replay succeeds without duplicate effect');
+assertClosure((int)$db->fetch_object($db->query('SELECT COUNT(*) AS n FROM '.MAIN_DB_PREFIX.'closure_events'))->n,1,'Empty closure emits exactly one native trigger');
+// Mixed shrinking candidate set: pagination must also close document-free projects.
+resetClosure(); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
+for ($id=2;$id<=270;$id++) {
+	fixtureInsert('projet',array('rowid'=>$id,'entity'=>1,'fk_statut'=>1,'public'=>1,'datec'=>$old,'dateo'=>$old,'ref'=>'EMPTY'.$id));
+}
+assertClosure($job->run(),0,'270 empty projects close across native keyset pages');
+assertClosure(strpos($job->output,$langs->trans('ProjectAutoCloseResult',270,270))===0,true,'270 empty closures counted only after commit');
+assertClosure((int)fixtureValue('fk_statut','projet',270),2,'Last empty project closed');
+
 echo $checks.' assertions passed including per-project diagnostics ('.DOL_VERSION.').'.PHP_EOL;

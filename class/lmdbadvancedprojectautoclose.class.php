@@ -27,6 +27,8 @@ class LmdbAdvancedProjectAutoclose
 	public $diagnosticReasons = array();
 	/** @var string Accessible project reference for the last decision. */
 	private $diagnosticReference = '';
+	/** @var bool Both document families are confirmed absent for this decision. */
+	private $withoutDocuments = false;
 
 	/** @param DoliDB $db Database handler */
 	public function __construct($db)
@@ -47,6 +49,7 @@ class LmdbAdvancedProjectAutoclose
 		$this->errors = array();
 		$this->diagnosticReasons = array();
 		$this->diagnosticReference = '';
+		$this->withoutDocuments = false;
 		$langs->loadLangs(array('projects', 'lmdbadvancedproject@lmdbadvancedproject'));
 		$rule = getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
 		if ($rule === 'disabled' || !isModEnabled('lmdbadvancedproject')) {
@@ -124,13 +127,16 @@ class LmdbAdvancedProjectAutoclose
 					}
 					$closed += $changed;
 					if (!$changed) {
-						$line = $langs->transnoentities('ProjectAutoCloseDiagnosticProject', $id, $this->diagnosticReference,
+						$line = $langs->transnoentities($this->withoutDocuments
+							? 'ProjectAutoCloseDiagnosticEmptyProject' : 'ProjectAutoCloseDiagnosticProject', $id, $this->diagnosticReference,
 							implode('; ', $this->diagnosticReasons));
 						// Native cron persists output, but may truncate it at 65535 characters.
 						// Keep every decision in the native log too, without inaccessible identifiers.
 						dol_syslog(__METHOD__.' entity='.(int) $conf->entity.' actor='.$actorId.' project='.$id
 							.' rule='.$rule.' reasons='.implode(',', array_keys($this->diagnosticReasons)), LOG_NOTICE);
 						$diagnostics .= "\n".dol_escape_htmltag($line);
+					} elseif ($this->withoutDocuments) {
+						$diagnostics .= "\n".dol_escape_htmltag($langs->transnoentities('ProjectAutoCloseDiagnosticEmptyClosed', $id, $this->diagnosticReference));
 					}
 				}
 			} while (count($ids) === 100);
@@ -155,6 +161,7 @@ class LmdbAdvancedProjectAutoclose
 	 * @param int $id Project ID
 	 * @param User $actor Explicit actor in the current entity
 	 * @param int|null $referenceTime UTC decision time; null uses the native clock
+	 * @phpstan-impure
 	 * @return int 1 if closed, 0 if ineligible or inaccessible
 	 * @throws RuntimeException Database or native closure failure
 	 */
@@ -163,6 +170,7 @@ class LmdbAdvancedProjectAutoclose
 		global $conf, $langs;
 		$this->diagnosticReasons = array();
 		$this->diagnosticReference = '';
+		$this->withoutDocuments = false;
 		$referenceTime = $referenceTime ?? dol_now();
 		$rule = getDolGlobalString('LMDBADVANCEDPROJECT_AUTO_CLOSE_RULE', 'disabled');
 		if ($id <= 0 || $rule === 'disabled' || !LmdbAdvancedProjectCompatibility::projectAutocloseAvailable()
@@ -203,6 +211,13 @@ class LmdbAdvancedProjectAutoclose
 			$invoices = $rule === 'orders' ? false : $this->documentsComplete($project, $actor, 'invoices');
 			$orders = $rule === 'invoices' ? false : $this->documentsComplete($project, $actor, 'orders');
 			$eligible = $rule === 'both' ? ($invoices && $orders) : ($invoices || $orders);
+			// An absent selected family alone does not prove the project is empty.
+			// Check both families, including ignored/hidden rows and historical allocations.
+			if (!$eligible && $invoices !== null && $orders !== null
+				&& (isset($this->diagnosticReasons['invoices_empty']) || isset($this->diagnosticReasons['orders_empty']))) {
+				$this->withoutDocuments = !$this->hasLinkedDocuments($project);
+				$eligible = $this->withoutDocuments;
+			}
 			if ($invoices === null || $orders === null || !$eligible) {
 				if (!$this->db->rollback()) { throw new RuntimeException($this->db->lasterror()); }
 				return 0;
@@ -217,6 +232,7 @@ class LmdbAdvancedProjectAutoclose
 			$project->oldcopy = clone $project;
 			$project->context['trigger_reason'] = 'lmdbadvancedproject_auto_close';
 			$project->context['auto_close_rule'] = $rule;
+			$project->context['auto_close_without_documents'] = $this->withoutDocuments;
 			// Native nested rollback only changes its counter. Isolate native writes
 			// so a caller can catch a trigger failure and still commit its own work.
 			$closureSavepoint = 'lmdbap_close_'.bin2hex(random_bytes(8));
@@ -333,12 +349,38 @@ class LmdbAdvancedProjectAutoclose
 	}
 
 	/**
+	 * Prove absence across both families without exposing out-of-scope documents.
+	 * No entity/status filter: hidden, canceled or replaced documents are not absence.
+	 * The caller owns the serializable transaction protecting these empty ranges.
+	 *
+	 * @param Project $project Authorized project owned by the current entity
+	 * @return bool Whether any direct document or nonzero invoice allocation exists
+	 * @throws RuntimeException Database failure, never interpreted as absence
+	 */
+	private function hasLinkedDocuments(Project $project): bool
+	{
+		foreach (array('facture', 'commande', 'lmdbadvancedproject_customer_invoice_parts') as $table) {
+			$sql = 'SELECT rowid FROM '.MAIN_DB_PREFIX.$table.' WHERE fk_projet = '.((int) $project->id);
+			if ($table === 'lmdbadvancedproject_customer_invoice_parts') {
+				$sql .= ' AND (total_ht <> 0 OR total_ttc <> 0 OR qty <> 0)';
+			}
+			$result = $this->db->query($sql.$this->db->plimit(1).' FOR UPDATE');
+			if (!$result) { throw new RuntimeException($this->db->lasterror()); }
+			$found = is_object($this->db->fetch_object($result));
+			$this->db->free($result);
+			if ($found) { return true; }
+		}
+		return false;
+	}
+
+	/**
 	 * Inspect all persisted links, including drafts and historical allocations.
 	 * Never drop an out-of-scope pending document from the completeness test.
 	 *
 	 * @param Project $project Loaded owner project
 	 * @param User $actor Explicit actor
 	 * @param string $kind Internal value: invoices or orders
+	 * @phpstan-impure
 	 * @return bool|null Complete nonempty set, incomplete/empty set, or inaccessible
 	 * @throws RuntimeException Database failure
 	 */

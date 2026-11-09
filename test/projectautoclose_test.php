@@ -172,7 +172,7 @@ foreach (array('invoices','orders','both','either','disabled') as $rule) {
 }
 foreach (array('both','either','invoices','orders') as $rule) {
 	resetClosure($rule); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'facture'); $db->query('DELETE FROM '.MAIN_DB_PREFIX.'commande');
-	assertClosure($job->closeProject(1, $actor), 0, 'Empty project stays open: '.$rule);
+	assertClosure($job->closeProject(1, $actor), 1, 'Empty inactive project closes: '.$rule);
 }
 foreach (array(array($old,null,null,1,false,1), array($recent,null,null,1,false,0), array($old,$future,null,1,false,0), array($future,null,null,1,false,0),
 	array($old,null,$recent,1,false,0), array(null,null,null,1,false,0), array($recent,null,null,1,true,0), array($old,null,null,1,true,1)) as $event) {

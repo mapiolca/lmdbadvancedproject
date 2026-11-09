@@ -13,6 +13,8 @@ Dans les réglages Advanced Project, sélectionner la condition, le délai d’i
 | ET | Les deux ensembles présents et les deux conditions satisfaites |
 | OU | Au moins un ensemble présent et complet ; une donnée inaccessible rend néanmoins la décision impossible |
 
+Les projets sans aucune facture client ni commande client liée peuvent aussi être clôturés dans les quatre modes actifs, uniquement après le même délai d’inactivité. La désactivation de la règle continue à empêcher toute clôture. Pour les projets avec documents, les conditions du tableau restent inchangées.
+
 La condition d’inactivité est obligatoire dans les quatre modes. **Un jour représente 24 heures écoulées**, et non une journée calendaire pouvant durer 23 heures au passage à l’heure d’été. Le seuil utilise le helper natif en heures ; il est vérifié à la seconde, sans arrondi à minuit. La date de décision est fixée au début du traitement du projet.
 
 L’activité prend la date la plus récente parmi début, fin, création et modification (`tms`) des événements reliés par `actioncomm.fk_project`, par le couple `elementtype = project/project@projet` et `fk_element`, ou par une tâche du projet. Pour les tâches, le lien `project_task/project_task@projet` fonctionne dès v20 ; `actioncomm.fk_task` est utilisé uniquement à partir de v21. Une saisie ou modification récente d’événement historique reporte donc la clôture.
@@ -146,3 +148,13 @@ La version précédente publiée vérifiée est 1.6.0, release stable du 6 novem
 ### Vérifications locales de la préparation 1.6.2
 
 Sous PHP 8.4, `projectautoclose_diagnostic_test.php` passe 224 assertions sur les sources 20.0.0 et 225 sur 21.0.0, 22.0.0, 23.0.0, 24.0.0 et la révision 25.0.0-alpha `6805f682cb72a0a7e519e0c79f0de5f667eb45e4`. Ces totaux incluent les tests de clôture et les régressions de transaction précédents. Les 270 exclusions tiennent dans la sortie native en français et en anglais ; l’échappement des références et le maintien des autres entités hors du diagnostic sont vérifiés. Les trois modes de découverte du descripteur passent sur les sources v20. Le lint des classes modifiées et le contrôle du diff passent. Aucune recette web, activation du travail réel, écriture métier sur l’entité 3 ou validation de paquet installable n’a été effectuée pour cette préparation.
+
+### Extension 1.6.2 — projets sans facture ni commande
+
+L’absence doit être prouvée dans les deux familles, même en mode Factures seul ou Commandes seul. Les ventilations de facture enregistrées avec montant ou quantité non nul empêchent aussi de considérer le projet comme vide, y compris si leur éditeur est désactivé. Le contrôle d’existence reste interne à la transaction et ne révèle aucun identifiant de document inaccessible. Une erreur SQL est bloquante et ne signifie jamais « aucun document ». Les documents masqués, brouillons, annulés ou remplacés ne constituent pas une absence ; leurs règles existantes restent applicables.
+
+Après confirmation de l’absence, les messages « Aucune facture concernée » / « Aucune commande non annulée » ne bloquent plus la décision. L’Agenda et les dates du projet sont vérifiés normalement. La sortie précise « sans facture ni commande, écarté » avec le motif d’inactivité/Agenda, ou confirme une clôture sans document. `auto_close_without_documents` dans le contexte de l’unique `PROJECT_CLOSE` natif indique ce cas ; aucun événement supplémentaire ni réouverture automatique n’est ajouté.
+
+Reproduction avant patch : le nouveau test attend une clôture d’un projet vide inactif en mode ET, et l’ancien code retourne zéro. Après patch, les tests couvrent les quatre modes, activité récente, événement inachevé/non daté, documents présents dans l’autre famille ou une autre entité, brouillons/annulations/remplacements, ventilations orphelines et nulles, refus de permission/entité, erreur SQL du contrôle d’absence, diagnostics, acteur natif, rejeu et 270 clôtures sans document après pagination. Les scénarios d’inactivité antérieurs continuent à empêcher une clôture anticipée même lorsque les documents sont complets.
+
+Validation locale de cette extension sous PHP 8.4 : 279 assertions passent sur les sources 20.0.0 et 280 sur 21.0.0, 22.0.0, 23.0.0, 24.0.0 et la révision 25.0.0-alpha précitée. PHPStan niveau 5 et le lint passent. Les essais SQL restent des fixtures SQLite avec objets natifs ; les verrous et insertions concurrentes MySQL/MariaDB ainsi que la recette web sur JPSUN restent à vérifier.
